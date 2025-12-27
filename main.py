@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from typing import Tuple, Optional
+from supabase_client import supabase
 import json
 import re
 import io

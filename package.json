@@ -1,0 +1,26 @@
+{
+  "name": "chatbot-supabase",
+  "version": "1.0.0",
+  "description": "Chatbot integrado con Supabase usando variables de entorno seguras",
+  "main": "chatbot-supabase-seguro.js",
+  "scripts": {
+    "start": "node chatbot-supabase-seguro.js",
+    "test": "node chatbot-supabase-seguro.js"
+  },
+  "keywords": [
+    "chatbot",
+    "supabase",
+    "database",
+    "bot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
