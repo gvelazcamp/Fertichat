@@ -20,25 +20,29 @@ import streamlit as st
 def get_db_connection():
     """Conexión a Postgres (Supabase) usando Secrets/Env vars."""
     try:
-        host = st.secrets.get("DB_HOST", os.getenv("DB_HOST"))
-        port = st.secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
-        dbname = st.secrets.get("DB_NAME", os.getenv("DB_NAME", "postgres"))
-        user = st.secrets.get("DB_USER", os.getenv("DB_USER"))
-        password = st.secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD"))
+        # ✅ Esto lo tenés que cargar en Streamlit Cloud → Settings → Secrets
+        host = st.secrets.get("DB_HOST", os.getenv("DB_HOST"))  # ej: "aws-0-us-west-2.pooler.supabase.com"
+        port = st.secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))  # "5432"
+        dbname = st.secrets.get("DB_NAME", os.getenv("DB_NAME", "postgres"))  # "postgres"
+        user = st.secrets.get("DB_USER", os.getenv("DB_USER"))  # ej: "postgres.ytmpjhdjecocoitptvjn"
+        password = st.secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD"))  # 🔥 ACÁ VA TU PASSWORD REAL, PERO EN SECRETS (NO EN EL CÓDIGO)
 
+        # ✅ Acá NO cambiás nada: usa las variables de arriba
         conn = psycopg2.connect(
-            host=host,
-            port=port,
-            dbname=dbname,
-            user=user,
-            password=password,
-            sslmode="require",
+            host=host,            # viene de Secrets
+            port=port,            # viene de Secrets
+            dbname=dbname,        # viene de Secrets
+            user=user,            # viene de Secrets
+            password=password,    # viene de Secrets (tu password real)
+            sslmode="require",    # obligatorio en Supabase
             cursor_factory=RealDictCursor
         )
         return conn
+
     except Exception as e:
         print(f"Error de conexión a Postgres/Supabase: {e}")
         return None
+
 
 
 # =====================================================================
