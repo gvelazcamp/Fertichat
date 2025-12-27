@@ -1,0 +1,89 @@
+# 🔒 FERTI CHAT - .gitignore
+# Archivos que NO deben subirse a GitHub
+
+# =====================================================================
+# 🔐 DATOS SENSIBLES
+# =====================================================================
+
+# Base de datos de usuarios (contiene contraseñas hasheadas)
+users.db
+
+# Configuración con credenciales (API keys, conexión DB)
+config.py
+
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# =====================================================================
+# 📦 PYTHON
+# =====================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+
+# =====================================================================
+# 💻 IDE / EDITORES
+# =====================================================================
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# =====================================================================
+# 📁 STREAMLIT
+# =====================================================================
+
+# Caché de Streamlit
+.streamlit/
+
+# =====================================================================
+# 🗂️ SISTEMA
+# =====================================================================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# =====================================================================
+# 📋 LOGS Y TEMPORALES
+# =====================================================================
+
+*.log
+*.tmp
+*.bak
+*.swp
+
+# =====================================================================
+# 📊 DATOS LOCALES
+# =====================================================================
+
+# Archivos Excel exportados
+*.xlsx
+*.xls
+
+# CSVs de datos
+data/
+exports/
