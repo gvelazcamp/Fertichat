@@ -3,31 +3,32 @@
 # =========================
 import os
 import psycopg2
-import pymysql
 import pandas as pd
 from typing import List, Tuple, Optional
 import re
 from datetime import datetime
 
 # =====================================================================
-# CONEXIÓN DB
+# CONEXIÓN DB (SUPABASE / POSTGRES)
 # =====================================================================
 
+import os
+import psycopg2
+
 def get_db_connection():
-    """Establece conexión con MySQL"""
+    """Establece conexión con Supabase (PostgreSQL) usando variables de entorno."""
     try:
-        conn = pymysql.connect(
-            host='localhost',
-            port=3307,
-            user='root',
-            password='',
-            database='chatbot',
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT", "6543"),  # 6543 recomendado en pooler
+            dbname=os.getenv("DB_NAME", "postgres"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            sslmode="require"
         )
         return conn
-    except pymysql.Error as e:
-        print(f"Error de conexión a MySQL: {e}")
+    except Exception as e:
+        print(f"Error de conexión a Supabase/Postgres: {e}")
         return None
 
 
