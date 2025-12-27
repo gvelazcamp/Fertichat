@@ -14,21 +14,30 @@ from datetime import datetime
 
 import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
+import streamlit as st
 
 def get_db_connection():
-    """Establece conexión con Supabase (PostgreSQL) usando variables de entorno."""
+    """Conexión a Postgres (Supabase) usando Secrets/Env vars."""
     try:
+        host = st.secrets.get("DB_HOST", os.getenv("DB_HOST"))
+        port = st.secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
+        dbname = st.secrets.get("DB_NAME", os.getenv("DB_NAME", "postgres"))
+        user = st.secrets.get("DB_USER", os.getenv("DB_USER"))
+        password = st.secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD"))
+
         conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT", "6543"),  # 6543 recomendado en pooler
-            dbname=os.getenv("DB_NAME", "postgres"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            sslmode="require"
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            sslmode="require",
+            cursor_factory=RealDictCursor
         )
         return conn
     except Exception as e:
-        print(f"Error de conexión a Supabase/Postgres: {e}")
+        print(f"Error de conexión a Postgres/Supabase: {e}")
         return None
 
 
