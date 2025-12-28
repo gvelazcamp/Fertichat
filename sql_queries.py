@@ -194,16 +194,26 @@ def guardar_chat_log(pregunta: str, intencion: str, respuesta: str, tuvo_datos: 
 def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
     """Ejecuta consulta SQL y retorna DataFrame."""
     try:
-        conn = get_db_connection()
-        if not conn:
-            return pd.DataFrame()
+        # Conexión SIN RealDictCursor para pandas
+        host = st.secrets.get("DB_HOST", os.getenv("DB_HOST"))
+        port = st.secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
+        dbname = st.secrets.get("DB_NAME", os.getenv("DB_NAME", "postgres"))
+        user = st.secrets.get("DB_USER", os.getenv("DB_USER"))
+        password = st.secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD"))
+
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            sslmode="require"
+        )
 
         if params is None:
             params = ()
 
-        # USAR pd.read_sql_query - esto funciona correctamente
         df = pd.read_sql_query(query, conn, params=params)
-        
         conn.close()
         return df
 
