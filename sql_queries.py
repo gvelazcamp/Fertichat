@@ -1646,17 +1646,22 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
 
     sql = f"""
         SELECT
-            TRIM({COL_PROV}) AS Proveedor,
-            TRIM({COL_ART}) AS Articulo,
-            TRIM({COL_NRO_COMP}) AS Nro_Factura,
-            TO_CHAR({fecha_expr}, 'DD/MM/YYYY') AS Fecha,
-            {COL_CANT} AS Cantidad,
-            {COL_MONEDA} AS Moneda,
-            {total_expr} AS Total
-        FROM {TABLE_COMPRAS}
-        WHERE ({COL_TIPO_COMP} = 'Compra Contado' OR {COL_TIPO_COMP} LIKE 'Compra%%')
-          AND LOWER(TRIM({COL_PROV})) LIKE %s
-          AND TRIM({COL_MES}) = %s
-        ORDER BY {fecha_expr} DESC NULLS LAST
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            TRIM("Articulo") AS Articulo,
+            TRIM("Nro. Comprobante") AS Nro_Factura,
+            "Fecha",
+            "Cantidad",
+            "Moneda",
+            "Monto Neto" AS Total
+        FROM chatbot_raw
+        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+          AND TRIM("Mes") = %s
+        ORDER BY "Fecha" DESC NULLS LAST
     """
+    
+    # 🔍 DEBUG - Imprimir en consola
+    print(f"🔍 SQL: {sql}")
+    print(f"🔍 PARAMS: proveedor='%{proveedor_like}%', mes='{mes_key}'")
+    
     return ejecutar_consulta(sql, (f"%{proveedor_like}%", mes_key))
