@@ -60,6 +60,70 @@ COL_FECHA     = '"Fecha"'
 COL_CANT      = '"Cantidad"'
 COL_MONTO     = '"Monto Neto"'
 
+# =========================
+# LISTADOS (SIDEBAR)
+# =========================
+def get_lista_proveedores() -> list[str]:
+    """
+    Devuelve proveedores DISTINCT desde la tabla 'chatbot'.
+
+    - Intenta detectar la columna real de proveedor si cambió el header del CSV:
+      'Proveedor', 'proveedor', 'Cliente / Proveedor', 'cliente_proveedor', etc.
+    - Si no puede detectar nada, devuelve [] (así no rompe la app).
+    """
+    conn = get_db_connection()
+    if conn is None:
+        return []
+
+    def _q_ident(name: str) -> str:
+        return '"' + name.replace('"', '""') + '"'
+
+    try:
+        with conn.cursor() as cur:
+            # 1) Detectar columnas reales de la tabla
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = %s
+            """, ("chatbot",))
+            cols = [r[0] for r in cur.fetchall()]
+
+            # Normalización para “adivinar” cuál es la columna de proveedor
+            def _norm(s: str) -> str:
+                return "".join(ch for ch in s.lower() if ch.isalnum())
+
+            cols_norm = {c: _norm(c) for c in cols}
+
+            candidatos = []
+            for c, cn in cols_norm.items():
+                if "proveedor" in cn:
+                    candidatos.append(c)
+
+            if not candidatos:
+                return []
+
+            col_prov = candidatos[0]  # agarramos el primero que matchee
+
+            # 2) Traer lista DISTINCT
+            sql = f"""
+                SELECT DISTINCT {_q_ident(col_prov)} AS proveedor
+                FROM {_q_ident("chatbot")}
+                WHERE {_q_ident(col_prov)} IS NOT NULL
+                  AND {_q_ident(col_prov)} <> ''
+                ORDER BY {_q_ident(col_prov)}
+            """
+            cur.execute(sql)
+            rows = cur.fetchall()
+            return [r[0] for r in rows]
+
+    except Exception:
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 # =====================================================================
 # HELPERS SQL (POSTGRES)
