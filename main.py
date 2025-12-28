@@ -2697,7 +2697,12 @@ def _get_totales_anio(anio: int) -> dict:
         "params": (anio,)
     }
 
-
+ # =========================
+    # DEBUG - RUTA TOMADA
+    # =========================
+    st.session_state.debug["ruta"] = "TOTAL_COMPRAS_ANIO"
+    st.session_state.debug["ruta"] = "COMPRAS_PROVEEDOR_MES"
+    
     df = ejecutar_consulta(query, (anio,))
     if df is None or df.empty:
         return {"pesos": 0.0, "usd": 0.0}
