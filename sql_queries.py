@@ -193,26 +193,23 @@ def guardar_chat_log(pregunta: str, intencion: str, respuesta: str, tuvo_datos: 
 
 def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
     """Ejecuta consulta SQL y retorna DataFrame."""
-    conn = get_db_connection()
-    if not conn:
-        return pd.DataFrame()
-
     try:
+        conn = get_db_connection()
+        if not conn:
+            return pd.DataFrame()
+
         if params is None:
             params = ()
 
+        # USAR pd.read_sql_query - esto funciona correctamente
         df = pd.read_sql_query(query, conn, params=params)
+        
+        conn.close()
         return df
 
     except Exception as e:
         print(f"Error en consulta SQL: {e}")
         return pd.DataFrame()
-
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
 # =====================================================================
 # LISTADOS
 # =====================================================================
