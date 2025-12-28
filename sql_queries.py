@@ -268,22 +268,22 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
     """Detalle de compras de un proveedor en un mes específico."""
     
     proveedor_like = (proveedor_like or "").strip().lower()
-    total_expr = _sql_total_num_expr_general()
     
-    sql = f"""
+    # SQL SIMPLE - sin conversión compleja
+    sql = """
         SELECT 
-            TRIM({COL_PROV}) AS Proveedor,
-            TRIM({COL_ART}) AS Articulo,
-            TRIM({COL_NRO_COMP}) AS Nro_Factura,
-            {COL_FECHA} AS Fecha,
-            {COL_CANT} AS Cantidad,
-            {COL_MONEDA} AS Moneda,
-            {total_expr} AS Total
-        FROM {TABLE_COMPRAS}
-        WHERE LOWER(TRIM({COL_PROV})) LIKE %s
-          AND TRIM({COL_MES}) = %s
-          AND ({COL_TIPO_COMP} = 'Compra Contado' OR {COL_TIPO_COMP} LIKE 'Compra%%')
-        ORDER BY {COL_FECHA} DESC NULLS LAST
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            TRIM("Articulo") AS Articulo,
+            TRIM("Nro. Comprobante") AS Nro_Factura,
+            "Fecha",
+            "Cantidad",
+            "Moneda",
+            "Monto Neto" AS Total
+        FROM chatbot_raw 
+        WHERE LOWER("Cliente / Proveedor") LIKE %s
+          AND "Mes" = %s
+          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+        ORDER BY "Fecha" DESC NULLS LAST
         LIMIT 200
     """
     
