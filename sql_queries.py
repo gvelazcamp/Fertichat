@@ -213,8 +213,6 @@ def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
             conn.close()
         except:
             pass
-
-
 # =====================================================================
 # LISTADOS
 # =====================================================================
