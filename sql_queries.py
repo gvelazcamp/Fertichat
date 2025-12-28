@@ -16,13 +16,26 @@ import streamlit as st
 # =====================================================================
 
 def get_db_connection():
-    """Conexión a Postgres (Supabase) usando Secrets/Env vars."""
+    """Conexión a Postgres (Supabase) usando Secrets/Env vars - CON DEBUG."""
+    import streamlit as st
+    
     try:
         host = st.secrets.get("DB_HOST", os.getenv("DB_HOST"))
         port = st.secrets.get("DB_PORT", os.getenv("DB_PORT", "5432"))
         dbname = st.secrets.get("DB_NAME", os.getenv("DB_NAME", "postgres"))
         user = st.secrets.get("DB_USER", os.getenv("DB_USER"))
         password = st.secrets.get("DB_PASSWORD", os.getenv("DB_PASSWORD"))
+
+        # 🔍 DEBUG - Ver qué valores tiene
+        st.info(f"🔍 HOST: {host}")
+        st.info(f"🔍 PORT: {port}")
+        st.info(f"🔍 DBNAME: {dbname}")
+        st.info(f"🔍 USER: {user}")
+        st.info(f"🔍 PASS: {'****' if password else 'NONE'}")
+
+        if not host or not user or not password:
+            st.error("❌ Faltan credenciales de DB")
+            return None
 
         conn = psycopg2.connect(
             host=host,
@@ -33,11 +46,13 @@ def get_db_connection():
             sslmode="require",
             cursor_factory=RealDictCursor
         )
+        
+        st.success("✅ Conexión establecida")
         return conn
+        
     except Exception as e:
-        print(f"Error de conexión a Postgres/Supabase: {e}")
+        st.error(f"❌ Error de conexión: {e}")
         return None
-
 
 # =====================================================================
 # TABLAS + COLUMNAS REALES (según tu screenshot en Supabase)
