@@ -32,7 +32,6 @@ init_db()
 # =========================
 # IMPORTS DE NUESTROS MÓDULOS
 # =========================
-from sql_queries import *
 from intent_detector import *
 from intent_detector import (
     _extraer_patron_libre,
