@@ -1641,7 +1641,6 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
     """Detalle de compras de un proveedor en un mes específico."""
     fecha_expr = _sql_fecha_expr()
     total_expr = _sql_total_num_expr_general()
-    mes_col = _sql_mes_col()
 
     proveedor_like = (proveedor_like or "").split("(")[0].strip().lower()
 
@@ -1657,7 +1656,7 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
         FROM {TABLE_COMPRAS}
         WHERE ({COL_TIPO_COMP} = 'Compra Contado' OR {COL_TIPO_COMP} LIKE 'Compra%%')
           AND LOWER(TRIM({COL_PROV})) LIKE %s
-          AND {mes_col} = %s
+          AND TRIM({COL_MES}) = %s
         ORDER BY {fecha_expr} DESC NULLS LAST
     """
     return ejecutar_consulta(sql, (f"%{proveedor_like}%", mes_key))
