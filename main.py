@@ -18,9 +18,9 @@ import plotly.graph_objects as go
 # =====================================================================
 from auth import init_db
 from login_page import (
-    require_auth, 
-    show_user_info_sidebar, 
-    get_current_user, 
+    require_auth,
+    show_user_info_sidebar,
+    get_current_user,
     logout,
     LOGIN_CSS
 )
@@ -28,41 +28,10 @@ from login_page import (
 # Inicializar base de datos de usuarios
 init_db()
 
-from sql_queries import (
-    # ... tus imports actuales ...
-    get_lista_tipos_comprobante,
-    get_lista_proveedores,
-    get_lista_tipos_comprobante,
-    get_lista_articulos,
-    buscar_comprobantes,
-    # Funciones para el buscador IA
-    _sql_fecha_expr,
-    _sql_total_num_expr_general,
-    ejecutar_consulta,
-    get_ultima_factura_de_articulo,
-    get_ultima_factura_inteligente,
-    get_facturas_de_articulo,
-    # Funciones para búsqueda de stock/lotes
-    get_lista_articulos_stock,
-    get_lista_familias_stock,
-    get_lista_depositos_stock,
-    buscar_stock_por_lote,
-    # Funciones para Stock IA (chatbot)
-    get_stock_total,
-    get_stock_por_familia,
-    get_stock_por_deposito,
-    get_stock_articulo,
-    get_lotes_por_vencer,
-    get_lotes_vencidos,
-    get_stock_bajo,
-    get_stock_lote_especifico,
-    get_total_compras_articulo_anio,
-    get_detalle_compras_articulo_anio,
-    get_top_10_proveedores_chatbot,
-    get_stock_familia
-)
 
-# Imports de nuestros módulos
+# =========================
+# IMPORTS DE NUESTROS MÓDULOS
+# =========================
 from sql_queries import *
 from intent_detector import *
 from intent_detector import (
@@ -73,6 +42,7 @@ from intent_detector import (
 
 # OpenAI
 from openai import OpenAI
+ OpenAI
 
 
 # =====================================================================
