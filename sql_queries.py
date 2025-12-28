@@ -1638,30 +1638,22 @@ def get_stock_familia(*args, **kwargs):
 # DETALLE COMPRAS: PROVEEDOR + MES
 # =========================
 def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.DataFrame:
-    """Detalle de compras de un proveedor en un mes específico."""
-    fecha_expr = _sql_fecha_expr()
-    total_expr = _sql_total_num_expr_general()
-
-    proveedor_like = (proveedor_like or "").split("(")[0].strip().lower()
-
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Articulo") AS Articulo,
-            TRIM("Nro. Comprobante") AS Nro_Factura,
-            "Fecha",
-            "Cantidad",
-            "Moneda",
-            "Monto Neto" AS Total
-        FROM chatbot_raw
-        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
-          AND TRIM("Mes") = %s
-        ORDER BY "Fecha" DESC NULLS LAST
-    """
+    """Detalle de compras de un proveedor en un mes específico - VERSIÓN DIRECTA"""
     
-    # 🔍 DEBUG - Imprimir en consola
-    print(f"🔍 SQL: {sql}")
-    print(f"🔍 PARAMS: proveedor='%{proveedor_like}%', mes='{mes_key}'")
+    proveedor_like = (proveedor_like or "").strip().lower()
+    
+    # SQL EXACTO que funciona en Supabase
+    sql = """
+        SELECT 
+            "Cliente / Proveedor" AS Proveedor,
+            "Articulo",
+            "Mes",
+            "Año",
+            "Monto Neto" AS Total
+        FROM chatbot_raw 
+        WHERE LOWER("Cliente / Proveedor") LIKE %s
+          AND "Mes" = %s
+        LIMIT 50
+    """
     
     return ejecutar_consulta(sql, (f"%{proveedor_like}%", mes_key))
