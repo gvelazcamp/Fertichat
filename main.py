@@ -64,6 +64,7 @@ from sql_queries import (
 
 # Imports de nuestros módulos
 from sql_queries import *
+from intent_detector import *
 from intent_detector import (
     _extraer_patron_libre,
     _extraer_lista_familias,
