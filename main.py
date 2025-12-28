@@ -990,49 +990,50 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
         return "📦 Compras por mes:", formatear_dataframe(df)
 
 # --- PRIORIDAD 8: DETALLE COMPRAS PROVEEDOR + MES ---
-elif tipo == 'detalle_compras_proveedor_mes':
-    mes_key = params.get('mes_key')
-    proveedor_like = params.get('proveedor_like')
+    # --- PRIORIDAD 8: DETALLE COMPRAS PROVEEDOR + MES ---
+    elif tipo == 'detalle_compras_proveedor_mes':
+        mes_key = params.get('mes_key')
+        proveedor_like = params.get('proveedor_like')
 
-    df = get_detalle_compras_proveedor_mes(proveedor_like, mes_key)
+        df = get_detalle_compras_proveedor_mes(proveedor_like, mes_key)
 
-    if df.empty:
-        titulo, df2, resp2 = fallback_openai_sql(
-            pregunta,
-            "No encontró detalle proveedor + mes"
+        if df.empty:
+            titulo, df2, resp2 = fallback_openai_sql(
+                pregunta,
+                "No encontró detalle proveedor + mes"
+            )
+            if df2 is not None and not df2.empty:
+                return f"📋 {resp2 or titulo}", formatear_dataframe(df2)
+            return "No encontré compras para ese proveedor y mes.", None
+
+        # Calcular total desde la columna "total"
+        # (texto tipo "$1.234,56", "U$S 1.234,56", "(1.234,56)")
+        total = 0.0
+
+        if 'total' in df.columns:
+            for val in df['total']:
+                try:
+                    if pd.notna(val) and str(val).strip():
+                        num_str = str(val).replace('U$S', '').replace('U$$', '').replace('$', '')
+                        num_str = (
+                            num_str
+                            .replace('.', '')
+                            .replace(',', '.')
+                            .replace('(', '-')
+                            .replace(')', '')
+                            .strip()
+                        )
+                        total += float(num_str) if num_str else 0
+                except Exception:
+                    pass
+
+        total_fmt = f"${total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+        return (
+            f"📋 Compras de {proveedor_like.upper()} en {mes_key} "
+            f"| 💰 **Total: {total_fmt}** | {len(df)} registros:",
+            formatear_dataframe(df)
         )
-        if df2 is not None and not df2.empty:
-            return f"📋 {resp2 or titulo}", formatear_dataframe(df2)
-        return "No encontré compras para ese proveedor y mes.", None
-
-    # Calcular total desde la columna "total"
-    # (texto tipo "$1.234,56", "U$S 1.234,56", "(1.234,56)")
-    total = 0.0
-
-    if 'total' in df.columns:
-        for val in df['total']:
-            try:
-                if pd.notna(val) and str(val).strip():
-                    num_str = str(val).replace('U$S', '').replace('U$$', '').replace('$', '')
-                    num_str = (
-                        num_str
-                        .replace('.', '')
-                        .replace(',', '.')
-                        .replace('(', '-')
-                        .replace(')', '')
-                        .strip()
-                    )
-                    total += float(num_str) if num_str else 0
-            except Exception:
-                pass
-
-    total_fmt = f"${total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-    return (
-        f"📋 Compras de {proveedor_like.upper()} en {mes_key} "
-        f"| 💰 **Total: {total_fmt}** | {len(df)} registros:",
-        formatear_dataframe(df)
-    )
 
     # --- PRIORIDAD 8: DETALLE COMPRAS ARTÍCULO + MES ---
     elif tipo == "detalle_compras_articulo_mes":
