@@ -2,11 +2,12 @@
 # SQL QUERIES - SOLO CONSULTAS (POSTGRES / SUPABASE)
 # =========================
 import os
+import re
+import time
 import psycopg2
 import pandas as pd
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from datetime import datetime
-
 from psycopg2.extras import RealDictCursor
 import streamlit as st
 
@@ -40,11 +41,12 @@ def get_db_connection():
 
 
 # =====================================================================
-# MAPA DE COLUMNAS (chatbot_raw)
+# TABLAS + COLUMNAS REALES (según tu screenshot en Supabase)
 # =====================================================================
 
 TABLE_COMPRAS = "chatbot_raw"
 
+# OJO: en Postgres, columnas con espacios/puntos van siempre entre comillas dobles.
 COL_TIPO_COMP = '"Tipo Comprobante"'
 COL_TIPO_CFE  = '"Tipo CFE"'
 COL_NRO_COMP  = '"Nro. Comprobante"'
@@ -65,39 +67,31 @@ COL_MONTO     = '"Monto Neto"'
 # =====================================================================
 
 def _sql_fecha_expr() -> str:
-    """Convierte 'Fecha' (texto) a DATE (YYYY-MM-DD o DD/MM/YYYY)."""
+    """Convierte Fecha (texto) a DATE (YYYY-MM-DD o DD/MM/YYYY)."""
     return f"COALESCE(TO_DATE({COL_FECHA}, 'YYYY-MM-DD'), TO_DATE({COL_FECHA}, 'DD/MM/YYYY'))"
 
 
 def _sql_mes_col() -> str:
-    """Columna Mes normalizada."""
     return f"TRIM(COALESCE({COL_MES}, ''))"
 
 
 def _sql_moneda_norm_expr() -> str:
-    """Normaliza moneda."""
     return f"TRIM(COALESCE({COL_MONEDA}, ''))"
 
 
 def _sql_num_from_text(text_expr: str) -> str:
-    """
-    Convierte un texto a NUMERIC(15,2) de forma defensiva (evita cast de string vacío).
-    Devuelve: CAST(NULLIF(<limpio>, '') AS NUMERIC(15,2))
-    """
+    """CAST defensivo: evita error si queda string vacío."""
     return f"CAST(NULLIF({text_expr}, '') AS NUMERIC(15,2))"
 
 
 def _sql_total_num_expr() -> str:
-    """Convierte 'Monto Neto' a número (pesos)."""
+    """Convierte Monto Neto a número (pesos)."""
     limpio = f"""
         REPLACE(
             REPLACE(
                 REPLACE(
                     REPLACE(
-                        REPLACE(
-                            TRIM(COALESCE({COL_MONTO}, '')),
-                            '.', ''
-                        ),
+                        REPLACE(TRIM(COALESCE({COL_MONTO}, '')), '.', ''),
                         ',', '.'
                     ),
                     '(', '-'
@@ -111,7 +105,7 @@ def _sql_total_num_expr() -> str:
 
 
 def _sql_total_num_expr_usd() -> str:
-    """Convierte 'Monto Neto' a número (USD)."""
+    """Convierte Monto Neto a número (USD: U$S / U$$)."""
     limpio = f"""
         REPLACE(
             REPLACE(
@@ -137,7 +131,7 @@ def _sql_total_num_expr_usd() -> str:
 
 
 def _sql_total_num_expr_general() -> str:
-    """Convierte 'Monto Neto' a número (sirve para $ o U$S/U$$)."""
+    """Convierte Monto Neto a número (sirve para $ o U$S/U$$)."""
     limpio = f"""
         REPLACE(
             REPLACE(
@@ -166,17 +160,51 @@ def _sql_total_num_expr_general() -> str:
 
 
 def _sql_cantidad_num_expr() -> str:
-    """Convierte 'Cantidad' a número."""
+    """Convierte Cantidad (texto) a número."""
     limpio = f"REPLACE(TRIM(COALESCE({COL_CANT}, '')), ',', '.')"
     return _sql_num_from_text(limpio)
 
 
 # =====================================================================
-# LOGGING (SI EXISTEN TABLAS query_log / chat_log)
+# ADAPTAR WHERE_CLAUSE (para que tu orquestador viejo siga funcionando)
+# Si en otro lado armás where_clause con 'Proveedor', 'Articulo', etc,
+# acá lo traducimos a tus columnas reales.
+# =====================================================================
+
+def _adapt_where_clause(where_clause: str) -> str:
+    if not where_clause or not str(where_clause).strip():
+        return "1=1"
+
+    m: Dict[str, str] = {
+        "Proveedor": COL_PROV,
+        "Articulo": COL_ART,
+        "Familia": COL_FAMILIA,
+        "Mes": COL_MES,
+        "Moneda": COL_MONEDA,
+        "tipo_comprobante": COL_TIPO_COMP,
+        "Tipo_Comprobante": COL_TIPO_COMP,
+        "nro_comprobante": COL_NRO_COMP,
+        "Nro_Comprobante": COL_NRO_COMP,
+        "fecha": COL_FECHA,
+        "Fecha": COL_FECHA,
+        "cantidad": COL_CANT,
+        "Cantidad": COL_CANT,
+        "anio": COL_ANIO,
+        "Año": COL_ANIO,
+        "Anio": COL_ANIO,
+    }
+
+    out = str(where_clause)
+    for k, v in m.items():
+        out = re.sub(rf"(?i)\b{re.escape(k)}\b", v, out)
+    return out
+
+
+# =====================================================================
+# LOGGING (si existen tablas query_log / chat_log)
 # =====================================================================
 
 def _guardar_log(consulta: str, parametros: str, resultado: str, registros: int, error: str, tiempo_ms: int):
-    """Guarda log de consulta en tabla query_log (silencioso si falla)."""
     try:
         conn = get_db_connection()
         if not conn:
@@ -187,8 +215,8 @@ def _guardar_log(consulta: str, parametros: str, resultado: str, registros: int,
                 INSERT INTO query_log (consulta, parametros, resultado, registros, error, tiempo_ms)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """
-            consulta_corta = consulta[:2000] if consulta else ""
-            error_corto = error[:500] if error else None
+            consulta_corta = (consulta or "")[:2000]
+            error_corto = (error or "")[:500] if error else None
             cursor.execute(sql, (consulta_corta, parametros, resultado, registros, error_corto, tiempo_ms))
             conn.commit()
         conn.close()
@@ -197,7 +225,6 @@ def _guardar_log(consulta: str, parametros: str, resultado: str, registros: int,
 
 
 def guardar_chat_log(pregunta: str, intencion: str, respuesta: str, tuvo_datos: bool, registros: int = 0, debug: str = None):
-    """Guarda log de pregunta/respuesta del chat (silencioso si falla)."""
     try:
         conn = get_db_connection()
         if not conn:
@@ -208,9 +235,9 @@ def guardar_chat_log(pregunta: str, intencion: str, respuesta: str, tuvo_datos: 
                 INSERT INTO chat_log (pregunta, intencion, respuesta, tuvo_datos, registros, debug)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """
-            pregunta_corta = pregunta[:1000] if pregunta else ""
-            respuesta_corta = respuesta[:2000] if respuesta else ""
-            debug_corto = debug[:500] if debug else None
+            pregunta_corta = (pregunta or "")[:1000]
+            respuesta_corta = (respuesta or "")[:2000]
+            debug_corto = (debug or "")[:500] if debug else None
             cursor.execute(sql, (pregunta_corta, intencion, respuesta_corta, tuvo_datos, registros, debug_corto))
             conn.commit()
         conn.close()
@@ -223,16 +250,13 @@ def guardar_chat_log(pregunta: str, intencion: str, respuesta: str, tuvo_datos: 
 # =====================================================================
 
 def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
-    """Ejecuta consulta SQL (psycopg2) y retorna DataFrame (con logging)."""
-    import time
-
+    """Ejecuta consulta SQL y retorna DataFrame (con logging)."""
     conn = get_db_connection()
     if not conn:
         _guardar_log(query, str(params), "ERROR", 0, "No se pudo conectar", 0)
         return pd.DataFrame()
 
     inicio = time.time()
-
     try:
         if params is None:
             params = ()
@@ -268,10 +292,9 @@ def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
 # CONSULTAS ESPECÍFICAS - ORDEN DE PRIORIDAD
 # =====================================================================
 
-# --- PRIORIDAD 1: FACTURAS POR NÚMERO (más específico) ---
+# --- PRIORIDAD 1: FACTURAS POR NÚMERO ---
 
 def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
-    """Detalle por Nro. Comprobante (factura)."""
     total_expr = _sql_total_num_expr_general()
     query = f"""
         SELECT
@@ -293,10 +316,8 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
 # --- PRIORIDAD 2: ÚLTIMA FACTURA DE ARTÍCULO ---
 
 def get_ultima_factura_de_articulo(patron_articulo: str) -> pd.DataFrame:
-    """Última factura donde vino un artículo."""
     total_expr = _sql_total_num_expr_general()
     fecha_expr = _sql_fecha_expr()
-
     query = f"""
         SELECT
             TRIM({COL_PROV}) AS Proveedor,
@@ -316,9 +337,7 @@ def get_ultima_factura_de_articulo(patron_articulo: str) -> pd.DataFrame:
 
 
 def get_ultima_factura_numero_de_articulo(patron_articulo: str) -> Optional[str]:
-    """Obtiene el número de la última factura de un artículo."""
     fecha_expr = _sql_fecha_expr()
-
     query = f"""
         SELECT TRIM({COL_NRO_COMP}) AS nro_factura
         FROM {TABLE_COMPRAS}
@@ -337,10 +356,8 @@ def get_ultima_factura_numero_de_articulo(patron_articulo: str) -> Optional[str]
 # --- PRIORIDAD 3: TODAS LAS FACTURAS DE ARTÍCULO ---
 
 def get_facturas_de_articulo(patron_articulo: str, solo_ultima: bool = False) -> pd.DataFrame:
-    """Lista facturas donde apareció un artículo."""
     fecha_expr = _sql_fecha_expr()
     total_expr = _sql_total_num_expr_general()
-
     limit_sql = "LIMIT 1" if solo_ultima else "LIMIT 50"
 
     query = f"""
@@ -364,7 +381,6 @@ def get_facturas_de_articulo(patron_articulo: str, solo_ultima: bool = False) ->
 # --- PRIORIDAD 4: COMPARACIONES (MESES) ---
 
 def get_comparacion_familia_meses(mes1: str, mes2: str, label1: str, label2: str, familias: List[str] = None) -> pd.DataFrame:
-    """Comparar familias entre 2 meses (Postgres)."""
     total_expr = _sql_total_num_expr_general()
     mes_col = _sql_mes_col()
 
@@ -408,13 +424,8 @@ def get_comparacion_familia_meses(mes1: str, mes2: str, label1: str, label2: str
                 LOWER(TRIM(COALESCE({COL_FAMILIA}, ''))) IN ('servicio citometro', 'servicio citómetro')
                 OR (
                     UPPER(TRIM(COALESCE({COL_FAMILIA}, ''))) NOT IN (
-                        'GASTOS FIJOS',
-                        'INGRESOS',
-                        'GASTOS IMPORTACION',
-                        'GASTOS IMPORTACIÓN',
-                        '_RESGUARDOS',
-                        'RESGUARDOS',
-                        'DESCUENTOS'
+                        'GASTOS FIJOS','INGRESOS','GASTOS IMPORTACION','GASTOS IMPORTACIÓN',
+                        '_RESGUARDOS','RESGUARDOS','DESCUENTOS'
                     )
                     AND UPPER(TRIM(COALESCE({COL_FAMILIA}, ''))) NOT LIKE 'SERVICIO%'
                 )
@@ -431,19 +442,12 @@ def get_comparacion_familia_meses(mes1: str, mes2: str, label1: str, label2: str
         *familia_params
     )
     df = ejecutar_consulta(query, params)
-
     if df.empty:
         return df
-
-    df = df.rename(columns={"Mes1": label1, "Mes2": label2})
-    return df
+    return df.rename(columns={"Mes1": label1, "Mes2": label2})
 
 
 def get_comparacion_familia_meses_moneda(mes1: str, mes2: str, label1: str, label2: str, moneda: str = "$", familias: List[str] = None) -> pd.DataFrame:
-    """
-    Comparar familias entre 2 meses FILTRADO POR MONEDA (Postgres).
-    moneda: "$" para pesos, "U$S"/"U$$"/"USD" para dólares
-    """
     mes_col = _sql_mes_col()
     mon_expr = _sql_moneda_norm_expr()
 
@@ -464,7 +468,6 @@ def get_comparacion_familia_meses_moneda(mes1: str, mes2: str, label1: str, labe
             familia_params.append(fam)
         familia_where = f"AND ({' OR '.join(parts)})"
 
-    # ✅ Subquery para poder filtrar Mes1/Mes2 (Postgres no usa alias en HAVING como MySQL)
     inner = f"""
         SELECT
             TRIM(COALESCE({COL_FAMILIA}, 'SIN FAMILIA')) AS Familia,
@@ -478,13 +481,8 @@ def get_comparacion_familia_meses_moneda(mes1: str, mes2: str, label1: str, labe
                 LOWER(TRIM(COALESCE({COL_FAMILIA}, ''))) IN ('servicio citometro', 'servicio citómetro')
                 OR (
                     UPPER(TRIM(COALESCE({COL_FAMILIA}, ''))) NOT IN (
-                        'GASTOS FIJOS',
-                        'INGRESOS',
-                        'GASTOS IMPORTACION',
-                        'GASTOS IMPORTACIÓN',
-                        '_RESGUARDOS',
-                        'RESGUARDOS',
-                        'DESCUENTOS'
+                        'GASTOS FIJOS','INGRESOS','GASTOS IMPORTACION','GASTOS IMPORTACIÓN',
+                        '_RESGUARDOS','RESGUARDOS','DESCUENTOS'
                     )
                     AND UPPER(TRIM(COALESCE({COL_FAMILIA}, ''))) NOT LIKE 'SERVICIO%'
                 )
@@ -510,21 +508,17 @@ def get_comparacion_familia_meses_moneda(mes1: str, mes2: str, label1: str, labe
 
     params = (mes1, mes2, mes1, mes2, *familia_params)
     df = ejecutar_consulta(query, params)
-
     if df.empty:
         return df
+    return df.rename(columns={"Mes1": label1, "Mes2": label2})
 
-    df = df.rename(columns={"Mes1": label1, "Mes2": label2})
-    return df
 def get_comparacion_proveedor_meses(mes1: str, mes2: str, label1: str, label2: str, proveedores: List[str] = None) -> pd.DataFrame:
     """Comparar proveedores entre 2 meses."""
     total_expr = _sql_total_num_expr_general()
     mes_col = _sql_mes_col()
 
-()
-
     prov_where = ""
-    prov_params = []
+    prov_params: List[str] = []
     if proveedores:
         parts = []
         for p in proveedores:
@@ -569,7 +563,7 @@ def get_comparacion_articulo_meses(mes1: str, mes2: str, label1: str, label2: st
     mes_col = _sql_mes_col()
 
     art_where = ""
-    art_params = []
+    art_params: List[str] = []
     if articulos:
         parts = []
         for a in articulos:
@@ -609,10 +603,10 @@ def get_comparacion_articulo_meses(mes1: str, mes2: str, label1: str, label2: st
     return ejecutar_consulta(query, tuple(params))
 
 
-# --- PRIORIDAD 5: COMPARACIONES POR AÑOS ---
+# --- PRIORIDAD 5: COMPARACIONES POR AÑOS (usando columna "Año") ---
 
 def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[str] = None) -> pd.DataFrame:
-    """Comparar proveedores por años ($ y USD separados) usando columna 'Año'."""
+    """Comparar proveedores por años ($ y USD separados)."""
     mon_expr = _sql_moneda_norm_expr()
     total_pesos = _sql_total_num_expr()
     total_usd = _sql_total_num_expr_usd()
@@ -620,7 +614,7 @@ def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[
     anios = sorted(anios)
 
     prov_where = ""
-    prov_params = []
+    prov_params: List[str] = []
     if proveedores:
         parts = []
         for p in proveedores:
@@ -630,14 +624,8 @@ def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[
 
     cols = []
     for y in anios:
-        cols.append(
-            f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} = '$'
-                 THEN {total_pesos} ELSE 0 END) AS "{y}_$" """
-        )
-        cols.append(
-            f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} IN ('U$S','U$$')
-                 THEN {total_usd} ELSE 0 END) AS "{y}_USD" """
-        )
+        cols.append(f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
+        cols.append(f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
 
     cols_sql = ",\n            ".join(cols)
     y_last = anios[-1]
@@ -656,30 +644,27 @@ def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[
         LIMIT 300
     """
 
-    params = tuple(prov_params) if prov_params else None
-    return ejecutar_consulta(query, params)
+    return ejecutar_consulta(query, tuple(prov_params) if prov_params else None)
 
 
 # =========================
-# DETALLE COMPRAS PROVEEDOR + AÑO (CON MONEDA)
+# DETALLE COMPRAS PROVEEDOR + AÑO (CON MONEDA opcional)
 # =========================
 def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, moneda: str = None) -> pd.DataFrame:
-    """Detalle compras de un proveedor en un año. moneda opcional: $, U$S/U$$."""
+    fecha_expr = _sql_fecha_expr()
     mon_expr = _sql_moneda_norm_expr()
 
     proveedor_like = (proveedor_like or "").split("(")[0].strip().lower()
 
     if moneda and str(moneda).strip().upper() in ("U$S", "USD", "U$$"):
         total_expr = _sql_total_num_expr_usd()
-        moneda_sql = f"AND {mon_expr} IN ('U$S', 'U$$')"
+        moneda_sql = f"AND {mon_expr} IN ('U$S','U$$')"
     elif moneda and str(moneda).strip() in ("$", "UYU"):
         total_expr = _sql_total_num_expr()
         moneda_sql = f"AND {mon_expr} = '$'"
     else:
         total_expr = _sql_total_num_expr_general()
         moneda_sql = ""
-
-    fecha_expr = _sql_fecha_expr()
 
     sql = f"""
         SELECT
@@ -697,12 +682,11 @@ def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, moneda: s
           {moneda_sql}
         ORDER BY {fecha_expr} DESC NULLS LAST
     """
-    params = (f"%{proveedor_like}%", anio)
-    return ejecutar_consulta(sql, params)
+    return ejecutar_consulta(sql, (f"%{proveedor_like}%", anio))
 
 
 def get_comparacion_articulo_anios_monedas(anios: List[int], articulos: List[str] = None) -> pd.DataFrame:
-    """Comparar artículos por años ($ y USD separados) usando columna 'Año'."""
+    """Comparar artículos por años ($ y USD separados)."""
     mon_expr = _sql_moneda_norm_expr()
     total_pesos = _sql_total_num_expr()
     total_usd = _sql_total_num_expr_usd()
@@ -710,7 +694,7 @@ def get_comparacion_articulo_anios_monedas(anios: List[int], articulos: List[str
     anios = sorted(anios)
 
     art_where = ""
-    art_params = []
+    art_params: List[str] = []
     if articulos:
         parts = []
         for a in articulos:
@@ -720,14 +704,8 @@ def get_comparacion_articulo_anios_monedas(anios: List[int], articulos: List[str
 
     cols = []
     for y in anios:
-        cols.append(
-            f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} = '$'
-                 THEN {total_pesos} ELSE 0 END) AS "{y}_$" """
-        )
-        cols.append(
-            f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} IN ('U$S','U$$')
-                 THEN {total_usd} ELSE 0 END) AS "{y}_USD" """
-        )
+        cols.append(f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
+        cols.append(f"""SUM(CASE WHEN {COL_ANIO} = {y} AND {mon_expr} IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
 
     cols_sql = ",\n            ".join(cols)
     y_last = anios[-1]
@@ -745,14 +723,13 @@ def get_comparacion_articulo_anios_monedas(anios: List[int], articulos: List[str
         ORDER BY {order_sql}
         LIMIT 300
     """
-    params = tuple(art_params) if art_params else None
-    return ejecutar_consulta(query, params)
+
+    return ejecutar_consulta(query, tuple(art_params) if art_params else None)
 
 
-# --- PRIORIDAD 6: DETALLE COMPRAS POR MES/PROVEEDOR ---
+# --- PRIORIDAD 6: DETALLE COMPRAS POR MES/PROVEEDOR/ARTÍCULO ---
 
 def get_compras_por_mes_excel(mes_key: str) -> pd.DataFrame:
-    """Detalle de compras de un mes (formato Excel)."""
     total_expr = _sql_total_num_expr_general()
     fecha_expr = _sql_fecha_expr()
 
@@ -760,13 +737,13 @@ def get_compras_por_mes_excel(mes_key: str) -> pd.DataFrame:
         SELECT
             {COL_TIPO_COMP} AS Tipo_Comprobante,
             {COL_NRO_COMP} AS Nro_Comprobante,
+            {COL_MONEDA} AS Moneda,
             {COL_PROV} AS Cliente_Proveedor,
             {COL_FAMILIA} AS Familia,
             {COL_TIPO_ART} AS Tipo_Articulo,
             {COL_ART} AS Articulo,
             TO_CHAR({fecha_expr}, 'DD/MM/YYYY') AS Fecha,
             {COL_CANT} AS Cantidad,
-            {COL_MONEDA} AS Moneda,
             {total_expr} AS Monto_Neto
         FROM {TABLE_COMPRAS}
         WHERE TRIM(COALESCE({COL_MES}, '')) = %s
@@ -777,7 +754,6 @@ def get_compras_por_mes_excel(mes_key: str) -> pd.DataFrame:
 
 
 def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.DataFrame:
-    """Detalle compras de un proveedor en un mes específico."""
     total_expr = _sql_total_num_expr_general()
     fecha_expr = _sql_fecha_expr()
 
@@ -801,7 +777,6 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
 
 
 def get_detalle_compras_articulo_mes(articulo_like: str, mes_key: str) -> pd.DataFrame:
-    """Detalle compras de un artículo en un mes específico."""
     total_expr = _sql_total_num_expr_general()
     fecha_expr = _sql_fecha_expr()
 
@@ -824,34 +799,51 @@ def get_detalle_compras_articulo_mes(articulo_like: str, mes_key: str) -> pd.Dat
     return ejecutar_consulta(query, (f"%{articulo_like.lower()}%", mes_key))
 
 
-def get_total_compras_proveedor_anio(proveedor_like: str, anio: int) -> dict:
-    """TOTAL real de compras de un proveedor en un año (sin límite)."""
+# --- PRIORIDAD 10/11: DETALLE GENERAL + CONSULTA GENERAL (con where_clause externo) ---
+
+def get_detalle_compras(where_clause: str, params: tuple) -> pd.DataFrame:
+    fecha_expr = _sql_fecha_expr()
     total_expr = _sql_total_num_expr_general()
+
+    where_ok = _adapt_where_clause(where_clause)
+
+    query = f"""
+        SELECT
+            TRIM({COL_PROV}) AS Proveedor,
+            TRIM(COALESCE({COL_FAMILIA}, '')) AS Familia,
+            TRIM({COL_ART}) AS Articulo,
+            TRIM({COL_NRO_COMP}) AS NumFactura,
+            TO_CHAR({fecha_expr}, 'DD/MM/YYYY') AS Fecha,
+            {COL_CANT} AS Cantidad,
+            {COL_MONEDA} AS Moneda,
+            {total_expr} AS Total
+        FROM {TABLE_COMPRAS}
+        WHERE {where_ok}
+        ORDER BY {fecha_expr} DESC NULLS LAST
+        LIMIT 200
+    """
+    return ejecutar_consulta(query, params)
+
+
+def get_consulta_general(where_clause: str, params: tuple) -> pd.DataFrame:
+    total_expr = _sql_total_num_expr_general()
+    where_ok = _adapt_where_clause(where_clause)
 
     query = f"""
         SELECT
             COUNT(*) AS Registros,
             COALESCE(SUM({total_expr}), 0) AS Total
         FROM {TABLE_COMPRAS}
-        WHERE ({COL_TIPO_COMP} = 'Compra Contado' OR {COL_TIPO_COMP} LIKE 'Compra%')
-          AND LOWER(TRIM({COL_PROV})) LIKE %s
-          AND {COL_ANIO} = %s
+        WHERE {where_ok}
     """
-    df = ejecutar_consulta(query, (f"%{proveedor_like.lower()}%", anio))
-    if df is not None and not df.empty:
-        return {
-            "registros": int(df["Registros"].iloc[0]) if pd.notna(df["Registros"].iloc[0]) else 0,
-            "total": float(df["Total"].iloc[0]) if pd.notna(df["Total"].iloc[0]) else 0.0
-        }
-    return {"registros": 0, "total": 0.0}
+    return ejecutar_consulta(query, params)
 
 
 # =====================================================================
-# FUNCIONES PARA BUSCADOR DE COMPROBANTES
+# LISTAS PARA SELECTS (UI)
 # =====================================================================
 
 def get_lista_proveedores():
-    """Lista única de proveedores."""
     sql = f"""
         SELECT DISTINCT TRIM({COL_PROV}) AS proveedor
         FROM {TABLE_COMPRAS}
@@ -865,7 +857,6 @@ def get_lista_proveedores():
 
 
 def get_lista_tipos_comprobante():
-    """Lista única de tipos de comprobante."""
     sql = f"""
         SELECT DISTINCT TRIM({COL_TIPO_COMP}) AS tipo
         FROM {TABLE_COMPRAS}
@@ -879,7 +870,6 @@ def get_lista_tipos_comprobante():
 
 
 def get_lista_articulos():
-    """Lista única de artículos."""
     sql = f"""
         SELECT DISTINCT TRIM({COL_ART}) AS articulo
         FROM {TABLE_COMPRAS}
@@ -894,7 +884,6 @@ def get_lista_articulos():
 
 def buscar_comprobantes(proveedor=None, tipo_comprobante=None, articulo=None,
                         fecha_desde=None, fecha_hasta=None, texto_busqueda=None):
-    """Búsqueda de comprobantes con filtros múltiples (Postgres)."""
     fecha_expr = _sql_fecha_expr()
     total_expr = _sql_total_num_expr_general()
 
@@ -913,7 +902,7 @@ def buscar_comprobantes(proveedor=None, tipo_comprobante=None, articulo=None,
         WHERE 1=1
     """
 
-    params = []
+    params: List[str] = []
 
     if proveedor and proveedor != "Todos":
         prov_clean = proveedor.split("(")[0].strip()
@@ -930,14 +919,12 @@ def buscar_comprobantes(proveedor=None, tipo_comprobante=None, articulo=None,
         params.append(f"%{articulo.strip()}%")
 
     if fecha_desde:
-        fecha_str = fecha_desde.strftime("%Y-%m-%d")
         sql += f" AND {fecha_expr} >= %s"
-        params.append(fecha_str)
+        params.append(fecha_desde.strftime("%Y-%m-%d"))
 
     if fecha_hasta:
-        fecha_str = fecha_hasta.strftime("%Y-%m-%d")
         sql += f" AND {fecha_expr} <= %s"
-        params.append(fecha_str)
+        params.append(fecha_hasta.strftime("%Y-%m-%d"))
 
     if texto_busqueda and texto_busqueda.strip():
         sql += f""" AND (
@@ -953,7 +940,7 @@ def buscar_comprobantes(proveedor=None, tipo_comprobante=None, articulo=None,
 
 
 # =====================================================================
-# TOTAL COMPRAS: ARTÍCULO + AÑO (SIN LÍMITE)
+# TOTAL COMPRAS: ARTÍCULO + AÑO
 # =====================================================================
 
 def get_total_compras_articulo_anio(articulo_like: str, anio: int) -> dict:
@@ -969,15 +956,11 @@ def get_total_compras_articulo_anio(articulo_like: str, anio: int) -> dict:
           AND LOWER(TRIM({COL_ART})) LIKE %s
     """
 
-    params = (anio, f"%{articulo_like.lower()}%")
-    df = ejecutar_consulta(sql, params)
-
+    df = ejecutar_consulta(sql, (anio, f"%{articulo_like.lower()}%"))
     if df is not None and not df.empty:
         reg = df["registros"].iloc[0] if "registros" in df.columns else 0
         tot = df["total"].iloc[0] if "total" in df.columns else 0
-        return {
-            "registros": int(reg) if pd.notna(reg) else 0,
-            "total": float(tot) if pd.notna(tot) else 0.0
-        }
-
+        return {"registros": int(reg) if pd.notna(reg) else 0,
+                "total": float(tot) if pd.notna(tot) else 0.0}
     return {"registros": 0, "total": 0.0}
+
