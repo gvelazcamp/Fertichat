@@ -31,16 +31,83 @@ init_db()
 # IMPORTS DE SQL_QUERIES
 # =========================
 from sql_queries import (
-    get_lista_proveedores,
+    # Conexión y ejecución
+    get_db_connection,
+    ejecutar_consulta,
+    
+    # Helpers SQL
     _sql_fecha_expr,
     _sql_total_num_expr_general,
-    ejecutar_consulta,
+    
+    # Listados
+    get_lista_proveedores,
+    get_lista_tipos_comprobante,
+    get_lista_articulos,
+    get_valores_unicos,
+    
+    # Facturas
+    get_detalle_factura_por_numero,
+    get_total_factura_por_numero,
     get_ultima_factura_de_articulo,
+    get_ultima_factura_inteligente,
+    get_ultima_factura_numero_de_articulo,
     get_facturas_de_articulo,
-    get_total_compras_articulo_anio,
+    
+    # Detalle compras proveedor
+    get_detalle_compras_proveedor_mes,
+    get_detalle_compras_proveedor_anio,
+    get_total_compras_proveedor_anio,
+    get_detalle_compras_proveedor_anios,
+    
+    # Detalle compras artículo
+    get_detalle_compras_articulo_mes,
     get_detalle_compras_articulo_anio,
-    get_detalle_compras_proveedor_mes,  
-    get_stock_familia
+    get_total_compras_articulo_anio,
+    
+    # Comparaciones meses
+    get_comparacion_proveedor_meses,
+    get_comparacion_articulo_meses,
+    get_comparacion_familia_meses_moneda,
+    
+    # Comparaciones años
+    get_comparacion_articulo_anios,
+    get_comparacion_proveedor_anios_monedas,
+    get_comparacion_familia_anios_monedas,
+    
+    # Gastos familias
+    get_gastos_todas_familias_mes,
+    get_gastos_todas_familias_anio,
+    get_gastos_secciones_detalle_completo,
+    get_gastos_por_familia,
+    
+    # Otros
+    get_detalle_compras,
+    get_compras_por_mes_excel,
+    get_total_compras_proveedor_moneda_periodos,
+    get_top_10_proveedores_chatbot,
+    
+    # Dashboard
+    get_dashboard_totales,
+    get_dashboard_compras_por_mes,
+    get_dashboard_top_proveedores,
+    get_dashboard_gastos_familia,
+    get_dashboard_ultimas_compras,
+    get_alertas_vencimiento_multiple,
+    
+    # Stock (placeholders)
+    get_lista_articulos_stock,
+    get_lista_familias_stock,
+    get_lista_depositos_stock,
+    get_stock_total,
+    get_stock_por_familia,
+    get_stock_por_deposito,
+    get_stock_articulo,
+    get_stock_familia,
+    get_lotes_por_vencer,
+    get_lotes_vencidos,
+    get_stock_bajo,
+    get_stock_lote_especifico,
+    buscar_stock_por_lote
 )
 
 # =========================
