@@ -1,6 +1,6 @@
 # =====================================================================
 # 📉 MÓDULO BAJA DE STOCK - USO OPERATIVO
-# Archivo: baja_stock.py
+# Archivo: bajastock.py
 # =====================================================================
 
 import streamlit as st
@@ -43,7 +43,8 @@ def buscar_articulo(texto: str) -> pd.DataFrame:
 
 def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
     """
-    Resta 1 unidad de stock y registra movimiento
+    Resta 1 unidad de stock (aunque STOCK sea texto con coma)
+    y registra movimiento
     """
     conn = get_db_connection()
     if not conn:
@@ -52,7 +53,7 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
     try:
         cursor = conn.cursor()
 
-        # Bloquea fila para evitar doble baja
+        # 🔒 Bloquear fila + convertir STOCK a número real
         cursor.execute("""
             SELECT 
                 CAST(
@@ -73,22 +74,25 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
             conn.close()
             return False, "Artículo no encontrado"
 
-        stock_raw, articulo = row
+        stock_actual, articulo = row
 
-        # Normalizar stock a número
-        try:
-            stock_actual = float(str(stock_raw).replace(",", "."))
-        except:
-            stock_actual = 0
-
-        if stock_actual < 1:
+        if stock_actual is None or stock_actual <= 0:
             conn.close()
             return False, "Stock en cero"
 
-        # Actualizar stock
+        # ✅ ACTUALIZACIÓN CORRECTA (SIN RESTAR TEXTO)
         cursor.execute("""
             UPDATE stock
-            SET "STOCK" = "STOCK" - 1
+            SET "STOCK" = CAST(
+                (
+                    CAST(
+                        REPLACE(
+                            REPLACE(TRIM("STOCK"), '.', ''),
+                            ',', '.'
+                        ) AS NUMERIC
+                    ) - 1
+                ) AS TEXT
+            )
             WHERE "CODIGO" = %s
         """, (codigo,))
 
@@ -102,7 +106,7 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
         conn.commit()
         conn.close()
 
-        return True, f"✔️ Bajado 1: {articulo}"
+        return True, f"✔️ Bajado: {articulo}"
 
     except Exception as e:
         try:
@@ -119,11 +123,11 @@ def obtener_historial(limit: int = 50) -> pd.DataFrame:
     """
     query = """
         SELECT
-            TO_CHAR(fecha, 'DD/MM/YYYY HH24:MI') AS "Fecha",
-            usuario  AS "Usuario",
-            codigo   AS "Código",
-            articulo AS "Artículo",
-            cantidad AS "Cantidad"
+            fecha        AS "Fecha",
+            usuario      AS "Usuario",
+            codigo       AS "Código",
+            articulo     AS "Artículo",
+            cantidad     AS "Cantidad"
         FROM stock_movimientos
         ORDER BY fecha DESC
         LIMIT %s
@@ -148,62 +152,45 @@ def mostrar_baja_stock():
     texto = st.text_input(
         "Código de barras o nombre",
         key="input_baja_stock",
-        placeholder="Escanear código o escribir nombre",
+        placeholder="Escanear código o escribir nombre"
     )
 
     if texto:
         df = buscar_articulo(texto)
 
         if df is None or df.empty:
-            st.error("❌ Artículo no encontrado")
+            st.warning("No se encontró el artículo")
         else:
-            # Tomamos el primero (uso operativo)
-            row = df.iloc[0]
+            for _, row in df.iterrows():
+                col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
 
-            st.markdown(
-                f"""
-                **{row['articulo']}**  
-                Código: `{row['codigo']}`  
-                Familia: `{row['familia']}`
-                """
-            )
+                with col1:
+                    st.markdown(f"**{row['articulo']}**")
+                    st.caption(f"Código: {row['codigo']}")
 
-            # Normalizar stock
-            try:
-                stock = float(str(row["stock"]).replace(",", "."))
-            except:
-                stock = 0
+                with col2:
+                    st.markdown(f"Familia: `{row['familia']}`")
 
-            st.markdown(f"Stock actual: **{stock}**")
+                with col3:
+                    st.markdown(f"Stock actual: **{row['stock']}**")
 
-            if stock < 1:
-                st.error("⚠️ Sin stock disponible")
-            else:
-                ok, msg = bajar_stock(row["codigo"], usuario)
-                if ok:
-                    st.success(msg)
-                    st.session_state["input_baja_stock"] = ""
-                    st.rerun()
-                else:
-                    st.error(msg)
+                with col4:
+                    if st.button("➖ Bajar 1", key=f"bajar_{row['codigo']}"):
+                        ok, msg = bajar_stock(row["codigo"], usuario)
+                        if ok:
+                            st.success(msg)
+                            st.session_state["input_baja_stock"] = ""
+                            st.rerun()
+                        else:
+                            st.error(msg)
 
     st.markdown("---")
 
-    # =========================
-    # HISTORIAL
-    # =========================
     st.subheader("🧾 Historial de bajas")
 
     df_hist = obtener_historial()
 
     if df_hist is not None and not df_hist.empty:
-        st.dataframe(
-            df_hist,
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_hist, use_container_width=True, hide_index=True)
     else:
         st.info("Todavía no hay movimientos registrados")
-
-
-
