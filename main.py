@@ -3373,14 +3373,17 @@ def main():
     if st.session_state.get('ejecutar_sugerencia'):
         sugerencia = st.session_state.get('sugerencia_pendiente', '')
         pregunta_orig = st.session_state.get('pregunta_original', '')
-        # Limpiar estado
+        
+        # Limpiar estado ANTES de procesar
         st.session_state['ejecutar_sugerencia'] = False
         st.session_state['sugerencia_pendiente'] = None
         st.session_state['mostrar_sugerencia'] = False
         st.session_state['pregunta_original'] = None
+        
         if sugerencia:
             with st.spinner("🧠 Ejecutando..."):
                 respuesta, df = procesar_pregunta_router(sugerencia)  
+                
                 # Comparación de FAMILIAS con tabs de moneda
                 if respuesta == "__COMPARACION_FAMILIA_TABS__" and 'comparacion_familia_tabs' in st.session_state:
                     tabs_data = st.session_state['comparacion_familia_tabs']
@@ -3411,13 +3414,13 @@ def main():
                         'es_comparacion': False,
                         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     })
-                # ✅ RENDER INMEDIATO (texto + tabla modo celular)
-                if respuesta and respuesta not in ["__MOSTRAR_SUGERENCIA__", "__COMPARACION_TABS__", "__COMPARACION_FAMILIA_TABS__"]:
-                    st.markdown("**Respuesta:**")
-                    st.markdown(respuesta)
-                    mostrar_detalle_df(df, titulo="📄 Ver detalle de compras", key=f"curr_sug_{len(st.session_state.historial)}")
             
-            st.rerun() 
+            # ✅ Mostrar resultado inmediato FUERA del spinner
+            st.success("✅ Consulta ejecutada")
+            if respuesta and respuesta not in ["__MOSTRAR_SUGERENCIA__", "__COMPARACION_TABS__", "__COMPARACION_FAMILIA_TABS__"]:
+                st.markdown(f"**{respuesta}**")
+                if df is not None and not df.empty:
+                    st.dataframe(df, use_container_width=True, hide_index=True)
     # =========================================================================
     # PROCESAR NUEVA PREGUNTA
     # =========================================================================
