@@ -3071,16 +3071,17 @@ def main():
 
         st.markdown("---")
 
-if DEBUG_MODE:
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔌 Test DB", use_container_width=True):
-                    conn = get_db_connection()
-                    if conn:
-                        st.success("✅ Postgres OK")
-                        conn.close()
-                    else:
-                        st.error("❌ Sin conexión")
+    if DEBUG_MODE:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("🔌 Test DB", use_container_width=True):
+                conn = get_db_connection()
+                if conn:
+                    st.success("✅ Postgres OK")
+                    conn.close()
+                else:
+                    st.error("❌ Sin conexión")
 
         with col2:
             if st.button("🧠 Test AI", use_container_width=True):
