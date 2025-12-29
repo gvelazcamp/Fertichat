@@ -3137,6 +3137,8 @@ def main():
     # Si llegó acá, el usuario está autenticado
     user = get_current_user()
 
+def main():
+
     # =====================================================================
     # 🚪 SIDEBAR CON INFO DE USUARIO Y LOGOUT
     # =====================================================================
