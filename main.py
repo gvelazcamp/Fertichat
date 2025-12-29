@@ -3231,6 +3231,14 @@ def main():
     # =========================
     header_slot = st.empty()
 
+    # ======================================================
+    # 🚦 REDIRECCIÓN DESDE CAMPANITA
+    # ======================================================
+    if st.session_state.get("ir_a_pedidos"):
+        st.session_state["menu_ui"] = "📄 Pedidos Internos"
+        st.session_state["menu_principal"] = "📄 Pedidos Internos"
+        st.session_state.pop("ir_a_pedidos")
+
     # =========================
     # MENÚ ÚNICO (HORIZONTAL)
     # =========================
@@ -3254,6 +3262,7 @@ def main():
 
     if menu != st.session_state.menu_principal:
         st.session_state.menu_principal = menu
+
 
     # DEBUG VISIBLE - QUÉ BUSCÓ LA APP
     if DEBUG_MODE:
