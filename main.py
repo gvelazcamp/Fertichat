@@ -3129,6 +3129,7 @@ def main():
     inject_css_responsive()
 
 def main():
+
     st.set_page_config(
         page_title="Ferti Chat - Gestión de Compras",
         page_icon="🦋",
@@ -3145,7 +3146,7 @@ def main():
         st.stop()
 
     # Si llegó acá, el usuario está autenticado
-    user = get_current_user()
+    user = get_current_user() or {}
 
     # =====================================================================
     # 🚪 SIDEBAR CON INFO DE USUARIO Y LOGOUT
@@ -3177,52 +3178,6 @@ def main():
             st.rerun()
 
         st.markdown("---")
-
-    # =========================
-    # MENÚ PRINCIPAL
-    # =========================
-    menu = st.radio(
-        "Menú:",
-        ["🛒 Compras IA", "📦 Stock IA", "🔎 Buscador IA", "📊 Dashboard", "📈 Indicadores IA"],
-        horizontal=True,
-        key="menu_principal"
-    )
-    
-    # =========================
-    # HEADER DINÁMICO (ARRIBA DEL MENÚ)
-    # =========================
-    header_slot = st.empty()
-
-    # =========================
-    # MENÚ ÚNICO (HORIZONTAL)
-    # =========================
-    menu = st.radio(
-        "Menú:",
-        ["🛒 Compras IA", "📦 Stock IA", "🔎 Buscador IA", "📊 Dashboard", "📈 Indicadores IA"],
-        horizontal=True,
-        key="menu_principal"
-    )
-
-    # =====================================================
-    # EJEMPLO DE USO DEL MENÚ (TU LÓGICA SIGUE ACÁ)
-    # =====================================================
-    if menu == "🛒 Compras IA":
-        st.title("Compras IA")
-        # tu lógica de compras
-
-    elif menu == "📦 Stock IA":
-        st.title("Stock IA")
-
-    elif menu == "🔎 Buscador IA":
-        st.title("Buscador IA")
-
-    elif menu == "📊 Dashboard":
-        st.title("Dashboard")
-
-    elif menu == "📈 Indicadores IA":
-        st.title("Indicadores IA")
-
-
     # =========================
     # HEADER DINÁMICO (ARRIBA DEL MENÚ)
     # =========================
