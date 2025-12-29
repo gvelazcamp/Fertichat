@@ -54,11 +54,12 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
 
         # Bloquea fila para evitar doble baja
         cursor.execute("""
-            SELECT "STOCK", "ARTICULO"
+            SELECT CAST("STOCK" AS NUMERIC), "ARTICULO"
             FROM stock
             WHERE "CODIGO" = %s
             FOR UPDATE
         """, (codigo,))
+
         row = cursor.fetchone()
 
         if not row:
@@ -196,4 +197,5 @@ def mostrar_baja_stock():
         )
     else:
         st.info("Todavía no hay movimientos registrados")
+
 
