@@ -1377,26 +1377,38 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
 
         return titulo + ":", formatear_dataframe(df)
 
-    # --- PRIORIDAD 10: COMPARACIONES (MESES) ---
+ # --- PRIORIDAD 10: COMPARACIONES (MESES) ---
     elif tipo == 'comparar_familia_meses':
-        mes1 = params.get("mes1")
-        mes2 = params.get("mes2")
+        # ✅ CORREGIDO: Primero intentar obtener de params['meses']
+        meses_params = params.get("meses", [])
         familias = params.get("familias")
-
-        # Fallback si los meses no vinieron en params
+        
+        mes1 = None
+        mes2 = None
+        
+        # Si vienen meses en params (lista de tuplas)
+        if meses_params and len(meses_params) >= 2:
+            try:
+                ini1, _, _ = meses_params[0]
+                ini2, _, _ = meses_params[1]
+                mes1 = ini1.strftime("%Y-%m")
+                mes2 = ini2.strftime("%Y-%m")
+            except:
+                pass
+        
+        # Fallback: extraer de la pregunta
         if not mes1 or not mes2:
             meses_detectados = extraer_meses_para_comparacion(pregunta)
-
+            
             if len(meses_detectados) >= 2:
                 ini1, _, _ = meses_detectados[0]
                 ini2, _, _ = meses_detectados[1]
-
                 mes1 = ini1.strftime("%Y-%m")
                 mes2 = ini2.strftime("%Y-%m")
 
         if not mes1 or not mes2:
             return (
-                "No pude identificar correctamente los dos meses a comparar.",
+                "No pude identificar los dos meses a comparar. Probá con: 'comparar gastos familias junio julio 2025'",
                 None
             )
 
@@ -1426,68 +1438,6 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
         }
         
         return "__COMPARACION_FAMILIA_TABS__", None
-
-    elif tipo == 'comparar_familia_anios_monedas':
-        anios = params.get('anios') or extraer_anios(pregunta)
-        familias = extraer_valores_multiples(pregunta, 'familia')
-
-        df = get_comparacion_familia_anios_monedas(
-            anios,
-            familias if familias else None
-        )
-
-        if df.empty:
-            titulo, df2, resp2 = fallback_openai_sql(
-                pregunta,
-                "No encontró comparación familia por años"
-            )
-            if df2 is not None and not df2.empty:
-                return f"📊 {resp2 or titulo}", formatear_dataframe(df2)
-            return "No encontré datos para comparar familias por años.", None
-
-        return "🏭 Comparación por familia (años, $ y U$S):", formatear_dataframe(df)
-    elif tipo == 'comparar_proveedor_meses':
-        meses = extraer_meses_para_comparacion(pregunta)
-        if len(meses) < 2:
-            return "Necesito al menos 2 meses para comparar.", None
-
-        ini1, _, label1 = meses[0]
-        ini2, _, label2 = meses[1]
-        mes1 = ini1.strftime('%Y-%m')
-        mes2 = ini2.strftime('%Y-%m')
-
-        # ✅ CORREGIDO: Usar params del intent_detector primero
-        proveedores = params.get('proveedores') or extraer_valores_multiples(pregunta, 'proveedor')
-        df = get_comparacion_proveedor_meses(mes1, mes2, label1, label2, proveedores if proveedores else None)
-
-        if df.empty:
-            titulo, df2, resp2 = fallback_openai_sql(pregunta, "No encontró comparación proveedores (meses)")
-            if df2 is not None and not df2.empty:
-                return f"📊 {resp2 or titulo}", formatear_dataframe(df2)
-            return "No encontré datos para comparar.", None
-
-        return "📊 Comparación por proveedor (meses):", formatear_dataframe(df)
-
-    elif tipo == 'comparar_articulo_meses':
-        meses = extraer_meses_para_comparacion(pregunta)
-        if len(meses) < 2:
-            return "Necesito al menos 2 meses para comparar.", None
-
-        ini1, _, label1 = meses[0]
-        ini2, _, label2 = meses[1]
-        mes1 = ini1.strftime('%Y-%m')
-        mes2 = ini2.strftime('%Y-%m')
-
-        articulos = extraer_valores_multiples(pregunta, 'articulo')
-        df = get_comparacion_articulo_meses(mes1, mes2, label1, label2, articulos if articulos else None)
-
-        if df.empty:
-            titulo, df2, resp2 = fallback_openai_sql(pregunta, "No encontró comparación artículos (meses)")
-            if df2 is not None and not df2.empty:
-                return f"📊 {resp2 or titulo}", formatear_dataframe(df2)
-            return "No encontré datos para comparar.", None
-
-        return "📊 Comparación por artículo (meses):", formatear_dataframe(df)
 
     # --- PRIORIDAD 11: COMPARACIONES (AÑOS) ---
     elif tipo == 'comparar_proveedor_anios_monedas':
