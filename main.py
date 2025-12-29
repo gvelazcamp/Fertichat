@@ -3114,6 +3114,38 @@ def inject_css_responsive():
         unsafe_allow_html=True
     )
 
+# =========================
+# UI - MOSTRAR DETALLE DF
+# =========================
+def mostrar_detalle_df(df, titulo="📋 Ver tabla (detalle)", key="detalle_df", max_rows=200):
+    """
+    Muestra un dataframe en pantalla bajo un checkbox (para no llenar la UI).
+    Evita NameError cuando main() llama mostrar_detalle_df(...).
+    """
+    if df is None:
+        return
+
+    try:
+        if hasattr(df, "empty") and df.empty:
+            return
+    except Exception:
+        pass
+
+    ver = st.checkbox(titulo, key=key, value=False)
+    if not ver:
+        return
+
+    try:
+        total_rows = len(df)
+    except Exception:
+        total_rows = None
+
+    # Mostrar hasta max_rows (como vos ya venías haciendo "mostrando 200")
+    df_show = df.head(max_rows) if hasattr(df, "head") else df
+    st.dataframe(df_show, use_container_width=True, hide_index=True)
+
+    if total_rows is not None and total_rows > max_rows:
+        st.caption(f"Mostrando {max_rows} de {total_rows} registros.")
 
 
 # =====================================================================
