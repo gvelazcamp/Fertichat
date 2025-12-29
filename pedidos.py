@@ -333,6 +333,21 @@ def obtener_articulos_por_seccion(seccion: str) -> pd.DataFrame:
     """
     return ejecutar_consulta(query, (seccion.upper(),))
 
+def render_campanita(usuario: str):
+    """
+    Muestra la campanita de notificaciones en Streamlit
+    """
+    count = contar_notificaciones_no_leidas(usuario)
+
+    col_icon, col_text = st.columns([1, 8])
+
+    with col_icon:
+        if st.button(f"🔔 {count}" if count > 0 else "🔔", key="btn_campanita"):
+            st.session_state["ver_notificaciones"] = True
+
+    with col_text:
+        if count > 0:
+            st.markdown(f"**Tenés {count} notificación(es) pendiente(s)**")
 
 
 # =====================================================================
@@ -684,4 +699,5 @@ def mostrar_pedidos_internos():
                                     st.error(msg)
         else:
             st.info("No hay pedidos registrados")
+
 
