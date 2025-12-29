@@ -141,7 +141,6 @@ def mostrar_baja_stock():
         "Código de barras o nombre",
         key="input_baja_stock",
         placeholder="Escanear código o escribir nombre",
-        autofocus=True
     )
 
     if texto:
@@ -197,3 +196,4 @@ def mostrar_baja_stock():
         )
     else:
         st.info("Todavía no hay movimientos registrados")
+
