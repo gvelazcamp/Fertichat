@@ -3171,7 +3171,11 @@ def main():
     # =========================
     # RENDER TABLA (MODO CELULAR)
     # =========================
-   def mostrar_detalle_df(df: pd.DataFrame, titulo: str = "📄 Detalle", key: str = "detalle"):
+    def mostrar_detalle_df(
+        df: pd.DataFrame,
+        titulo: str = "📄 Detalle",
+        key: str = "detalle"
+    ):
         if df is None or df.empty:
             return
 
