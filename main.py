@@ -3119,7 +3119,6 @@ def inject_css_responsive():
 # INTERFAZ STREAMLIT
 # =====================================================================
 def main():
-
     st.set_page_config(
         page_title="Ferti Chat - Gestión de Compras",
         page_icon="🦋",
@@ -3184,14 +3183,14 @@ def main():
         key="menu_principal"
     )
 
-    # DEBUG VISIBLE - QUÉ BUSCÓ LA APP (solo si DEBUG_MODE = True)
+    # DEBUG VISIBLE - QUÉ BUSCÓ LA APP
     if DEBUG_MODE:
         with st.expander("🐞 Debug – Última búsqueda", expanded=False):
             if "debug" in st.session_state:
                 st.json(st.session_state.debug)
 
     # =========================
-    # TARJETAS SEGÚN MENÚ (SE RENDERIZAN ARRIBA)
+    # TARJETAS SEGÚN MENÚ
     # =========================
     if menu == "🛒 Compras IA":
         with header_slot.container():
