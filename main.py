@@ -2720,108 +2720,205 @@ def mostrar_indicadores_ia():
     )
 
 # =========================
-# 📊 RESUMEN RÁPIDO (ROTATIVO) - ANTI DUPLICADO
+# 📊 RESUMEN RÁPIDO
 # =========================
+def _safe_float(x) -> float:
+    try:
+        if x is None:
+            return 0.0
+        return float(x)
+    except Exception:
+        return 0.0
+
+
+@st.cache_data(ttl=300)
+def _get_totales_anio(anio: int) -> dict:
+    total_expr = _sql_total_num_expr_general()
+
+    query = f"""
+        SELECT
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) = '$'
+                     THEN {total_expr} ELSE 0 END) AS total_pesos,
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) IN ('U$S','U$$')
+                     THEN {total_expr} ELSE 0 END) AS total_usd
+        FROM chatbot_raw
+        WHERE
+            ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+            AND "Año"::int = %s
+    """
+
+    params = (anio,)
+
+    # DEBUG (opcional)
+    if DEBUG_MODE:
+        st.session_state.debug = {
+            "pregunta": "total compras por año",
+            "proveedor": None,
+            "mes": None,
+            "anio": anio,
+            "sql": query,
+            "params": params,
+            "ruta": "TOTAL_COMPRAS_ANIO",
+        }
+
+    df = ejecutar_consulta(query, params)
+    if df is None or df.empty:
+        return {"pesos": 0.0, "usd": 0.0}
+
+    return {
+        "pesos": _safe_float(df["total_pesos"].iloc[0]),
+        "usd": _safe_float(df["total_usd"].iloc[0]),
+    }
+
+
+@st.cache_data(ttl=300)
+def _get_totales_mes(mes_key: str) -> dict:
+    total_expr = _sql_total_num_expr_general()
+
+    query = f"""
+        SELECT
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) = '$'
+                     THEN {total_expr} ELSE 0 END) AS total_pesos,
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) IN ('U$S','U$$')
+                     THEN {total_expr} ELSE 0 END) AS total_usd
+        FROM chatbot_raw
+        WHERE
+            ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+            AND TRIM("Mes") = %s
+    """
+    df = ejecutar_consulta(query, (mes_key,))
+    if df is None or df.empty:
+        return {"pesos": 0.0, "usd": 0.0}
+
+    return {
+        "pesos": _safe_float(df["total_pesos"].iloc[0]),
+        "usd": _safe_float(df["total_usd"].iloc[0]),
+    }
+
+
+@st.cache_data(ttl=300)
+def _get_top_proveedores_anio(anio: int, top_n: int = 20) -> pd.DataFrame:
+    total_expr = _sql_total_num_expr_general()
+
+    query = f"""
+        SELECT
+            TRIM("Cliente / Proveedor") AS "Proveedor",
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) = '$'
+                     THEN {total_expr} ELSE 0 END) AS "Total_$",
+            SUM(CASE WHEN TRIM(COALESCE("Moneda",'')) IN ('U$S','U$$')
+                     THEN {total_expr} ELSE 0 END) AS "Total_USD"
+        FROM chatbot_raw
+        WHERE
+            ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+            AND "Año"::int = %s
+            AND "Cliente / Proveedor" IS NOT NULL
+            AND TRIM("Cliente / Proveedor") <> ''
+        GROUP BY TRIM("Cliente / Proveedor")
+        ORDER BY "Total_$" DESC, "Total_USD" DESC
+        LIMIT {int(top_n)}
+    """
+    df = ejecutar_consulta(query, (anio,))
+    if df is None:
+        return pd.DataFrame(columns=["Proveedor", "Total_$", "Total_USD"])
+    return df
+
+
 def mostrar_resumen_compras_rotativo():
+    # ✅ esto hace que el script se re-ejecute cada 5 segundos
+    tick = 0
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        tick = st_autorefresh(interval=5000, key="__rotar_proveedor_5s__") or 0
+    except Exception:
+        tick = 0  # si no está instalado, queda fijo
 
-    # ✅ Slot único: si la función corre 2 veces, NO duplica (se sobreescribe)
-    if "__resumen_slot" not in st.session_state:
-        st.session_state["__resumen_slot"] = st.empty()
-    slot = st.session_state["__resumen_slot"]
+    anio = datetime.now().year
+    mes_key = datetime.now().strftime("%Y-%m")
 
-    # ✅ Tick interno para rotar proveedor (evita depender de st_autorefresh acá)
-    tick = st.session_state.get("__resumen_tick", 0)
-    st.session_state["__resumen_tick"] = tick + 1
+    tot_anio = _get_totales_anio(anio)
+    tot_mes = _get_totales_mes(mes_key)
 
-    # ✅ TODO lo que imprima tarjetas/columns/markdown va acá adentro
-    with slot.container():
+    dfp = _get_top_proveedores_anio(anio, top_n=20)
 
-        anio = datetime.now().year
-        mes_key = datetime.now().strftime("%Y-%m")
+    prov_nom = "—"
+    prov_pesos = 0.0
+    prov_usd = 0.0
 
-        tot_anio = _get_totales_anio(anio)
-        tot_mes = _get_totales_mes(mes_key)
-        dfp = _get_top_proveedores_anio(anio, top_n=20)
+    if dfp is not None and not dfp.empty:
+        idx = int(tick) % len(dfp)
+        row = dfp.iloc[idx]
 
-        prov_nom = "—"
-        prov_pesos = 0.0
-        prov_usd = 0.0
+        # Buscar columnas (PostgreSQL devuelve en minúsculas a veces según driver)
+        for col in dfp.columns:
+            if col.lower() == 'proveedor':
+                prov_nom = str(row[col]) if pd.notna(row[col]) else "—"
+            elif col.lower() == 'total_$':
+                prov_pesos = _safe_float(row[col])
+            elif col.lower() == 'total_usd':
+                prov_usd = _safe_float(row[col])
 
-        if dfp is not None and not dfp.empty:
-            idx = int(tick) % len(dfp)
-            row = dfp.iloc[idx]
+    # ✅ estilo "mini" (chico y prolijo)
+    st.markdown("""
+    <style>
+      .mini-resumen {
+        display: flex;
+        gap: 12px;
+        margin: 6px 0 10px 0;
+      }
+      .mini-card {
+        flex: 1;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.8);
+      }
+      .mini-t {
+        font-size: 0.82rem;
+        font-weight: 600;
+        opacity: 0.85;
+        margin: 0;
+      }
+      .mini-v {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin: 4px 0 0 0;
+      }
+      .mini-s {
+        font-size: 0.82rem;
+        opacity: 0.75;
+        margin: 4px 0 0 0;
+      }
+    </style>
+    """, unsafe_allow_html=True)
 
-            for col in dfp.columns:
-                if col.lower() == 'proveedor':
-                    prov_nom = str(row[col]) if pd.notna(row[col]) else "—"
-                elif col.lower() == 'total_$':
-                    prov_pesos = _safe_float(row[col])
-                elif col.lower() == 'total_usd':
-                    prov_usd = _safe_float(row[col])
+    total_anio_txt = f"$ {_fmt_num_latam(tot_anio['pesos'], 0)}"
+    total_anio_sub = f"U$S {_fmt_num_latam(tot_anio['usd'], 0)}"
 
-        total_anio_txt = f"$ {_fmt_num_latam(tot_anio['pesos'], 0)}"
-        total_anio_sub = f"U$S {_fmt_num_latam(tot_anio['usd'], 0)}"
+    prov_sub = f"$ {_fmt_num_latam(prov_pesos, 0)} | U$S {_fmt_num_latam(prov_usd, 0)}"
 
-        prov_sub = f"$ {_fmt_num_latam(prov_pesos, 0)} | U$S {_fmt_num_latam(prov_usd, 0)}"
+    mes_txt = f"$ {_fmt_num_latam(tot_mes['pesos'], 0)}"
+    mes_sub = f"U$S {_fmt_num_latam(tot_mes['usd'], 0)}"
 
-        mes_txt = f"$ {_fmt_num_latam(tot_mes['pesos'], 0)}"
-        mes_sub = f"U$S {_fmt_num_latam(tot_mes['usd'], 0)}"
-
-        # ✅ Render único: se sobreescribe siempre en el MISMO slot
-        html = f"""
-        <style>
-          .mini-resumen {{
-            display: flex;
-            gap: 12px;
-            margin: 6px 0 10px 0;
-          }}
-          .mini-card {{
-            flex: 1;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 10px 12px;
-            background: rgba(255,255,255,0.8);
-          }}
-          .mini-t {{
-            font-size: 0.82rem;
-            font-weight: 600;
-            opacity: 0.85;
-            margin: 0;
-          }}
-          .mini-v {{
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin: 4px 0 0 0;
-          }}
-          .mini-s {{
-            font-size: 0.82rem;
-            opacity: 0.75;
-            margin: 4px 0 0 0;
-          }}
-        </style>
-
-        <div class="mini-resumen">
-          <div class="mini-card">
-            <p class="mini-t">💰 Total {anio}</p>
-            <p class="mini-v">{total_anio_txt}</p>
-            <p class="mini-s">{total_anio_sub}</p>
-          </div>
-
-          <div class="mini-card">
-            <p class="mini-t">🏭 Proveedor</p>
-            <p class="mini-v">{prov_nom}</p>
-            <p class="mini-s">{prov_sub}</p>
-          </div>
-
-          <div class="mini-card">
-            <p class="mini-t">🗓️ Mes actual</p>
-            <p class="mini-v">{mes_txt}</p>
-            <p class="mini-s">{mes_sub}</p>
-          </div>
+    # ✅ IMPORTANTE: SOLO UNA VEZ (acá estaba duplicado)
+    st.markdown(f"""
+      <div class="mini-resumen">
+        <div class="mini-card">
+          <p class="mini-t">💰 Total {anio}</p>
+          <p class="mini-v">{total_anio_txt}</p>
+          <p class="mini-s">{total_anio_sub}</p>
         </div>
-        """
-
-        st.markdown(html, unsafe_allow_html=True)
+        <div class="mini-card">
+          <p class="mini-t">🏭 Proveedor</p>
+          <p class="mini-v">{prov_nom}</p>
+          <p class="mini-s">{prov_sub}</p>
+        </div>
+        <div class="mini-card">
+          <p class="mini-t">🗓️ Mes actual</p>
+          <p class="mini-v">{mes_txt}</p>
+          <p class="mini-s">{mes_sub}</p>
+        </div>
+      </div>
+    """, unsafe_allow_html=True)
 
 
 # =====================================================================
