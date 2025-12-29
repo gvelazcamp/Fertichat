@@ -25,3 +25,8 @@ flask>=3.0.0
 
 # Opcional: Para bots de Telegram
 python-telegram-bot>=20.7
+
+streamlit-autorefresh
+
+openpyxl
+
