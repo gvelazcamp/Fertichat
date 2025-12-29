@@ -3238,10 +3238,24 @@ def main():
     # =========================
     menu = st.radio(
         "Menú:",
-        ["🛒 Compras IA", "📦 Stock IA", "🔎 Buscador IA", "📊 Dashboard", "📈 Indicadores IA", "📄 Pedidos Internos"],
+        [
+            "🛒 Compras IA",
+            "📦 Stock IA",
+            "🔎 Buscador IA",
+            "📊 Dashboard",
+            "📈 Indicadores IA",
+            "📄 Pedidos Internos"
+        ],
         horizontal=True,
-        key="menu_principal"
+        key="menu_ui"
     )
+
+    # 🔁 Sincronizar menú UI con menú lógico (evita crash de Streamlit)
+    if "menu_principal" not in st.session_state:
+        st.session_state.menu_principal = menu
+
+    if menu != st.session_state.menu_principal:
+        st.session_state.menu_principal = menu
 
     # DEBUG VISIBLE - QUÉ BUSCÓ LA APP
     if DEBUG_MODE:
