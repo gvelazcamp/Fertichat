@@ -1,17 +1,12 @@
 # =====================================================================
 # 🔐 MÓDULO DE AUTENTICACIÓN - FERTI CHAT
 # =====================================================================
-# Sistema de login con auto-registro y notificación por email
-# Fecha: 27 Diciembre 2024
+# Sistema de login con usuarios predefinidos
+# Solo los usuarios de la lista pueden acceder
 # =====================================================================
 
 import sqlite3
 import hashlib
-import os
-import re
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -19,32 +14,29 @@ from typing import Optional, Tuple
 DB_PATH = "users.db"
 
 # =====================================================================
-# CONFIGURACIÓN DE EMAIL (SMTP)
+# 👥 USUARIOS PREDEFINIDOS (SOLO ESTOS PUEDEN ENTRAR)
 # =====================================================================
-# Configuración para enviar emails de bienvenida
-
-SMTP_CONFIG = {
-    "enabled": False,  # Cambiar a True y configurar para activar emails
-    "server": "smtp.gmail.com",
-    "port": 587,
-    "email": "tu_email@gmail.com",
-    "password": "",  # Contraseña de aplicación de Gmail
-    "destinatario_copia": "tu_email@gmail.com"
-}
+USUARIOS_PREDEFINIDOS = [
+    {"usuario": "gvelazquez", "password": "123abc", "nombre": "G. Velazquez", "empresa": "Fertilab"},
+    {"usuario": "dserveti", "password": "abc123", "nombre": "D. Serveti", "empresa": "Fertilab"},
+    {"usuario": "jesteves", "password": "123abc", "nombre": "J. Esteves", "empresa": "Fertilab"},
+    {"usuario": "sruiz", "password": "123abc", "nombre": "S. Ruiz", "empresa": "Fertilab"},
+]
 
 # =====================================================================
 # INICIALIZACIÓN DE BASE DE DATOS
 # =====================================================================
 
 def init_db():
-    """Crea la tabla de usuarios si no existe"""
+    """Crea la tabla de usuarios y carga los predefinidos"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # Crear tabla
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
+            usuario TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             nombre TEXT,
             empresa TEXT,
@@ -55,6 +47,19 @@ def init_db():
     ''')
     
     conn.commit()
+    
+    # Cargar usuarios predefinidos (si no existen)
+    for u in USUARIOS_PREDEFINIDOS:
+        cursor.execute("SELECT id FROM users WHERE usuario = ?", (u["usuario"].lower(),))
+        if not cursor.fetchone():
+            password_hash = hash_password(u["password"])
+            cursor.execute('''
+                INSERT INTO users (usuario, password_hash, nombre, empresa)
+                VALUES (?, ?, ?, ?)
+            ''', (u["usuario"].lower(), password_hash, u["nombre"], u["empresa"]))
+            print(f"✅ Usuario creado: {u['usuario']}")
+    
+    conn.commit()
     conn.close()
 
 # =====================================================================
@@ -62,8 +67,7 @@ def init_db():
 # =====================================================================
 
 def hash_password(password: str) -> str:
-    """Genera hash SHA-256 de la contraseña con salt"""
-    # Salt fijo para simplicidad (en producción usar salt único por usuario)
+    """Genera hash SHA-256 de la contraseña"""
     salt = "ferti_chat_2024_salt"
     salted = f"{salt}{password}{salt}"
     return hashlib.sha256(salted.encode()).hexdigest()
@@ -73,226 +77,32 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hash_password(password) == password_hash
 
 # =====================================================================
-# VALIDACIONES
+# LOGIN (SOLO USUARIOS PREDEFINIDOS)
 # =====================================================================
 
-def validate_email(email: str) -> Tuple[bool, str]:
-    """Valida formato de email"""
-    if not email:
-        return False, "El email es requerido"
-    
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(pattern, email):
-        return False, "Formato de email inválido"
-    
-    return True, ""
-
-def validate_password(password: str) -> Tuple[bool, str]:
-    """Valida requisitos de contraseña"""
-    if not password:
-        return False, "La contraseña es requerida"
-    
-    if len(password) < 6:
-        return False, "La contraseña debe tener al menos 6 caracteres"
-    
-    return True, ""
-
-# =====================================================================
-# OPERACIONES DE USUARIO
-# =====================================================================
-
-def register_user(email: str, password: str, nombre: str = "", empresa: str = "") -> Tuple[bool, str]:
+def login_user(usuario: str, password: str) -> Tuple[bool, str, Optional[dict]]:
     """
-    Registra un nuevo usuario
-    Returns: (éxito, mensaje)
-    """
-    # Validar email
-    valid, msg = validate_email(email)
-    if not valid:
-        return False, msg
-    
-    # Validar contraseña
-    valid, msg = validate_password(password)
-    if not valid:
-        return False, msg
-    
-    # Verificar si ya existe
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT id FROM users WHERE email = ?", (email.lower(),))
-    if cursor.fetchone():
-        conn.close()
-        return False, "Este email ya está registrado"
-    
-    # Crear usuario
-    try:
-        password_hash = hash_password(password)
-        cursor.execute('''
-            INSERT INTO users (email, password_hash, nombre, empresa)
-            VALUES (?, ?, ?, ?)
-        ''', (email.lower(), password_hash, nombre, empresa))
-        
-        conn.commit()
-        conn.close()
-        return True, "¡Registro exitoso! Ya podés iniciar sesión"
-    
-    except Exception as e:
-        conn.close()
-        return False, f"Error al registrar: {str(e)}"
-
-def enviar_email_bienvenida(email_usuario: str, password: str) -> bool:
-    """
-    Envía email de bienvenida con las credenciales.
-    Retorna True si se envió, False si falló.
-    """
-    if not SMTP_CONFIG.get("enabled"):
-        print(f"📧 Email desactivado. Nuevo usuario: {email_usuario} / {password}")
-        return False
-    
-    try:
-        # Crear mensaje
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = '🦋 Bienvenido a Ferti Chat'
-        msg['From'] = SMTP_CONFIG['email']
-        msg['To'] = SMTP_CONFIG['destinatario_copia']
-        
-        # Contenido HTML
-        html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-            <div style="max-width: 500px; margin: 0 auto; background: #f8fafc; padding: 30px; border-radius: 10px;">
-                <h2 style="color: #1f2937; text-align: center;">🦋 Ferti Chat</h2>
-                <h3 style="color: #374151;">Nuevo usuario registrado</h3>
-                <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <p><strong>Email:</strong> {email_usuario}</p>
-                    <p><strong>Contraseña:</strong> {password}</p>
-                    <p><strong>Fecha:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
-                </div>
-                <p style="color: #6b7280; font-size: 12px; text-align: center;">
-                    Este email fue generado automáticamente por Ferti Chat
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html, 'html'))
-        
-        # Intentar enviar con diferentes métodos
-        enviado = False
-        
-        # Método 1: STARTTLS (puerto 587)
-        try:
-            print(f"📧 Intentando enviar email via STARTTLS...")
-            server = smtplib.SMTP(SMTP_CONFIG['server'], 587, timeout=10)
-            server.starttls()
-            server.login(SMTP_CONFIG['email'], SMTP_CONFIG['password'])
-            server.sendmail(SMTP_CONFIG['email'], SMTP_CONFIG['destinatario_copia'], msg.as_string())
-            server.quit()
-            enviado = True
-        except Exception as e1:
-            print(f"⚠️ STARTTLS falló: {e1}")
-            
-            # Método 2: SSL directo (puerto 465)
-            try:
-                print(f"📧 Intentando enviar email via SSL...")
-                server = smtplib.SMTP_SSL(SMTP_CONFIG['server'], 465, timeout=10)
-                server.login(SMTP_CONFIG['email'], SMTP_CONFIG['password'])
-                server.sendmail(SMTP_CONFIG['email'], SMTP_CONFIG['destinatario_copia'], msg.as_string())
-                server.quit()
-                enviado = True
-            except Exception as e2:
-                print(f"⚠️ SSL falló: {e2}")
-                
-                # Método 3: Sin encriptación (puerto 25)
-                try:
-                    print(f"📧 Intentando enviar email via puerto 25...")
-                    server = smtplib.SMTP(SMTP_CONFIG['server'], 25, timeout=10)
-                    server.login(SMTP_CONFIG['email'], SMTP_CONFIG['password'])
-                    server.sendmail(SMTP_CONFIG['email'], SMTP_CONFIG['destinatario_copia'], msg.as_string())
-                    server.quit()
-                    enviado = True
-                except Exception as e3:
-                    print(f"⚠️ Puerto 25 falló: {e3}")
-        
-        if enviado:
-            print(f"✅ Email enviado a {SMTP_CONFIG['destinatario_copia']}")
-            return True
-        else:
-            print(f"❌ No se pudo enviar el email por ningún método")
-            return False
-        
-    except Exception as e:
-        print(f"❌ Error general enviando email: {e}")
-        return False
-
-def login_user(email: str, password: str) -> Tuple[bool, str, Optional[dict]]:
-    """
-    Inicia sesión. Si el usuario no existe, lo crea automáticamente.
+    Inicia sesión. Solo funcionan usuarios predefinidos.
     Returns: (éxito, mensaje, datos_usuario)
     """
-    if not email or not password:
-        return False, "Email y contraseña son requeridos", None
-    
-    # Validar formato de email
-    valid, msg = validate_email(email)
-    if not valid:
-        return False, msg, None
-    
-    # Validar contraseña mínima
-    if len(password) < 4:
-        return False, "La contraseña debe tener al menos 4 caracteres", None
+    if not usuario or not password:
+        return False, "Usuario y contraseña son requeridos", None
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT id, email, password_hash, nombre, empresa, is_active
-        FROM users WHERE email = ?
-    ''', (email.lower(),))
+        SELECT id, usuario, password_hash, nombre, empresa, is_active
+        FROM users WHERE usuario = ?
+    ''', (usuario.lower().strip(),))
     
     user = cursor.fetchone()
     
-    # =========================================================
-    # CASO 1: Usuario NO existe → CREAR automáticamente
-    # =========================================================
     if not user:
-        print(f"🆕 Nuevo usuario: {email}")
-        
-        # Crear usuario
-        password_hash = hash_password(password)
-        nombre = email.split('@')[0].replace('.', ' ').replace('_', ' ').title()
-        
-        cursor.execute('''
-            INSERT INTO users (email, password_hash, nombre, empresa)
-            VALUES (?, ?, ?, ?)
-        ''', (email.lower(), password_hash, nombre, "Fertilab"))
-        
-        conn.commit()
-        user_id = cursor.lastrowid
-        
-        # Actualizar último login
-        cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', (datetime.now(), user_id))
-        conn.commit()
         conn.close()
-        
-        # Enviar email de notificación
-        enviar_email_bienvenida(email, password)
-        
-        user_data = {
-            'id': user_id,
-            'email': email.lower(),
-            'nombre': nombre,
-            'empresa': "Fertilab"
-        }
-        
-        return True, f"¡Bienvenido {nombre}! Tu cuenta fue creada.", user_data
+        return False, "Usuario no autorizado", None
     
-    # =========================================================
-    # CASO 2: Usuario EXISTE → Verificar contraseña
-    # =========================================================
-    user_id, user_email, password_hash, nombre, empresa, is_active = user
+    user_id, user_usuario, password_hash, nombre, empresa, is_active = user
     
     if not is_active:
         conn.close()
@@ -303,39 +113,36 @@ def login_user(email: str, password: str) -> Tuple[bool, str, Optional[dict]]:
         return False, "Contraseña incorrecta", None
     
     # Actualizar último login
-    cursor.execute('''
-        UPDATE users SET last_login = ? WHERE id = ?
-    ''', (datetime.now(), user_id))
-    
+    cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', (datetime.now(), user_id))
     conn.commit()
     conn.close()
     
     user_data = {
         'id': user_id,
-        'email': user_email,
-        'nombre': nombre or user_email.split('@')[0],
+        'usuario': user_usuario,
+        'email': f"{user_usuario}@fertilab.com",
+        'nombre': nombre,
         'empresa': empresa
     }
     
-    return True, "¡Bienvenido!", user_data
+    return True, f"¡Bienvenido {nombre}!", user_data
 
-def change_password(email: str, old_password: str, new_password: str) -> Tuple[bool, str]:
+# =====================================================================
+# CAMBIO DE CONTRASEÑA
+# =====================================================================
+
+def change_password(usuario: str, old_password: str, new_password: str) -> Tuple[bool, str]:
     """
     Cambia la contraseña del usuario
     Returns: (éxito, mensaje)
     """
-    # Validar nueva contraseña
-    valid, msg = validate_password(new_password)
-    if not valid:
-        return False, msg
+    if len(new_password) < 4:
+        return False, "La nueva contraseña debe tener al menos 4 caracteres"
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cursor.execute('''
-        SELECT id, password_hash FROM users WHERE email = ?
-    ''', (email.lower(),))
-    
+    cursor.execute('SELECT id, password_hash FROM users WHERE usuario = ?', (usuario.lower(),))
     user = cursor.fetchone()
     
     if not user:
@@ -350,17 +157,18 @@ def change_password(email: str, old_password: str, new_password: str) -> Tuple[b
     
     # Actualizar contraseña
     new_hash = hash_password(new_password)
-    cursor.execute('''
-        UPDATE users SET password_hash = ? WHERE id = ?
-    ''', (new_hash, user_id))
-    
+    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user_id))
     conn.commit()
     conn.close()
     
-    return True, "¡Contraseña actualizada correctamente!"
+    return True, "¡Contraseña actualizada!"
+
+# =====================================================================
+# FUNCIONES AUXILIARES
+# =====================================================================
 
 def get_user_count() -> int:
-    """Retorna cantidad de usuarios registrados"""
+    """Retorna cantidad de usuarios"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -368,34 +176,33 @@ def get_user_count() -> int:
     conn.close()
     return count
 
-def crear_usuario(email: str, password: str, nombre: str = "", empresa: str = "Fertilab") -> Tuple[bool, str]:
-    """
-    Crea un nuevo usuario (para uso administrativo).
-    Usar esto para agregar usuarios ya que no hay registro público.
-    
-    Ejemplo:
-        from auth import crear_usuario
-        crear_usuario("juan@fertilab.com", "clave123", "Juan Pérez")
-    """
-    return register_user(email, password, nombre, empresa)
-
 def listar_usuarios() -> list:
-    """Lista todos los usuarios registrados"""
+    """Lista todos los usuarios"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, email, nombre, empresa, created_at, last_login FROM users WHERE is_active = 1")
+    cursor.execute("SELECT id, usuario, nombre, empresa, last_login FROM users WHERE is_active = 1")
     users = cursor.fetchall()
     conn.close()
     return users
 
-# =====================================================================
-# USUARIO POR DEFECTO
-# =====================================================================
-# Email: admin@fertilab.com
-# Contraseña: admin123
-# 
-# ⚠️ IMPORTANTE: Cambiar la contraseña después del primer login
-# =====================================================================
+def reset_password(usuario: str, new_password: str) -> Tuple[bool, str]:
+    """Reset de contraseña (uso admin)"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT id FROM users WHERE usuario = ?', (usuario.lower(),))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        return False, "Usuario no encontrado"
+    
+    new_hash = hash_password(new_password)
+    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user[0]))
+    conn.commit()
+    conn.close()
+    
+    return True, f"Contraseña de {usuario} reseteada"
 
 # Inicializar DB al importar
 init_db()
