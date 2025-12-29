@@ -3251,6 +3251,7 @@ def main():
             "📊 Dashboard",
             "📈 Indicadores IA",
             "📄 Pedidos Internos"
+            "📉 Baja de Stock"
         ],
         horizontal=True,
         key="menu_ui"
