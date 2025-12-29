@@ -3140,6 +3140,11 @@ def main():
 
 def main():
 
+    # =====================================================
+    # OBTENER USUARIO LOGUEADO (EVITA NameError)
+    # =====================================================
+    user = get_current_user() or {}
+
     # =====================================================================
     # 🚪 SIDEBAR CON INFO DE USUARIO Y LOGOUT
     # =====================================================================
@@ -3203,7 +3208,12 @@ def main():
         )
 
         st.markdown(f"**{titulo}**")
-        st.dataframe(df_show, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_show,
+            use_container_width=True,
+            hide_index=True
+        )
+
 
     # =========================
     # HEADER DINÁMICO (ARRIBA DEL MENÚ)
