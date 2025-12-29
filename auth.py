@@ -1,8 +1,8 @@
 # =====================================================================
 # 🔐 MÓDULO DE AUTENTICACIÓN - FERTI CHAT
 # =====================================================================
-# Sistema de login con usuarios predefinidos
-# Solo los usuarios de la lista pueden acceder
+# Login por USUARIO (no email)
+# DB: SQLite (users.db)
 # =====================================================================
 
 import sqlite3
@@ -24,45 +24,6 @@ USUARIOS_PREDEFINIDOS = [
 ]
 
 # =====================================================================
-# INICIALIZACIÓN DE BASE DE DATOS
-# =====================================================================
-
-def init_db():
-    """Crea la tabla de usuarios y carga los predefinidos"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # Crear tabla
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            nombre TEXT,
-            empresa TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP,
-            is_active INTEGER DEFAULT 1
-        )
-    ''')
-    
-    conn.commit()
-    
-    # Cargar usuarios predefinidos (si no existen)
-    for u in USUARIOS_PREDEFINIDOS:
-        cursor.execute("SELECT id FROM users WHERE usuario = ?", (u["usuario"].lower(),))
-        if not cursor.fetchone():
-            password_hash = hash_password(u["password"])
-            cursor.execute('''
-                INSERT INTO users (usuario, password_hash, nombre, empresa)
-                VALUES (?, ?, ?, ?)
-            ''', (u["usuario"].lower(), password_hash, u["nombre"], u["empresa"]))
-            print(f"✅ Usuario creado: {u['usuario']}")
-    
-    conn.commit()
-    conn.close()
-
-# =====================================================================
 # FUNCIONES DE HASH
 # =====================================================================
 
@@ -77,54 +38,118 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hash_password(password) == password_hash
 
 # =====================================================================
-# LOGIN (SOLO USUARIOS PREDEFINIDOS)
+# INICIALIZACIÓN DE BASE DE DATOS (MIGRACIÓN SI HAY TABLA VIEJA)
+# =====================================================================
+
+def init_db():
+    """Crea la tabla de usuarios y carga los predefinidos.
+    Si detecta estructura vieja (ej: columna email y no usuario), recrea la tabla.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Ver si existe tabla users
+    cursor.execute("""
+        SELECT name FROM sqlite_master WHERE type='table' AND name='users'
+    """)
+    exists = cursor.fetchone() is not None
+
+    if exists:
+        # Leer columnas actuales
+        cursor.execute("PRAGMA table_info(users)")
+        cols = [row[1] for row in cursor.fetchall()]  # row[1] = nombre columna
+
+        # Si NO está 'usuario' o falta 'password_hash', asumimos tabla vieja -> recrear
+        if ("usuario" not in cols) or ("password_hash" not in cols):
+            cursor.execute("DROP TABLE IF EXISTS users")
+            conn.commit()
+
+    # Crear tabla (estructura nueva)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            nombre TEXT,
+            empresa TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active INTEGER DEFAULT 1
+        )
+    """)
+    conn.commit()
+
+    # Cargar usuarios predefinidos (si no existen)
+    for u in USUARIOS_PREDEFINIDOS:
+        usuario_norm = u["usuario"].lower().strip()
+        cursor.execute("SELECT id FROM users WHERE usuario = ?", (usuario_norm,))
+        if not cursor.fetchone():
+            password_hash = hash_password(u["password"])
+            cursor.execute("""
+                INSERT INTO users (usuario, password_hash, nombre, empresa)
+                VALUES (?, ?, ?, ?)
+            """, (usuario_norm, password_hash, u.get("nombre"), u.get("empresa")))
+            print(f"✅ Usuario creado: {usuario_norm}")
+
+    conn.commit()
+    conn.close()
+
+# =====================================================================
+# LOGIN
 # =====================================================================
 
 def login_user(usuario: str, password: str) -> Tuple[bool, str, Optional[dict]]:
     """
-    Inicia sesión. Solo funcionan usuarios predefinidos.
+    Inicia sesión por usuario.
     Returns: (éxito, mensaje, datos_usuario)
     """
     if not usuario or not password:
         return False, "Usuario y contraseña son requeridos", None
-    
+
+    usuario_norm = usuario.lower().strip()
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
-    cursor.execute('''
+
+    cursor.execute("""
         SELECT id, usuario, password_hash, nombre, empresa, is_active
-        FROM users WHERE usuario = ?
-    ''', (usuario.lower().strip(),))
-    
-    user = cursor.fetchone()
-    
-    if not user:
+        FROM users
+        WHERE usuario = ?
+    """, (usuario_norm,))
+
+    row = cursor.fetchone()
+
+    if not row:
         conn.close()
         return False, "Usuario no autorizado", None
-    
-    user_id, user_usuario, password_hash, nombre, empresa, is_active = user
-    
+
+    user_id, user_usuario, password_hash, nombre, empresa, is_active = row
+
     if not is_active:
         conn.close()
         return False, "Cuenta desactivada", None
-    
+
     if not verify_password(password, password_hash):
         conn.close()
         return False, "Contraseña incorrecta", None
-    
+
     # Actualizar último login
-    cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', (datetime.now(), user_id))
+    cursor.execute(
+        "UPDATE users SET last_login = ? WHERE id = ?",
+        (datetime.now(), user_id)
+    )
     conn.commit()
     conn.close()
-    
+
     user_data = {
-        'id': user_id,
-        'usuario': user_usuario,
-        'email': f"{user_usuario}@fertilab.com",
-        'nombre': nombre,
-        'empresa': empresa
+        "id": user_id,
+        "usuario": user_usuario,
+        "nombre": nombre,
+        "empresa": empresa,
+        # Si tu UI muestra email, lo dejamos “virtual” para compatibilidad (no viene de la DB)
+        "email": f"{user_usuario}@fertilab.com",
     }
-    
+
     return True, f"¡Bienvenido {nombre}!", user_data
 
 # =====================================================================
@@ -132,35 +157,33 @@ def login_user(usuario: str, password: str) -> Tuple[bool, str, Optional[dict]]:
 # =====================================================================
 
 def change_password(usuario: str, old_password: str, new_password: str) -> Tuple[bool, str]:
-    """
-    Cambia la contraseña del usuario
-    Returns: (éxito, mensaje)
-    """
+    """Cambia la contraseña del usuario."""
     if len(new_password) < 4:
         return False, "La nueva contraseña debe tener al menos 4 caracteres"
-    
+
+    usuario_norm = usuario.lower().strip()
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
-    cursor.execute('SELECT id, password_hash FROM users WHERE usuario = ?', (usuario.lower(),))
-    user = cursor.fetchone()
-    
-    if not user:
+
+    cursor.execute("SELECT id, password_hash FROM users WHERE usuario = ?", (usuario_norm,))
+    row = cursor.fetchone()
+
+    if not row:
         conn.close()
         return False, "Usuario no encontrado"
-    
-    user_id, password_hash = user
-    
+
+    user_id, password_hash = row
+
     if not verify_password(old_password, password_hash):
         conn.close()
         return False, "Contraseña actual incorrecta"
-    
-    # Actualizar contraseña
+
     new_hash = hash_password(new_password)
-    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user_id))
+    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
     conn.commit()
     conn.close()
-    
+
     return True, "¡Contraseña actualizada!"
 
 # =====================================================================
@@ -168,7 +191,6 @@ def change_password(usuario: str, old_password: str, new_password: str) -> Tuple
 # =====================================================================
 
 def get_user_count() -> int:
-    """Retorna cantidad de usuarios"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -177,32 +199,33 @@ def get_user_count() -> int:
     return count
 
 def listar_usuarios() -> list:
-    """Lista todos los usuarios"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, usuario, nombre, empresa, last_login FROM users WHERE is_active = 1")
-    users = cursor.fetchall()
+    rows = cursor.fetchall()
     conn.close()
-    return users
+    return rows
 
 def reset_password(usuario: str, new_password: str) -> Tuple[bool, str]:
-    """Reset de contraseña (uso admin)"""
+    usuario_norm = usuario.lower().strip()
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
-    cursor.execute('SELECT id FROM users WHERE usuario = ?', (usuario.lower(),))
-    user = cursor.fetchone()
-    
-    if not user:
+
+    cursor.execute("SELECT id FROM users WHERE usuario = ?", (usuario_norm,))
+    row = cursor.fetchone()
+
+    if not row:
         conn.close()
         return False, "Usuario no encontrado"
-    
+
+    user_id = row[0]
     new_hash = hash_password(new_password)
-    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user[0]))
+    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
     conn.commit()
     conn.close()
-    
-    return True, f"Contraseña de {usuario} reseteada"
+
+    return True, f"Contraseña de {usuario_norm} reseteada"
 
 # Inicializar DB al importar
 init_db()
