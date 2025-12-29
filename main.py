@@ -3208,7 +3208,6 @@ def main():
     # =========================
     # MENÚ ÚNICO (HORIZONTAL)
     # =========================
-    # -*- coding: utf-8 -*-
     menu = st.radio(
         "Menú:",
         ["🛒 Compras IA", "📦 Stock IA", "🔎 Buscador IA", "📊 Dashboard", "📈 Indicadores IA", 🧾 Pedidos Internos"],
