@@ -32,6 +32,7 @@ from login_page import (
 # Inicializar base de datos de usuarios
 init_db()
 
+
 # =========================
 # IMPORTS DE SQL_QUERIES
 # =========================
