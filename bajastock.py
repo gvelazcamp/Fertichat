@@ -142,17 +142,16 @@ def obtener_historial(limit: int = 50) -> pd.DataFrame:
 def mostrar_baja_stock():
     st.title("📉 Baja de Stock")
 
-    # Usuario actual
     user = st.session_state.get("user", {})
     usuario = user.get("usuario", user.get("email", "anonimo"))
 
     st.markdown("### 🔎 Escaneá o escribí el artículo")
-    st.caption("Cantidad fija = 1 · Uso rápido · Baja automática")
+    st.caption("Cantidad fija = 1 · Uso rápido · Baja automática (ENTER)")
 
     texto = st.text_input(
         "Código de barras o nombre",
         key="input_baja_stock",
-        placeholder="Escanear código o escribir nombre"
+        placeholder="Escanear código y presionar Enter"
     )
 
     if texto:
@@ -161,28 +160,24 @@ def mostrar_baja_stock():
         if df is None or df.empty:
             st.warning("No se encontró el artículo")
         else:
-            for _, row in df.iterrows():
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+            # 🔥 TOMAMOS SOLO EL PRIMERO (uso operativo)
+            row = df.iloc[0]
 
-                with col1:
-                    st.markdown(f"**{row['articulo']}**")
-                    st.caption(f"Código: {row['codigo']}")
+            st.markdown(f"**{row['articulo']}**")
+            st.caption(f"Código: {row['codigo']}")
+            st.markdown(f"Familia: `{row['familia']}`")
+            st.markdown(f"Stock actual: **{row['stock']}**")
 
-                with col2:
-                    st.markdown(f"Familia: `{row['familia']}`")
+            # ⬇️ BAJA AUTOMÁTICA
+            ok, msg = bajar_stock(row["codigo"], usuario)
 
-                with col3:
-                    st.markdown(f"Stock actual: **{row['stock']}**")
-
-                with col4:
-                    if st.button("➖ Bajar 1", key=f"bajar_{row['codigo']}"):
-                        ok, msg = bajar_stock(row["codigo"], usuario)
-                        if ok:
-                            st.success(msg)
-                            st.session_state["input_baja_stock"] = ""
-                            st.rerun()
-                        else:
-                            st.error(msg)
+            if ok:
+                st.success(msg)
+                st.info("Movimiento registrado. Ver historial ↓")
+                return
+            else:
+                st.error(msg)
+                return
 
     st.markdown("---")
 
@@ -191,6 +186,10 @@ def mostrar_baja_stock():
     df_hist = obtener_historial()
 
     if df_hist is not None and not df_hist.empty:
-        st.dataframe(df_hist, use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_hist,
+            use_container_width=True,
+            hide_index=True
+        )
     else:
         st.info("Todavía no hay movimientos registrados")
