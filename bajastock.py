@@ -1,6 +1,6 @@
 # =====================================================================
 # 📉 MÓDULO BAJA DE STOCK - USO OPERATIVO
-# Archivo: baja_stock.py
+# Archivo: bajastock.py
 # =====================================================================
 
 import streamlit as st
@@ -52,7 +52,6 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
     try:
         cursor = conn.cursor()
 
-        # Ver stock actual
         cursor.execute("""
             SELECT "STOCK", "ARTICULO"
             FROM stock
@@ -71,14 +70,12 @@ def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
             conn.close()
             return False, "Stock en cero"
 
-        # Actualizar stock
         cursor.execute("""
             UPDATE stock
             SET "STOCK" = "STOCK" - 1
             WHERE "CODIGO" = %s
         """, (codigo,))
 
-        # Registrar historial
         cursor.execute("""
             INSERT INTO stock_movimientos
             (codigo, articulo, usuario, cantidad, fecha)
@@ -124,12 +121,11 @@ def obtener_historial(limit: int = 50) -> pd.DataFrame:
 def mostrar_baja_stock():
     st.title("📉 Baja de Stock")
 
-    # Usuario actual
     user = st.session_state.get("user", {})
     usuario = user.get("usuario", user.get("email", "anonimo"))
 
     st.markdown("### 🔎 Escaneá o escribí el artículo")
-    st.caption("Cantidad fija = 1 · Uso rápido · Sin vueltas")
+    st.caption("Cantidad fija = 1 · Uso rápido")
 
     texto = st.text_input(
         "Código de barras o nombre",
@@ -144,7 +140,7 @@ def mostrar_baja_stock():
             st.warning("No se encontró el artículo")
         else:
             for _, row in df.iterrows():
-                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 1, 2])
+                col1, col2, col3, col4 = st.columns([4, 2, 2, 2])
 
                 with col1:
                     st.markdown(f"**{row['articulo']}**")
@@ -156,7 +152,7 @@ def mostrar_baja_stock():
                 with col3:
                     st.markdown(f"Stock: **{row['stock']}**")
 
-                with col5:
+                with col4:
                     if st.button("➖ Bajar 1", key=f"bajar_{row['codigo']}"):
                         ok, msg = bajar_stock(row["codigo"], usuario)
                         if ok:
@@ -167,19 +163,11 @@ def mostrar_baja_stock():
                             st.error(msg)
 
     st.markdown("---")
-
-    # =========================
-    # HISTORIAL
-    # =========================
     st.subheader("🧾 Historial de bajas")
 
     df_hist = obtener_historial()
 
     if df_hist is not None and not df_hist.empty:
-        st.dataframe(
-            df_hist,
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_hist, use_container_width=True, hide_index=True)
     else:
         st.info("Todavía no hay movimientos registrados")
