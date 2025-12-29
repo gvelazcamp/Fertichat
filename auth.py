@@ -157,6 +157,18 @@ def login_user(usuario: str, password: str) -> Tuple[bool, str, Optional[dict]]:
 
     return True, f"¡Bienvenido {nombre}!", user_data
 
+
+# =====================================================================
+# REGISTRO (DESHABILITADO) - SOLO PARA COMPATIBILIDAD DE IMPORTS
+# =====================================================================
+
+def register_user(usuario: str, password: str, nombre: str = "", empresa: str = "Fertilab"):
+    """
+    Registro deshabilitado: en este sistema solo entran USUARIOS_PREDEFINIDOS.
+    Se deja esta función para que no falle el import desde login_page.py.
+    """
+    return False, "Registro deshabilitado. Contactá al administrador.", None
+
 # =====================================================================
 # CAMBIO DE CONTRASEÑA
 # =====================================================================
