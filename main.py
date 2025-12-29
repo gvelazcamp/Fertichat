@@ -52,9 +52,7 @@ if usuario_actual:
                 key="campanita_global",
                 help="Tenés pedidos internos pendientes"
             ):
-                # 👉 Forzar navegación clara
-                st.session_state["menu_principal"] = "📥 Pedidos Internos"
-                st.session_state["ir_a_mis_pedidos"] = True
+                st.session_state["ir_a_pedidos"] = True
                 st.rerun()
         else:
             st.markdown("🔔")
