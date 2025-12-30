@@ -307,7 +307,7 @@ def mostrar_pedidos_internos():
     ])
 
     # =============================================================
-    # TAB 1 – TEXTO LIBRE + SUGERENCIAS (REEMPLAZO EN LA TABLA)
+    # TAB 1 – TEXTO LIBRE + SUGERENCIAS (REEMPLAZA EN LA TABLA)
     # =============================================================
     with tab1:
         st.subheader("✍️ Escribir pedido")
@@ -315,34 +315,40 @@ def mostrar_pedidos_internos():
         seccion = st.selectbox(
             "Sección (opcional):",
             [""] + [f"{k} - {v}" for k, v in SECCIONES.items()],
-            key="pedido_tab1_seccion"
+            key="tab1_seccion"
         )
         seccion_codigo = seccion.split(" - ")[0] if seccion else ""
 
-        texto_pedido = st.text_area("Pedido:", height=150, key="pedido_tab1_texto")
+        texto_pedido = st.text_area("Pedido:", height=150, key="tab1_texto")
 
-        # Si cambia el texto, regenero el DF base
-        if texto_pedido and st.session_state.get("pedido_tab1_texto_last") != texto_pedido:
-            st.session_state["pedido_tab1_texto_last"] = texto_pedido
-            st.session_state["df_pedido"] = pd.DataFrame(parsear_texto_pedido(texto_pedido))
+        # Si cambia el texto, regenerar la tabla base
+        texto_prev = st.session_state.get("tab1_texto_prev", "")
+        if texto_pedido != texto_prev:
+            st.session_state["tab1_texto_prev"] = texto_pedido
+            if texto_pedido and texto_pedido.strip():
+                st.session_state["df_pedido"] = pd.DataFrame(parsear_texto_pedido(texto_pedido))
+            else:
+                st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
+            st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
 
         if "df_pedido" not in st.session_state:
             st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
+
+        editor_key = f"tab1_editor_{int(st.session_state.get('tab1_editor_ver', 0))}"
 
         df_edit = st.data_editor(
             st.session_state["df_pedido"],
             hide_index=True,
             num_rows="dynamic",
-            key="editor_pedido_tab1"
+            key=editor_key
         )
 
-        # Guardar lo editado siempre
         st.session_state["df_pedido"] = df_edit.copy()
 
         st.markdown("### 🔎 Sugerencias")
 
         bloquear_envio = False
-        necesita_rerun = False
+        necesita_refresh = False
 
         for idx, fila in df_edit.iterrows():
             art = str(fila.get("articulo", "")).strip()
@@ -352,213 +358,295 @@ def mostrar_pedidos_internos():
             texto_limpio = limpiar_texto_para_busqueda(art)
             sugerencias = sugerir_articulos_similares(texto_limpio, seccion_codigo)
 
+            # Varias coincidencias → obligar selección
             if len(sugerencias) > 1:
                 st.warning(f"⚠️ **{art}** puede ser:")
 
                 elegido = st.selectbox(
                     f"Seleccioná el artículo correcto para '{art}':",
                     ["— Elegir —"] + sugerencias,
-                    key=f"sug_tab1_{idx}"
+                    key=f"tab1_sug_{idx}_{editor_key}"
                 )
 
                 if elegido != "— Elegir —":
                     if st.session_state["df_pedido"].at[idx, "articulo"] != elegido:
                         st.session_state["df_pedido"].at[idx, "articulo"] = elegido
-                        necesita_rerun = True
+                        necesita_refresh = True
                 else:
                     bloquear_envio = True
 
+            # Una sola coincidencia → autocompletar
             elif len(sugerencias) == 1:
                 sug = sugerencias[0]
                 st.info(f"🔹 {art} → {sug}")
                 if st.session_state["df_pedido"].at[idx, "articulo"] != sug:
                     st.session_state["df_pedido"].at[idx, "articulo"] = sug
-                    necesita_rerun = True
+                    necesita_refresh = True
 
-        if necesita_rerun:
+        # Refrescar editor para que “arriba” se vea el artículo reemplazado
+        if necesita_refresh:
+            st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
+            st.rerun()
+
+        # Preparar líneas a enviar (sin vacíos)
+        lineas_enviar = []
+        for _, r in st.session_state["df_pedido"].iterrows():
+            a = str(r.get("articulo", "")).strip()
+            if not a:
+                continue
+            c = r.get("cantidad", 1)
             try:
-                st.rerun()
-            except Exception:
-                st.experimental_rerun()
+                c = int(float(c))
+            except:
+                c = 1
+            if c < 1:
+                c = 1
 
-        if st.button("📨 Enviar pedido", type="primary", disabled=bloquear_envio, key="btn_enviar_tab1"):
-            lineas = st.session_state["df_pedido"].to_dict("records")
+            lineas_enviar.append({
+                "codigo": str(r.get("codigo", "") or ""),
+                "articulo": a,
+                "cantidad": c
+            })
+
+        if st.button("📨 Enviar pedido", type="primary", disabled=bloquear_envio, key="tab1_btn_enviar"):
             ok, msg, _ = crear_pedido(
                 usuario,
                 nombre_usuario,
                 seccion_codigo,
-                lineas,
+                lineas_enviar,
                 ""
             )
-            st.success(msg) if ok else st.error(msg)
+            if ok:
+                st.success(msg)
+                # Limpiar
+                st.session_state["tab1_texto_prev"] = ""
+                st.session_state["tab1_texto"] = ""
+                st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
+                st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
+                st.rerun()
+            else:
+                st.error(msg)
 
     # =============================================================
-    # TAB 2 – SELECCIONAR PRODUCTOS (LISTA + CANTIDADES)
+    # TAB 2 – SELECCIONAR PRODUCTOS (TABLA + CHECK + CANTIDAD + TR)
     # =============================================================
     with tab2:
         st.subheader("✅ Seleccionar productos")
 
         seccion2 = st.selectbox(
-            "Sección (opcional):",
+            "Sección:",
             [""] + [f"{k} - {v}" for k, v in SECCIONES.items()],
-            key="pedido_tab2_seccion"
+            key="tab2_seccion"
         )
         seccion2_codigo = seccion2.split(" - ")[0] if seccion2 else ""
 
-        incluir_tr = st.checkbox("Incluir TR (Tronco Comun)", value=True, key="pedido_tab2_incluir_tr")
-        buscar = st.text_input("Buscar artículo (opcional):", key="pedido_tab2_buscar")
+        incluir_tr = st.checkbox("Incluir TR (Tronco Común)", value=True, key="tab2_incluir_tr")
+        buscar = st.text_input("Buscar artículo (opcional):", key="tab2_buscar")
 
-        # Armar familias a incluir (si no elige sección: por defecto TR solo, para no traer infinito)
-        familias = []
-        if seccion2_codigo:
-            familias.append(seccion2_codigo.upper())
-            if incluir_tr and seccion2_codigo.upper() != "TR":
+        if "tab2_sel" not in st.session_state:
+            st.session_state["tab2_sel"] = {}  # articulo -> {"codigo":..., "articulo":..., "cantidad":...}
+
+        if not seccion2_codigo:
+            st.info("Elegí una sección para listar productos.")
+        else:
+            familias = [seccion2_codigo]
+            if incluir_tr and "TR" not in familias:
                 familias.append("TR")
-        else:
-            # sin sección → solo TR (y listo)
-            familias.append("TR")
 
-        params = []
-        where_parts = []
+            # Query familias dinámico
+            if len(familias) == 1:
+                fam_clause = 'UPPER(TRIM("FAMILIA")) = %s'
+                fam_params = [familias[0].upper()]
+            else:
+                fam_clause = 'UPPER(TRIM("FAMILIA")) IN (' + ",".join(["%s"] * len(familias)) + ')'
+                fam_params = [f.upper() for f in familias]
 
-        # filtro por familias (IN)
-        if familias:
-            placeholders = ", ".join(["%s"] * len(familias))
-            where_parts.append(f'UPPER(TRIM("FAMILIA")) IN ({placeholders})')
-            params.extend(familias)
+            query = f'''
+                SELECT
+                    COALESCE(CAST("CODIGO" AS TEXT), '') AS "CODIGO",
+                    COALESCE(CAST("ARTICULO" AS TEXT), '') AS "ARTICULO",
+                    COALESCE(CAST("FAMILIA" AS TEXT), '') AS "FAMILIA"
+                FROM stock
+                WHERE {fam_clause}
+            '''
+            params = list(fam_params)
 
-        # filtro por búsqueda
-        if buscar and len(buscar.strip()) >= 2:
-            where_parts.append('UPPER("ARTICULO") ILIKE %s')
-            params.append(f"%{buscar.strip().upper()}%")
+            if buscar and buscar.strip():
+                query += ' AND "ARTICULO" ILIKE %s'
+                params.append(f"%{buscar.strip()}%")
 
-        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+            query += ' ORDER BY "ARTICULO" LIMIT 500'
 
-        q = f"""
-            SELECT DISTINCT "ARTICULO"
-            FROM stock
-            WHERE {where_sql}
-            ORDER BY 1
-            LIMIT 400
-        """
-        df_art = ejecutar_consulta(q, tuple(params) if params else None)
-        articulos = df_art.iloc[:, 0].astype(str).tolist() if df_art is not None and not df_art.empty else []
+            df_stock = ejecutar_consulta(query, tuple(params))
 
-        if not articulos:
-            st.info("No se encontraron artículos con esos filtros.")
-        else:
-            seleccionados = st.multiselect(
-                "Seleccioná artículos:",
-                articulos,
-                key="pedido_tab2_multiselect"
-            )
+            if df_stock is None or df_stock.empty:
+                st.warning("No encontré artículos para esa sección/filtro.")
+            else:
+                # Armar tabla editable con selección persistente
+                sel_map = st.session_state["tab2_sel"]
 
-            if "tab2_cantidades" not in st.session_state:
-                st.session_state["tab2_cantidades"] = {}
+                filas = []
+                for _, r in df_stock.iterrows():
+                    codigo = str(r.get("CODIGO", "") or "")
+                    articulo = str(r.get("ARTICULO", "") or "")
+                    familia = str(r.get("FAMILIA", "") or "")
 
-            lineas_tab2 = []
-            for a in seleccionados:
-                key_c = f"cant_{a}"
-                if key_c not in st.session_state["tab2_cantidades"]:
-                    st.session_state["tab2_cantidades"][key_c] = 1
+                    if not articulo:
+                        continue
 
-                cant = st.number_input(
-                    f"Cantidad para: {a}",
-                    min_value=1,
-                    step=1,
-                    value=int(st.session_state["tab2_cantidades"][key_c]),
-                    key=f"pedido_tab2_{key_c}"
+                    if articulo in sel_map:
+                        sel = True
+                        cant = int(sel_map[articulo].get("cantidad", 1))
+                    else:
+                        sel = False
+                        cant = 1
+
+                    filas.append({
+                        "Sel": sel,
+                        "Código": codigo,
+                        "Artículo": articulo,
+                        "Familia": familia,
+                        "Cantidad": cant
+                    })
+
+                df_tab2 = pd.DataFrame(filas)
+
+                df_tab2_edit = st.data_editor(
+                    df_tab2,
+                    hide_index=True,
+                    num_rows="fixed",
+                    column_config={
+                        "Sel": st.column_config.CheckboxColumn("Sel"),
+                        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                    },
+                    disabled=["Código", "Artículo", "Familia"],
+                    key="tab2_editor"
                 )
-                st.session_state["tab2_cantidades"][key_c] = int(cant)
 
-                lineas_tab2.append({
-                    "codigo": "",
-                    "articulo": a,
-                    "cantidad": int(cant)
-                })
+                # Guardar selección
+                nuevo = {}
+                for _, rr in df_tab2_edit.iterrows():
+                    if bool(rr.get("Sel", False)):
+                        art = str(rr.get("Artículo", "")).strip()
+                        if not art:
+                            continue
+                        cod = str(rr.get("Código", "") or "")
+                        try:
+                            cant = int(float(rr.get("Cantidad", 1)))
+                        except:
+                            cant = 1
+                        if cant < 1:
+                            cant = 1
 
-            if lineas_tab2:
-                st.markdown("### 🧾 Resumen")
-                st.dataframe(pd.DataFrame(lineas_tab2), hide_index=True)
+                        nuevo[art] = {"codigo": cod, "articulo": art, "cantidad": cant}
 
-                if st.button("📨 Enviar pedido (selección)", type="primary", key="btn_enviar_tab2"):
+                st.session_state["tab2_sel"] = nuevo
+
+                colA, colB = st.columns([1, 1])
+
+                with colA:
+                    if st.button("🧹 Limpiar selección", key="tab2_btn_limpiar"):
+                        st.session_state["tab2_sel"] = {}
+                        st.rerun()
+
+                with colB:
+                    lineas = list(st.session_state["tab2_sel"].values())
+                    st.write(f"Seleccionados: **{len(lineas)}**")
+
+                if st.session_state["tab2_sel"]:
+                    st.markdown("#### ✅ Selección final")
+                    st.dataframe(pd.DataFrame(lineas)[["codigo", "articulo", "cantidad"]], use_container_width=True)
+
+                if st.button("📨 Enviar pedido", type="primary", key="tab2_btn_enviar", disabled=(len(lineas) == 0)):
                     ok, msg, _ = crear_pedido(
                         usuario,
                         nombre_usuario,
                         seccion2_codigo,
-                        lineas_tab2,
+                        lineas,
                         ""
                     )
-                    st.success(msg) if ok else st.error(msg)
+                    if ok:
+                        st.success(msg)
+                        st.session_state["tab2_sel"] = {}
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
     # =============================================================
-    # TAB 3 – SUBIR EXCEL/CSV (MAPEO SIMPLE + ENVÍO)
+    # TAB 3 – SUBIR EXCEL/CSV (codigo/articulo/cantidad)
     # =============================================================
     with tab3:
-        st.subheader("📤 Subir Excel / CSV")
+        st.subheader("📤 Subir Excel")
 
         seccion3 = st.selectbox(
-            "Sección (opcional):",
+            "Sección:",
             [""] + [f"{k} - {v}" for k, v in SECCIONES.items()],
-            key="pedido_tab3_seccion"
+            key="tab3_seccion"
         )
         seccion3_codigo = seccion3.split(" - ")[0] if seccion3 else ""
 
-        archivo = st.file_uploader("Subí un archivo .xlsx, .xls o .csv", type=["xlsx", "xls", "csv"], key="pedido_tab3_file")
+        archivo = st.file_uploader("Subí un Excel/CSV con columnas: codigo, articulo, cantidad", type=["xlsx", "xls", "csv"])
 
         if archivo is not None:
             try:
-                if archivo.name.lower().endswith(".csv"):
+                nombre = (archivo.name or "").lower()
+
+                if nombre.endswith(".csv"):
                     df_up = pd.read_csv(archivo)
                 else:
                     df_up = pd.read_excel(archivo)
+
+                # Normalizar nombres de columnas
+                cols = {c.strip().lower(): c for c in df_up.columns}
+                c_codigo = cols.get("codigo") or cols.get("código") or cols.get("cod")
+                c_art = cols.get("articulo") or cols.get("artículo") or cols.get("art")
+                c_cant = cols.get("cantidad") or cols.get("cant") or cols.get("qty")
+
+                if not c_art:
+                    st.error("No encontré la columna 'articulo'. Asegurate que exista.")
+                else:
+                    if not c_codigo:
+                        df_up["codigo"] = ""
+                        c_codigo = "codigo"
+                    if not c_cant:
+                        df_up["cantidad"] = 1
+                        c_cant = "cantidad"
+
+                    df_lineas = df_up[[c_codigo, c_art, c_cant]].copy()
+                    df_lineas.columns = ["codigo", "articulo", "cantidad"]
+
+                    df_lineas = df_lineas.fillna({"codigo": "", "articulo": "", "cantidad": 1})
+                    df_lineas["articulo"] = df_lineas["articulo"].astype(str).str.strip()
+
+                    st.markdown("#### Revisar antes de enviar")
+                    df_edit3 = st.data_editor(df_lineas, hide_index=True, num_rows="dynamic", key="tab3_editor")
+
+                    lineas3 = []
+                    for _, r in df_edit3.iterrows():
+                        art = str(r.get("articulo", "")).strip()
+                        if not art:
+                            continue
+                        try:
+                            cant = int(float(r.get("cantidad", 1)))
+                        except:
+                            cant = 1
+                        if cant < 1:
+                            cant = 1
+                        lineas3.append({
+                            "codigo": str(r.get("codigo", "") or ""),
+                            "articulo": art,
+                            "cantidad": cant
+                        })
+
+                    if st.button("📨 Enviar pedido", type="primary", key="tab3_btn_enviar", disabled=(len(lineas3) == 0 or not seccion3_codigo)):
+                        if not seccion3_codigo:
+                            st.error("Elegí una sección antes de enviar.")
+                        else:
+                            ok, msg, _ = crear_pedido(usuario, nombre_usuario, seccion3_codigo, lineas3, "")
+                            st.success(msg) if ok else st.error(msg)
+
             except Exception as e:
-                st.error(f"No pude leer el archivo: {e}")
-                df_up = None
-
-            if df_up is not None and not df_up.empty:
-                st.caption("Detecté estas columnas. Elegí cuál corresponde a Artículo / Cantidad (Código opcional).")
-
-                cols = list(df_up.columns)
-
-                def _guess_col(posibles):
-                    for c in cols:
-                        if str(c).strip().lower() in posibles:
-                            return c
-                    for c in cols:
-                        lc = str(c).strip().lower()
-                        for p in posibles:
-                            if p in lc:
-                                return c
-                    return None
-
-                col_art_guess = _guess_col(["articulo", "artículo", "item", "producto", "descripcion", "descripción"])
-                col_cant_guess = _guess_col(["cantidad", "cant", "qty", "cantidad solicitada"])
-                col_cod_guess = _guess_col(["codigo", "código", "cod", "code"])
-
-                col_art = st.selectbox("Columna de ARTÍCULO:", cols, index=cols.index(col_art_guess) if col_art_guess in cols else 0, key="map_art")
-                col_cant = st.selectbox("Columna de CANTIDAD:", cols, index=cols.index(col_cant_guess) if col_cant_guess in cols else 0, key="map_cant")
-                col_cod = st.selectbox("Columna de CÓDIGO (opcional):", ["(sin código)"] + cols,
-                                       index=(cols.index(col_cod_guess) + 1) if col_cod_guess in cols else 0,
-                                       key="map_cod")
-
-                df_lineas = pd.DataFrame()
-                df_lineas["codigo"] = "" if col_cod == "(sin código)" else df_up[col_cod].astype(str)
-                df_lineas["articulo"] = df_up[col_art].astype(str)
-                df_lineas["cantidad"] = pd.to_numeric(df_up[col_cant], errors="coerce").fillna(1).astype(int)
-
-                st.markdown("### 🧾 Vista previa (editable)")
-                df_edit3 = st.data_editor(df_lineas, hide_index=True, num_rows="dynamic", key="editor_tab3")
-
-                if st.button("📨 Enviar pedido (archivo)", type="primary", key="btn_enviar_tab3"):
-                    ok, msg, _ = crear_pedido(
-                        usuario,
-                        nombre_usuario,
-                        seccion3_codigo,
-                        df_edit3.to_dict("records"),
-                        ""
-                    )
-                    st.success(msg) if ok else st.error(msg)
+                st.error(f"Error leyendo el archivo: {e}")
 
     # =============================================================
     # TAB 4 – MIS PEDIDOS (LISTA + DETALLE)
@@ -566,24 +654,33 @@ def mostrar_pedidos_internos():
     with tab4:
         st.subheader("📋 Mis pedidos")
 
-        estado = st.selectbox("Filtrar por estado (opcional):", ["", "Pendiente", "En proceso", "Entregado", "Cancelado"], key="pedido_tab4_estado")
-        estado_f = estado if estado else None
+        solo_mios = st.checkbox("Solo mis pedidos", value=True, key="tab4_solo_mios")
 
-        df_p = obtener_pedidos(usuario=usuario, estado=estado_f)
+        estado_op = st.selectbox(
+            "Estado:",
+            ["(Todos)", "Pendiente", "En proceso", "Entregado", "Cancelado"],
+            key="tab4_estado"
+        )
+        estado_f = None if estado_op == "(Todos)" else estado_op
+
+        df_p = obtener_pedidos(usuario=usuario if solo_mios else None, estado=estado_f)
 
         if df_p is None or df_p.empty:
-            st.info("No tenés pedidos para mostrar.")
+            st.info("No hay pedidos para mostrar.")
         else:
-            st.dataframe(df_p.drop(columns=["id"], errors="ignore"), hide_index=True)
+            st.dataframe(df_p.drop(columns=["id"], errors="ignore"), use_container_width=True)
 
-            # selector por ID interno
-            ids = df_p["id"].tolist() if "id" in df_p.columns else []
-            if ids:
-                pid = st.selectbox("Ver detalle del pedido:", ids, key="pedido_tab4_pid")
-                df_det = obtener_detalle_pedido(int(pid))
+            # Ver detalle
+            try:
+                opciones = df_p[["Nro Pedido", "id"]].dropna()
+                nro_sel = st.selectbox("Ver detalle del pedido:", opciones["Nro Pedido"].tolist(), key="tab4_detalle_sel")
+                pedido_id = int(opciones.loc[opciones["Nro Pedido"] == nro_sel, "id"].iloc[0])
+
+                df_det = obtener_detalle_pedido(pedido_id)
                 if df_det is None or df_det.empty:
-                    st.info("No hay detalle para ese pedido.")
+                    st.warning("No encontré detalle para ese pedido.")
                 else:
-                    st.markdown("### 🧾 Detalle")
-                    st.dataframe(df_det, hide_index=True)
-
+                    st.markdown("#### Detalle")
+                    st.dataframe(df_det, use_container_width=True)
+            except Exception:
+                pass
