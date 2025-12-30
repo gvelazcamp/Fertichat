@@ -3309,7 +3309,14 @@ def main():
         return
     
     elif menu == "📄 Pedidos Internos":
-        from pedidos import mostrar_pedidos_internos
+        try:
+            from pedidos import mostrar_pedidos_internos
+        except Exception:
+            import traceback
+            st.error("❌ Error cargando pedidos.py (abajo va el error REAL):")
+            st.code(traceback.format_exc())
+            return
+
         mostrar_pedidos_internos()
         return
 
