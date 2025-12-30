@@ -3712,25 +3712,52 @@ def mostrar_detalle_df(
     enable_chart=True,
     enable_explain=True,
 ):
+    # ---------------------------------
+    # Validaciones básicas
+    # ---------------------------------
+    if df is None:
+        return
+
     try:
         if hasattr(df, "empty") and df.empty:
             return
     except Exception:
         pass
 
-    # DF completo para cálculos
-    df_full = df.copy()
+    # ---------------------------------
+    # DATASET COMPLETO PARA CÁLCULOS
+    # ---------------------------------
+    df_full = None
 
-    # DF recortado solo para mostrar tabla
+    if contexto_respuesta and "where_clause" in contexto_respuesta:
+        try:
+            df_full = get_dataset_completo(
+                contexto_respuesta["where_clause"],
+                contexto_respuesta.get("params", ())
+            )
+        except Exception:
+            df_full = None
+
+    # Fallback seguro
+    if df_full is None or df_full.empty:
+        df_full = df.copy()
+
+    # ---------------------------------
+    # DATASET RECORTADO SOLO PARA TABLA
+    # ---------------------------------
     try:
         df_view = df_full.head(int(max_rows)).copy()
     except Exception:
         df_view = df_full.copy()
 
-    # Header
+    # ---------------------------------
+    # HEADER
+    # ---------------------------------
     st.markdown(f"### {titulo}")
 
-    # Checks (3 columnas)
+    # ---------------------------------
+    # CHECKS UI
+    # ---------------------------------
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
@@ -3758,10 +3785,16 @@ def mostrar_detalle_df(
                 value=False
             )
 
-    # TABLA (solo recorte)
+    # ---------------------------------
+    # TABLA (LIMITADA)
+    # ---------------------------------
     if ver_tabla:
         try:
-            st.dataframe(df_view, use_container_width=True, hide_index=True)
+            st.dataframe(
+                df_view,
+                use_container_width=True,
+                hide_index=True
+            )
         except Exception:
             st.dataframe(df_view)
 
@@ -3771,10 +3804,28 @@ def mostrar_detalle_df(
             if total_full > total_view:
                 st.caption(
                     f"Mostrando {total_view} de {total_full} registros. "
-                    f"Gráficos/explicación se calculan sobre los {total_full}."
+                    f"Gráficos y explicación se calculan sobre el total."
                 )
         except Exception:
             pass
+
+    # ---------------------------------
+    # GRÁFICOS (DATASET COMPLETO)
+    # ---------------------------------
+    if ver_grafico:
+        try:
+            _render_graficos_compras(df_full, key_base=key)
+        except Exception:
+            st.warning("No se pudo generar el gráfico para este detalle.")
+
+    # ---------------------------------
+    # EXPLICACIÓN (DATASET COMPLETO)
+    # ---------------------------------
+    if ver_explicacion:
+        try:
+            _render_explicacion_compras(df_full)
+        except Exception:
+            st.warning("No se pudo generar la explicación para este detalle.")
 
         # =========================
         # DATASET COMPLETO PARA ANALISIS (SIN LIMIT)
