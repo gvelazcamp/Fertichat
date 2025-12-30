@@ -3703,15 +3703,16 @@ def _render_explicacion_compras(df: pd.DataFrame, contexto_respuesta: str = "") 
 # =========================
 # UI - MOSTRAR DETALLE DF
 # =========================
-def mostrar_detalle_df(
-    df: pd.DataFrame,
-    titulo: str = "📋 Ver tabla (detalle)",
-    key: str = "detalle_df",
-    max_rows: int = 200,
-    contexto_respuesta: str = "",
-    enable_chart: bool = True,
-    enable_explain: bool = True
-):
+mostrar_detalle_df(
+    df,
+    titulo="📄 Ver detalle de compras",
+    key=...,
+    contexto_respuesta={
+        "where_clause": where_clause,
+        "params": params_sql
+    }
+)
+
     """
     Muestra 3 opciones al costado:
     - 📄 Ver tabla (detalle)
