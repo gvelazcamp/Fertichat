@@ -288,146 +288,6 @@ def obtener_detalle_pedido(pedido_id: int) -> pd.DataFrame:
     return ejecutar_consulta(query, (pedido_id,))
 
 
-# =====================================================================
-# INTERFAZ
-# =====================================================================
-
-def mostrar_pedidos_internos():
-
-    st.title("📥 Pedidos Internos")
-
-    user = st.session_state.get('user', {})
-    usuario = user.get('usuario', user.get('email', 'anonimo'))
-    nombre_usuario = user.get('nombre', usuario)
-
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "✍️ Escribir pedido",
-        "✅ Seleccionar productos",
-        "📤 Subir Excel",
-        "📋 Mis pedidos"
-    ])
-
-    # =============================================================
-    # TAB 1 – TEXTO LIBRE + SUGERENCIAS (REEMPLAZA EN LA TABLA)
-    # =============================================================
-    with tab1:
-        st.subheader("✍️ Escribir pedido")
-
-        seccion = st.selectbox(
-            "Sección (opcional):",
-            [""] + [f"{k} - {v}" for k, v in SECCIONES.items()],
-            key="tab1_seccion"
-        )
-        seccion_codigo = seccion.split(" - ")[0] if seccion else ""
-
-        texto_pedido = st.text_area("Pedido:", height=150, key="tab1_texto")
-
-        # Si cambia el texto, regenerar la tabla base
-        texto_prev = st.session_state.get("tab1_texto_prev", "")
-        if texto_pedido != texto_prev:
-            st.session_state["tab1_texto_prev"] = texto_pedido
-            if texto_pedido and texto_pedido.strip():
-                st.session_state["df_pedido"] = pd.DataFrame(parsear_texto_pedido(texto_pedido))
-            else:
-                st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
-            st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
-
-        if "df_pedido" not in st.session_state:
-            st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
-
-        editor_key = f"tab1_editor_{int(st.session_state.get('tab1_editor_ver', 0))}"
-
-        df_edit = st.data_editor(
-            st.session_state["df_pedido"],
-            hide_index=True,
-            num_rows="dynamic",
-            key=editor_key
-        )
-
-        st.session_state["df_pedido"] = df_edit.copy()
-
-        st.markdown("### 🔎 Sugerencias")
-
-        bloquear_envio = False
-        necesita_refresh = False
-
-        for idx, fila in df_edit.iterrows():
-            art = str(fila.get("articulo", "")).strip()
-            if not art:
-                continue
-
-            texto_limpio = limpiar_texto_para_busqueda(art)
-            sugerencias = sugerir_articulos_similares(texto_limpio, seccion_codigo)
-
-            # Varias coincidencias → obligar selección
-            if len(sugerencias) > 1:
-                st.warning(f"⚠️ **{art}** puede ser:")
-
-                elegido = st.selectbox(
-                    f"Seleccioná el artículo correcto para '{art}':",
-                    ["— Elegir —"] + sugerencias,
-                    key=f"tab1_sug_{idx}_{editor_key}"
-                )
-
-                if elegido != "— Elegir —":
-                    if st.session_state["df_pedido"].at[idx, "articulo"] != elegido:
-                        st.session_state["df_pedido"].at[idx, "articulo"] = elegido
-                        necesita_refresh = True
-                else:
-                    bloquear_envio = True
-
-            # Una sola coincidencia → autocompletar
-            elif len(sugerencias) == 1:
-                sug = sugerencias[0]
-                st.info(f"🔹 {art} → {sug}")
-                if st.session_state["df_pedido"].at[idx, "articulo"] != sug:
-                    st.session_state["df_pedido"].at[idx, "articulo"] = sug
-                    necesita_refresh = True
-
-        # Refrescar editor para que “arriba” se vea el artículo reemplazado
-        if necesita_refresh:
-            st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
-            st.rerun()
-
-        # Preparar líneas a enviar (sin vacíos)
-        lineas_enviar = []
-        for _, r in st.session_state["df_pedido"].iterrows():
-            a = str(r.get("articulo", "")).strip()
-            if not a:
-                continue
-            c = r.get("cantidad", 1)
-            try:
-                c = int(float(c))
-            except:
-                c = 1
-            if c < 1:
-                c = 1
-
-            lineas_enviar.append({
-                "codigo": str(r.get("codigo", "") or ""),
-                "articulo": a,
-                "cantidad": c
-            })
-
-        if st.button("📨 Enviar pedido", type="primary", disabled=bloquear_envio, key="tab1_btn_enviar"):
-            ok, msg, _ = crear_pedido(
-                usuario,
-                nombre_usuario,
-                seccion_codigo,
-                lineas_enviar,
-                ""
-            )
-            if ok:
-                st.success(msg)
-                # Limpiar
-                st.session_state["tab1_texto_prev"] = ""
-                st.session_state["tab1_texto"] = ""
-                st.session_state["df_pedido"] = pd.DataFrame(columns=["codigo", "articulo", "cantidad"])
-                st.session_state["tab1_editor_ver"] = int(st.session_state.get("tab1_editor_ver", 0)) + 1
-                st.rerun()
-            else:
-                st.error(msg)
-
     # =============================================================
     # TAB 2 – SELECCIONAR PRODUCTOS (TABLA + CHECK + CANTIDAD (- 0 +) EN LA CELDA)
     # =============================================================
@@ -441,7 +301,11 @@ def mostrar_pedidos_internos():
         )
         seccion2_codigo = seccion2.split(" - ")[0] if seccion2 else ""
 
-        incluir_tr = st.checkbox("Incluir TR (Tronco Común)", value=True, key="tab2_incluir_tr")
+        incluir_tr = st.checkbox(
+            "Incluir TR (Tronco Común)",
+            value=True,
+            key="tab2_incluir_tr"
+        )
         buscar = st.text_input("Buscar artículo (opcional):", key="tab2_buscar")
 
         if "tab2_sel" not in st.session_state:
@@ -516,54 +380,44 @@ def mostrar_pedidos_internos():
 
                 df_tab2 = pd.DataFrame(filas)
 
-                # ✅ Renderer: muestra "−  N  +" dentro de la celda (sin HTML)
-                qty_renderer = JsCode(r"""
+                # ✅ Mostrar siempre: "−   N   +"
+                qty_formatter = JsCode(r"""
                 function(params) {
                     let v = params.value;
-                    v = (v === null || v === undefined || v === "") ? 0 : parseInt(v);
+                    v = (v === null || v === undefined || v === "") ? 0 : parseInt(v, 10);
                     if (isNaN(v) || v < 0) v = 0;
-                    return "−  " + v + "  +";
+
+                    const sp = "\u00A0\u00A0\u00A0"; // NBSP
+                    return "−" + sp + v + sp + "+";
                 }
                 """)
 
-                # ✅ Click: si clickeás IZQ baja, si clickeás DER sube (en la misma celda)
+                # ✅ Click en la celda:
+                # - mitad izquierda => resta
+                # - mitad derecha  => suma
+                # - doble click => escribir (porque suppressClickEdit=True)
                 on_cell_clicked = JsCode(r"""
                 function(e) {
                     try {
                         if (!e || !e.colDef || e.colDef.field !== "Cantidad") return;
                         if (!e.event) return;
 
-                        // ✅ cortar edición si se abrió por cualquier motivo
-                        if (e.api && e.api.stopEditing) {
-                            e.api.stopEditing();
-                        }
+                        const cell = (e.event.target && e.event.target.closest)
+                            ? e.event.target.closest('.ag-cell')
+                            : null;
+                        if (!cell || !cell.getBoundingClientRect) return;
 
-                        let rect = null;
+                        const rect = cell.getBoundingClientRect();
+                        const x = (e.event.clientX || 0) - rect.left;
+                        const w = rect.width || 1;
 
-                        if (e.event.target && e.event.target.closest) {
-                            const cell = e.event.target.closest('.ag-cell');
-                            if (cell && cell.getBoundingClientRect) rect = cell.getBoundingClientRect();
-                        }
-
-                        if ((!rect || !rect.width) && e.event.target && e.event.target.getBoundingClientRect) {
-                            rect = e.event.target.getBoundingClientRect();
-                        }
-
-                        if (!rect || !rect.width) return;
-
-                        const x = (e.event.clientX || e.event.pageX) - rect.left;
-                        const w = rect.width;
-
-                        let cur = parseInt(e.value);
+                        let cur = parseInt(e.data["Cantidad"], 10);
                         if (isNaN(cur) || cur < 0) cur = 0;
 
-                        // izquierda: − | derecha: +
-                        if (x < w * 0.33) {
+                        if (x < w * 0.50) {
                             cur = Math.max(0, cur - 1);
-                        } else if (x > w * 0.66) {
-                            cur = cur + 1;
                         } else {
-                            return; // centro: no hace nada
+                            cur = cur + 1;
                         }
 
                         e.node.setDataValue("Cantidad", cur);
@@ -573,13 +427,13 @@ def mostrar_pedidos_internos():
                             e.api.refreshCells({ rowNodes: [e.node], columns: ["Cantidad"], force: true });
                         }
 
-                        e.event.preventDefault();
-                        e.event.stopPropagation();
+                        if (e.event.preventDefault) e.event.preventDefault();
+                        if (e.event.stopPropagation) e.event.stopPropagation();
                     } catch(err) {}
                 }
                 """)
 
-                 gb = GridOptionsBuilder.from_dataframe(df_tab2)
+                gb = GridOptionsBuilder.from_dataframe(df_tab2)
 
                 gb.configure_column(
                     "Sel",
@@ -593,63 +447,11 @@ def mostrar_pedidos_internos():
                 gb.configure_column("Artículo", editable=False, flex=2, minWidth=280)
                 gb.configure_column("Familia", editable=False, width=90)
 
-                # ✅ Formatter: "−   N   +" (siempre visible)
-                qty_formatter = JsCode(r"""
-                function(params) {
-                    let v = params.value;
-                    v = (v === null || v === undefined || v === "") ? 0 : parseInt(v, 10);
-                    if (isNaN(v) || v < 0) v = 0;
-
-                    const sp = "\u00A0\u00A0\u00A0"; // NBSP para separar
-                    return "−" + sp + v + sp + "+";
-                }
-                """)
-
-                # ✅ Click: izquierda baja, derecha sube, centro = editar (para escribir)
-                on_cell_clicked = JsCode(r"""
-                function(e) {
-                    try {
-                        if (!e || !e.colDef || e.colDef.field !== "Cantidad") return;
-                        if (!e.event) return;
-
-                        const cell = e.event.target.closest('.ag-cell');
-                        if (!cell) return;
-
-                        const rect = cell.getBoundingClientRect();
-                        const x = e.event.clientX - rect.left;
-                        const w = rect.width;
-
-                        let cur = parseInt(e.data["Cantidad"], 10);
-                        if (isNaN(cur) || cur < 0) cur = 0;
-
-                        // zonas amplias: fácil de clickear
-                        if (x < w * 0.40) {
-                            cur = Math.max(0, cur - 1);
-                            e.node.setDataValue("Cantidad", cur);
-                        } else if (x > w * 0.60) {
-                            cur = cur + 1;
-                            e.node.setDataValue("Cantidad", cur);
-                        } else {
-                            // centro: edición para escribir
-                            if (e.api && e.rowIndex !== undefined) {
-                                e.api.startEditingCell({ rowIndex: e.rowIndex, colKey: "Cantidad" });
-                            }
-                            return;
-                        }
-
-                        // refrescar para que se vea al instante
-                        if (e.api && e.api.refreshCells) {
-                            e.api.refreshCells({ rowNodes: [e.node], columns: ["Cantidad"], force: true });
-                        }
-                    } catch(err) {}
-                }
-                """)
-
                 gb.configure_column(
                     "Cantidad",
-                    editable=True,  # ✅ centro o doble click para escribir
+                    editable=True,                    # ✅ doble click para escribir
                     cellEditor="agNumberCellEditor",
-                    valueFormatter=qty_formatter,  # ✅ clave: no desaparece
+                    valueFormatter=qty_formatter,     # ✅ siempre visible "− N +"
                     width=160,
                     cellStyle={
                         "textAlign": "center",
@@ -662,11 +464,11 @@ def mostrar_pedidos_internos():
                     }
                 )
 
-                # ✅ IMPORTANTE: asignarlo al gridOptions final
                 grid_options = gb.build()
                 grid_options["suppressRowClickSelection"] = True
-                grid_options["onCellClicked"] = on_cell_clicked
+                grid_options["suppressClickEdit"] = True            # ✅ clave: no entra en edición con 1 click
                 grid_options["stopEditingWhenCellsLoseFocus"] = True
+                grid_options["onCellClicked"] = on_cell_clicked
 
                 grid = AgGrid(
                     df_tab2,
@@ -708,7 +510,6 @@ def mostrar_pedidos_internos():
                     lineas = list(st.session_state["tab2_sel"].values())
                     st.write(f"Seleccionados: **{len(lineas)}**")
 
-                # Bloquear envío si hay cantidad 0
                 hay_cero = any(int(it.get("cantidad", 0) or 0) <= 0 for it in lineas)
                 if len(lineas) > 0 and hay_cero:
                     st.warning("⚠️ Tenés artículos seleccionados con cantidad 0. Ajustá la cantidad para poder enviar.")
@@ -732,6 +533,7 @@ def mostrar_pedidos_internos():
                         st.rerun()
                     else:
                         st.error(msg)
+
 
     # =============================================================
     # TAB 3 – SUBIR EXCEL/CSV (codigo/articulo/cantidad)
@@ -845,3 +647,4 @@ def mostrar_pedidos_internos():
                     st.dataframe(df_det, use_container_width=True)
             except Exception:
                 pass
+
