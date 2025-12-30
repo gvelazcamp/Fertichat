@@ -354,5 +354,91 @@ def mostrar_pedidos_internos():
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
+with tab2:
+    st.subheader("✅ Seleccionar productos")
+
+    df_stock = ejecutar_consulta("""
+        SELECT
+            "ARTICULO",
+            "FAMILIA"
+        FROM stock
+        ORDER BY 1
+        LIMIT 200
+    """)
+
+    if df_stock is None or df_stock.empty:
+        st.info("No hay productos para mostrar.")
+    else:
+        seleccionados = []
+
+        for i, row in df_stock.iterrows():
+            col1, col2, col3 = st.columns([5, 2, 2])
+
+            with col1:
+                checked = st.checkbox(
+                    row["ARTICULO"],
+                    key=f"chk_{i}"
+                )
+
+            with col2:
+                cantidad = st.number_input(
+                    "Cantidad",
+                    min_value=1,
+                    value=1,
+                    key=f"qty_{i}"
+                )
+
+            if checked:
+                seleccionados.append({
+                    "codigo": "",
+                    "articulo": row["ARTICULO"],
+                    "cantidad": cantidad
+                })
+
+        if seleccionados:
+            if st.button("📨 Enviar pedido seleccionado", type="primary"):
+                ok, msg, _ = crear_pedido(
+                    usuario,
+                    nombre_usuario,
+                    "",
+                    seleccionados,
+                    ""
+                )
+                st.success(msg) if ok else st.error(msg)
+
+with tab3:
+    st.subheader("📤 Subir pedido desde Excel")
+
+    archivo = st.file_uploader(
+        "Subí un archivo Excel (.xlsx)",
+        type=["xlsx"]
+    )
+
+    if archivo:
+        df = pd.read_excel(archivo)
+
+        st.write("Vista previa:")
+        st.dataframe(df)
+
+        if st.button("📨 Enviar pedido desde Excel", type="primary"):
+            lineas = []
+
+            for _, fila in df.iterrows():
+                lineas.append({
+                    "codigo": str(fila.get("codigo", "")),
+                    "articulo": str(fila.get("articulo", "")),
+                    "cantidad": int(fila.get("cantidad", 1))
+                })
+
+            ok, msg, _ = crear_pedido(
+                usuario,
+                nombre_usuario,
+                "",
+                lineas,
+                "Pedido cargado desde Excel"
+            )
+            st.success(msg) if ok else st.error(msg)
+
 
    
+
