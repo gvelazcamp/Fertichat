@@ -219,10 +219,10 @@ def marcar_notificacion_leida(notif_id: int) -> bool:
 
 def limpiar_texto_para_busqueda(texto: str) -> str:
     """
-    Limpia el texto del artículo para poder buscar sugerencias:
+    Limpia el texto del artículo para sugerencias:
     - Quita números
     - Quita símbolos
-    - Deja solo letras y espacios
+    - Normaliza espacios
     """
     if not texto:
         return ""
@@ -367,5 +367,6 @@ def mostrar_pedidos_internos():
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
+
 
 
