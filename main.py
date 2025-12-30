@@ -3254,12 +3254,375 @@ def inject_css_responsive():
 
 
 # =========================
-# UI - MOSTRAR DETALLE DF
+# UI - MOSTRAR DETALLE DF (+ gráfico + explicación)
 # =========================
-def mostrar_detalle_df(df, titulo="📋 Ver tabla (detalle)", key="detalle_df", max_rows=200):
+
+def _norm_colname(x: str) -> str:
+    try:
+        return normalizar_texto(str(x or ""))
+    except Exception:
+        return str(x or "").lower().strip()
+
+
+def _pick_col(df: pd.DataFrame, posibles: list[str]) -> Optional[str]:
+    if df is None or df.empty:
+        return None
+    cols = list(df.columns)
+    cols_norm = {_norm_colname(c): c for c in cols}
+    for p in posibles:
+        pnorm = _norm_colname(p)
+        # match exacto normalizado
+        if pnorm in cols_norm:
+            return cols_norm[pnorm]
+        # match parcial
+        for cnorm, corig in cols_norm.items():
+            if pnorm in cnorm:
+                return corig
+    return None
+
+
+def _latam_to_float(valor) -> float:
+    """Convierte string LATAM/currency a float (robusto)."""
+    if valor is None:
+        return 0.0
+    try:
+        if pd.isna(valor):
+            return 0.0
+    except Exception:
+        pass
+
+    # Ya es numérico
+    if isinstance(valor, (int, float)):
+        try:
+            return float(valor)
+        except Exception:
+            return 0.0
+
+    s = str(valor).strip()
+    if not s:
+        return 0.0
+
+    # Quitar símbolos y paréntesis
+    s = s.replace("U$S", "").replace("USD", "").replace("$", "").strip()
+    s = s.replace("(", "-").replace(")", "")
+    s = s.replace(" ", "")
+
+    # Normalizar separadores: casos con miles y decimales
+    if "," in s and "." in s:
+        # si la coma está al final → coma decimal, punto miles
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            # punto decimal, coma miles
+            s = s.replace(",", "")
+    else:
+        # solo coma → decimal
+        if "," in s and "." not in s:
+            s = s.replace(".", "").replace(",", ".")
+        # solo punto → puede ser decimal o miles; intentamos directo
+
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
+def _df_get_numeric(df: pd.DataFrame, col: str) -> pd.Series:
+    if col is None or df is None or df.empty or col not in df.columns:
+        return pd.Series([0.0] * (len(df) if df is not None else 0))
+    ser = df[col]
+    # si ya es numérico, usarlo
+    if pd.api.types.is_numeric_dtype(ser):
+        return pd.to_numeric(ser, errors="coerce").fillna(0.0)
+    # si es string (por formatear_dataframe), parsear LATAM
+    return ser.apply(_latam_to_float).fillna(0.0)
+
+
+def _df_get_datetime(df: pd.DataFrame, col: str) -> Optional[pd.Series]:
+    if df is None or df.empty or not col or col not in df.columns:
+        return None
+    try:
+        # dayfirst=True por DD/MM/YYYY que aparece a veces
+        return pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+    except Exception:
+        return None
+
+
+def _es_df_compras(df: pd.DataFrame) -> bool:
+    """Heurística: si parece detalle de compras (artículo/proveedor/total/fecha)."""
+    if df is None or df.empty:
+        return False
+    c_art = _pick_col(df, ["articulo", "Artículo", "Articulo"])
+    c_prov = _pick_col(df, ["proveedor", "Proveedor", "cliente / proveedor", "Cliente / Proveedor"])
+    c_tot = _pick_col(df, ["total", "monto", "importe", "monto neto"])
+    c_fec = _pick_col(df, ["fecha", "Fecha"])
+    # basta con artículo + (total o cantidad) o proveedor + total
+    c_cant = _pick_col(df, ["cantidad", "Cantidad"])
+    return bool((c_art and (c_tot or c_cant)) or (c_prov and c_tot) or (c_fec and c_tot))
+
+
+def _fmt_money_latam(valor: float, moneda: str = "$", dec: int = 2) -> str:
+    if moneda and moneda.strip().upper() in ["U$S", "USD", "U$$"]:
+        pref = "U$S "
+    else:
+        pref = "$ "
+    return pref + _fmt_num_latam(valor, dec)
+
+
+def _build_resumen_compras(df: pd.DataFrame) -> dict:
+    """Devuelve métricas + top artículos."""
+    if df is None or df.empty:
+        return {}
+
+    c_art = _pick_col(df, ["articulo", "Artículo", "Articulo"])
+    c_prov = _pick_col(df, ["proveedor", "Proveedor", "cliente / proveedor", "Cliente / Proveedor"])
+    c_fec = _pick_col(df, ["fecha", "Fecha"])
+    c_mon = _pick_col(df, ["moneda", "Moneda"])
+    c_fac = _pick_col(df, ["nro_factura", "N Factura", "Nro Factura", "Factura", "Nro. Comprobante", "Nro. Comprobante "])
+    c_tot = _pick_col(df, ["total", "Total", "monto", "Monto", "importe", "Importe", "monto neto", "Monto Neto"])
+    c_cant = _pick_col(df, ["cantidad", "Cantidad"])
+
+    total_num = _df_get_numeric(df, c_tot) if c_tot else pd.Series([0.0] * len(df))
+    cant_num = _df_get_numeric(df, c_cant) if c_cant else None
+
+    # Totales por moneda (si existe)
+    totales_por_moneda = {}
+    if c_mon and c_tot:
+        for m in df[c_mon].dropna().astype(str).unique():
+            sub = df[df[c_mon].astype(str) == str(m)]
+            sub_total = _df_get_numeric(sub, c_tot).sum()
+            totales_por_moneda[str(m).strip()] = float(sub_total)
+
+    # Fechas
+    dt = _df_get_datetime(df, c_fec) if c_fec else None
+    fecha_min = None
+    fecha_max = None
+    if dt is not None:
+        try:
+            fecha_min = dt.min()
+            fecha_max = dt.max()
+        except Exception:
+            pass
+
+    # Proveedor principal (si es casi único)
+    prov_modo = None
+    if c_prov:
+        try:
+            vc = df[c_prov].dropna().astype(str).value_counts()
+            if not vc.empty:
+                prov_modo = vc.index[0]
+        except Exception:
+            pass
+
+    # Facturas únicas
+    facturas_unicas = None
+    if c_fac:
+        try:
+            facturas_unicas = int(df[c_fac].dropna().astype(str).nunique())
+        except Exception:
+            facturas_unicas = None
+
+    # Artículos: top por total (o por cantidad si no hay total)
+    top_items_df = pd.DataFrame()
+    if c_art:
+        if c_tot:
+            tmp = df[[c_art]].copy()
+            tmp["_total_"] = total_num.values
+            top_items_df = (
+                tmp.groupby(c_art, as_index=False)["_total_"]
+                   .sum()
+                   .sort_values("_total_", ascending=False)
+                   .head(10)
+            )
+            top_items_df = top_items_df.rename(columns={c_art: "Artículo", "_total_": "Total"})
+        elif c_cant:
+            tmp = df[[c_art]].copy()
+            tmp["_cant_"] = cant_num.values
+            top_items_df = (
+                tmp.groupby(c_art, as_index=False)["_cant_"]
+                   .sum()
+                   .sort_values("_cant_", ascending=False)
+                   .head(10)
+            )
+            top_items_df = top_items_df.rename(columns={c_art: "Artículo", "_cant_": "Cantidad"})
+
+    # Cantidad total (si existe)
+    cantidad_total = None
+    if c_cant:
+        try:
+            cantidad_total = float(_df_get_numeric(df, c_cant).sum())
+        except Exception:
+            cantidad_total = None
+
+    return {
+        "rows": int(len(df)),
+        "col_total": c_tot,
+        "col_moneda": c_mon,
+        "col_fecha": c_fec,
+        "col_factura": c_fac,
+        "col_articulo": c_art,
+        "col_proveedor": c_prov,
+        "total_sum": float(total_num.sum()) if c_tot else None,
+        "totales_por_moneda": totales_por_moneda,
+        "fecha_min": fecha_min,
+        "fecha_max": fecha_max,
+        "proveedor_modo": prov_modo,
+        "facturas_unicas": facturas_unicas,
+        "cantidad_total": cantidad_total,
+        "top_items_df": top_items_df
+    }
+
+
+def _render_graficos_compras(df: pd.DataFrame, key_base: str = "graf") -> None:
+    """Renderiza tabs de gráficos para un df de compras."""
+    info = _build_resumen_compras(df)
+    if not info:
+        st.info("No hay datos para graficar.")
+        return
+
+    c_tot = info["col_total"]
+    c_mon = info["col_moneda"]
+    c_fec = info["col_fecha"]
+    c_art = info["col_articulo"]
+
+    tabs = st.tabs(["🏷️ Top artículos", "🗓️ Evolución", "💱 Monedas"])
+
+    # 1) Top artículos
+    with tabs[0]:
+        top_df = info["top_items_df"]
+        if top_df is None or top_df.empty:
+            st.info("No pude armar el ranking de artículos (faltan columnas).")
+        else:
+            # Si es Total, graficar total; si es Cantidad, graficar cantidad
+            ycol = "Total" if "Total" in top_df.columns else "Cantidad"
+            fig = px.bar(
+                top_df.sort_values(ycol, ascending=True),
+                x=ycol,
+                y="Artículo",
+                orientation="h"
+            )
+            fig.update_layout(height=420, margin=dict(l=10, r=10, t=30, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # 2) Evolución por fecha
+    with tabs[1]:
+        if not c_fec or not c_tot:
+            st.info("No hay columnas de Fecha + Total para graficar evolución.")
+        else:
+            dfx = df.copy()
+            dfx["_fecha_"] = _df_get_datetime(dfx, c_fec)
+            dfx["_total_"] = _df_get_numeric(dfx, c_tot)
+            dfx = dfx.dropna(subset=["_fecha_"])
+            if dfx.empty:
+                st.info("No pude interpretar las fechas para graficar.")
+            else:
+                serie = (
+                    dfx.groupby(dfx["_fecha_"].dt.date, as_index=False)["_total_"]
+                       .sum()
+                       .rename(columns={"_total_": "Total", "_fecha_": "Fecha"})
+                )
+                fig2 = px.line(serie, x="Fecha", y="Total", markers=True)
+                fig2.update_layout(height=420, margin=dict(l=10, r=10, t=30, b=10))
+                st.plotly_chart(fig2, use_container_width=True)
+
+    # 3) Monedas
+    with tabs[2]:
+        totm = info["totales_por_moneda"] or {}
+        if not totm:
+            st.info("No hay columna Moneda + Total para armar distribución por moneda.")
+        else:
+            dfm = pd.DataFrame({"Moneda": list(totm.keys()), "Total": list(totm.values())})
+            fig3 = px.pie(dfm, names="Moneda", values="Total", hole=0.4)
+            fig3.update_layout(height=420, margin=dict(l=10, r=10, t=30, b=10))
+            st.plotly_chart(fig3, use_container_width=True)
+
+
+def _render_explicacion_compras(df: pd.DataFrame, contexto_respuesta: str = "") -> None:
+    """Explicación simple y útil sin IA (100% determinística)."""
+    info = _build_resumen_compras(df)
+    if not info:
+        st.info("No hay datos para explicar.")
+        return
+
+    rows = info["rows"]
+    total_sum = info["total_sum"]
+    totales_por_moneda = info["totales_por_moneda"] or {}
+    prov = info["proveedor_modo"]
+    facs = info["facturas_unicas"]
+    cant_total = info["cantidad_total"]
+    fmin = info["fecha_min"]
+    fmax = info["fecha_max"]
+    top_df = info["top_items_df"]
+
+    st.markdown("### 🧠 Explicación")
+    if contexto_respuesta:
+        st.caption(contexto_respuesta)
+
+    st.markdown(
+        "- El **Total** se calcula como la **suma del importe de cada renglón** (cada renglón suele ser un artículo/línea dentro de una factura)."
+    )
+    st.markdown(f"- Se encontraron **{rows}** renglones (registros) en el detalle.")
+
+    if facs is not None:
+        st.markdown(f"- Facturas únicas detectadas: **{facs}**.")
+
+    if prov:
+        st.markdown(f"- Proveedor más frecuente en el detalle: **{prov}**.")
+
+    if fmin is not None and fmax is not None:
+        try:
+            st.markdown(
+                f"- Rango de fechas: **{fmin.date().strftime('%d/%m/%Y')}** → **{fmax.date().strftime('%d/%m/%Y')}**."
+            )
+        except Exception:
+            pass
+
+    # Totales por moneda si aplica
+    if totales_por_moneda:
+        st.markdown("#### 💰 Total por moneda")
+        for mon, val in totales_por_moneda.items():
+            mon_norm = str(mon).strip()
+            if mon_norm.upper() in ["U$S", "USD", "U$$"]:
+                st.markdown(f"- **{mon_norm}**: **{_fmt_money_latam(val, 'U$S')}**")
+            else:
+                st.markdown(f"- **{mon_norm or '$'}**: **{_fmt_money_latam(val, '$')}**")
+    else:
+        # Total general si no hay moneda
+        if total_sum is not None:
+            st.markdown(f"- Total (sumatoria): **{_fmt_money_latam(total_sum, '$')}**")
+
+    if cant_total is not None and cant_total > 0:
+        st.markdown(f"- Cantidad total (sumatoria de cantidades): **{_fmt_num_latam(cant_total, 2)}**")
+
+    # Top artículos
+    if top_df is not None and not top_df.empty:
+        st.markdown("#### 🏷️ Artículos que más impactan")
+        show = top_df.copy()
+        if "Total" in show.columns:
+            show["Total"] = show["Total"].apply(lambda x: _fmt_money_latam(float(x), "$"))
+        st.dataframe(show, use_container_width=True, hide_index=True)
+
+        st.markdown(
+            "- Estos son los artículos con **mayor impacto** (por importe o por cantidad, según lo que tenga el detalle)."
+        )
+
+
+def mostrar_detalle_df(
+    df,
+    titulo: str = "📋 Ver tabla (detalle)",
+    key: str = "detalle_df",
+    max_rows: int = 200,
+    contexto_respuesta: str = "",
+    enable_chart: bool = True,
+    enable_explain: bool = True
+):
     """
-    Muestra un dataframe bajo un checkbox (para no llenar la UI).
-    Evita NameError cuando main() llama mostrar_detalle_df(...).
+    Muestra 3 opciones al costado:
+    - 📄 Ver tabla (detalle)
+    - 📈 Ver gráfico
+    - 🧠 Ver explicación
+
+    Si el DF no parece de compras, mantiene comportamiento: solo tabla.
     """
     if df is None:
         return
@@ -3270,20 +3633,52 @@ def mostrar_detalle_df(df, titulo="📋 Ver tabla (detalle)", key="detalle_df", 
     except Exception:
         pass
 
-    ver = st.checkbox(titulo, key=key, value=False)
-    if not ver:
-        return
+    # Detectar si es compras (para habilitar gráfico/explicación)
+    es_compras = _es_df_compras(df)
 
-    try:
-        total_rows = len(df)
-    except Exception:
-        total_rows = None
+    # Layout: 3 checks al costado
+    c1, c2, c3 = st.columns([2.2, 1.0, 1.2])
 
-    df_show = df.head(max_rows) if hasattr(df, "head") else df
-    st.dataframe(df_show, use_container_width=True, hide_index=True)
+    with c1:
+        ver_tabla = st.checkbox(titulo, key=f"{key}_tabla", value=False)
 
-    if total_rows is not None and total_rows > max_rows:
-        st.caption(f"Mostrando {max_rows} de {total_rows} registros.")
+    with c2:
+        ver_graf = st.checkbox(
+            "📈 Ver gráfico",
+            key=f"{key}_graf",
+            value=False,
+            disabled=(not enable_chart or not es_compras)
+        )
+
+    with c3:
+        ver_exp = st.checkbox(
+            "🧠 Ver explicación",
+            key=f"{key}_exp",
+            value=False,
+            disabled=(not enable_explain or not es_compras)
+        )
+
+    # TABLA
+    if ver_tabla:
+        try:
+            total_rows = len(df)
+        except Exception:
+            total_rows = None
+
+        df_show = df.head(max_rows) if hasattr(df, "head") else df
+        st.dataframe(df_show, use_container_width=True, hide_index=True)
+
+        if total_rows is not None and total_rows > max_rows:
+            st.caption(f"Mostrando {max_rows} de {total_rows} registros.")
+
+    # GRÁFICO
+    if ver_graf:
+        _render_graficos_compras(df, key_base=key)
+
+    # EXPLICACIÓN
+    if ver_exp:
+        _render_explicacion_compras(df, contexto_respuesta=contexto_respuesta)
+
 
 # =====================================================================
 # INTERFAZ STREAMLIT
@@ -3642,7 +4037,13 @@ def main():
                 if respuesta and respuesta not in ["__MOSTRAR_SUGERENCIA__", "__COMPARACION_TABS__", "__COMPARACION_FAMILIA_TABS__"]:
                     st.markdown("**Respuesta:**")
                     st.markdown(respuesta)
-                    mostrar_detalle_df(df, titulo="📄 Ver detalle de compras", key=f"curr_{len(st.session_state.historial)}")
+                    mostrar_detalle_df(
+                        df,
+                        titulo="📄 Ver detalle de compras",
+                        key=f"curr_{len(st.session_state.historial)}",
+                        contexto_respuesta=respuesta
+                    )
+
 
     # Hacer rerun DESPUÉS del spinner si hay sugerencia pendiente
     if mostrar_sugerencia_ahora:
