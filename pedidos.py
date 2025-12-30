@@ -263,8 +263,8 @@ def mostrar_pedidos_internos():
         "📋 Mis pedidos"
     ])
 
-    # =============================================================
-    # TAB 1 – TEXTO LIBRE + SUGERENCIAS
+       # =============================================================
+    # TAB 1 – TEXTO LIBRE + SUGERENCIAS (AUTO-REEMPLAZO)
     # =============================================================
     with tab1:
         st.subheader("✍️ Escribir pedido")
@@ -278,12 +278,22 @@ def mostrar_pedidos_internos():
         texto_pedido = st.text_area("Pedido:", height=150)
 
         if texto_pedido:
-            df = pd.DataFrame(parsear_texto_pedido(texto_pedido))
-            df_edit = st.data_editor(df, hide_index=True, num_rows="dynamic")
+            if "df_pedido" not in st.session_state:
+                st.session_state.df_pedido = pd.DataFrame(
+                    parsear_texto_pedido(texto_pedido)
+                )
+
+            df_edit = st.data_editor(
+                st.session_state.df_pedido,
+                hide_index=True,
+                num_rows="dynamic",
+                key="editor_pedido"
+            )
+
+            st.session_state.df_pedido = df_edit.copy()
 
             st.markdown("### 🔎 Sugerencias")
 
-            lineas_finales = []
             bloquear_envio = False
 
             for idx, fila in df_edit.iterrows():
@@ -305,29 +315,14 @@ def mostrar_pedidos_internos():
                         key=f"sug_{idx}"
                     )
 
-                    if elegido == "— Elegir —":
-                        bloquear_envio = True
-                        lineas_finales.append(fila.to_dict())
+                    if elegido != "— Elegir —":
+                        st.session_state.df_pedido.at[idx, "articulo"] = elegido
                     else:
-                        lineas_finales.append({
-                            "codigo": "",
-                            "articulo": elegido,
-                            "cantidad": cant
-                        })
+                        bloquear_envio = True
 
                 elif len(sugerencias) == 1:
                     st.info(f"🔹 {art} → {sugerencias[0]}")
-                    lineas_finales.append({
-                        "codigo": "",
-                        "articulo": sugerencias[0],
-                        "cantidad": cant
-                    })
-
-                else:
-                    lineas_finales.append(fila.to_dict())
-
-            if bloquear_envio:
-                st.caption("ℹ️ Seleccioná todas las opciones antes de enviar.")
+                    st.session_state.df_pedido.at[idx, "articulo"] = sugerencias[0]
 
             if st.button(
                 "📨 Enviar pedido",
@@ -338,8 +333,7 @@ def mostrar_pedidos_internos():
                     usuario,
                     nombre_usuario,
                     seccion_codigo,
-                    lineas_finales,
+                    st.session_state.df_pedido.to_dict("records"),
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
-
