@@ -2,6 +2,26 @@
 # MAIN - ORQUESTADOR PRINCIPAL
 # =========================
 import streamlit as st
+
+st.set_page_config(page_title="FertiChat", layout="wide")
+
+# ======================
+# LOGIN
+# ======================
+if "usuario" not in st.session_state:
+
+    st.title("Login FertiChat")
+
+    usuario = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
+
+    if st.button("Entrar"):
+        if usuario and password:
+            # acá podés validar contra Supabase si querés
+            st.session_state["usuario"] = usuario
+            st.rerun()
+
+    st.stop()   # ⬅️ CLAVE ABSOLUTA
 import pandas as pd
 from datetime import datetime
 from typing import Tuple, Optional
