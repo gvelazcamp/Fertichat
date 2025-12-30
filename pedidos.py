@@ -213,6 +213,26 @@ def marcar_notificacion_leida(notif_id: int) -> bool:
         except:
             pass
         return False
+# =====================================================================
+# NORMALIZACIÓN DE TEXTO PARA SUGERENCIAS
+# =====================================================================
+
+def limpiar_texto_para_busqueda(texto: str) -> str:
+    """
+    Limpia el texto del artículo para poder buscar sugerencias:
+    - Quita números
+    - Quita símbolos
+    - Deja solo letras y espacios
+    """
+    if not texto:
+        return ""
+
+    texto = texto.upper()
+    texto = re.sub(r'\d+', ' ', texto)          # quitar números
+    texto = re.sub(r'[^A-Z\s]', ' ', texto)     # quitar símbolos
+    texto = re.sub(r'\s+', ' ', texto).strip()  # espacios múltiples
+
+    return texto
 
 # =====================================================================
 # PARSEO TEXTO LIBRE
@@ -329,7 +349,8 @@ def mostrar_pedidos_internos():
             st.markdown("### 🔎 Sugerencias")
             for _, fila in df_edit.iterrows():
                 art = str(fila.get("articulo", "")).strip()
-                sugerencias = sugerir_articulos_similares(art, seccion_codigo)
+                texto_limpio = limpiar_texto_para_busqueda(articulo)
+                sugerencias = sugerir_articulos_similares(texto_limpio, seccion_codigo)
                 if len(sugerencias) > 1:
                     st.warning(f"⚠️ **{art}** puede ser:")
                     for s in sugerencias:
@@ -346,4 +367,5 @@ def mostrar_pedidos_internos():
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
+
 
