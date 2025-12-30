@@ -3775,17 +3775,36 @@ def mostrar_detalle_df(
         except Exception:
             pass
 
-    # GRÁFICOS (sobre DF completo)
-    if enable_chart and ver_grafico:
-        _render_graficos_compras(df_full, key_base=key)
+        # =========================
+        # DATASET COMPLETO PARA ANALISIS (SIN LIMIT)
+        # =========================
+        df_agregado = None
+        if contexto_respuesta and "where_clause" in contexto_respuesta:
+            try:
+                df_agregado = get_serie_compras_agregada(
+                    contexto_respuesta["where_clause"],
+                    contexto_respuesta.get("params", ())
+                )
+            except Exception:
+                df_agregado = None
 
-    # EXPLICACIÓN (sobre DF completo)
-    if enable_explain and ver_explicacion:
-        try:
-            _render_explicacion_compras(df_full, contexto_respuesta=contexto_respuesta)
-        except Exception:
-            # Si no tenés esa función o falla, no rompemos la app
-            st.info("No pude generar la explicación (pero la tabla está OK).")
+        # =========================
+        # GRAFICOS
+        # =========================
+        if enable_chart:
+            if df_agregado is not None and not df_agregado.empty:
+                _render_graficos_compras(df_agregado, key_base=key)
+            else:
+                _render_graficos_compras(df, key_base=key)
+
+        # =========================
+        # EXPLICACION
+        # =========================
+        if enable_explain:
+            if df_agregado is not None and not df_agregado.empty:
+                _render_explicacion_compras(df_agregado)
+            else:
+                _render_explicacion_compras(df)
 
 
 
