@@ -428,7 +428,7 @@ def mostrar_pedidos_internos():
                 st.error(msg)
 
     # =============================================================
-    # TAB 2 – SELECCIONAR PRODUCTOS (TABLA + CHECK + CANTIDAD + TR)
+    # TAB 2 – SELECCIONAR PRODUCTOS (TABLA + CHECK + CANTIDAD ±)
     # =============================================================
     with tab2:
         st.subheader("✅ Seleccionar productos")
@@ -443,8 +443,9 @@ def mostrar_pedidos_internos():
         incluir_tr = st.checkbox("Incluir TR (Tronco Común)", value=True, key="tab2_incluir_tr")
         buscar = st.text_input("Buscar artículo (opcional):", key="tab2_buscar")
 
+        # row_key -> {"codigo":..., "articulo":..., "cantidad":...}
         if "tab2_sel" not in st.session_state:
-            st.session_state["tab2_sel"] = {}  # articulo -> {"codigo":..., "articulo":..., "cantidad":...}
+            st.session_state["tab2_sel"] = {}
 
         if not seccion2_codigo:
             st.info("Elegí una sección para listar productos.")
@@ -492,15 +493,17 @@ def mostrar_pedidos_internos():
                     if not articulo:
                         continue
 
-                    if articulo in sel_map:
+                    row_key = f"{codigo}||{articulo}"
+
+                    if row_key in sel_map:
                         sel = True
                         try:
-                            cant = int(float(sel_map[articulo].get("cantidad", 0)))
+                            cant = int(float(sel_map[row_key].get("cantidad", 0)))
                         except:
                             cant = 0
                     else:
                         sel = False
-                        cant = 0  # ✅ default en 0
+                        cant = 0  # ✅ default SIEMPRE 0
 
                     filas.append({
                         "Sel": sel,
@@ -518,20 +521,23 @@ def mostrar_pedidos_internos():
                     num_rows="fixed",
                     column_config={
                         "Sel": st.column_config.CheckboxColumn("Sel"),
-                        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),  # ✅ permite 0
+                        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
                     },
                     disabled=["Código", "Artículo", "Familia"],
                     key="tab2_editor"
                 )
 
-                # Guardar selección
+                # Guardar selección (mantiene cantidad 0 si el usuario no la sube)
                 nuevo = {}
                 for _, rr in df_tab2_edit.iterrows():
                     if bool(rr.get("Sel", False)):
-                        art = str(rr.get("Artículo", "")).strip()
+                        cod = str(rr.get("Código", "") or "")
+                        art = str(rr.get("Artículo", "") or "").strip()
                         if not art:
                             continue
-                        cod = str(rr.get("Código", "") or "")
+
+                        row_key = f"{cod}||{art}"
+
                         try:
                             cant = int(float(rr.get("Cantidad", 0)))
                         except:
@@ -539,106 +545,95 @@ def mostrar_pedidos_internos():
                         if cant < 0:
                             cant = 0
 
-                        nuevo[art] = {"codigo": cod, "articulo": art, "cantidad": cant}
+                        nuevo[row_key] = {"codigo": cod, "articulo": art, "cantidad": cant}
 
                 st.session_state["tab2_sel"] = nuevo
-                sel_map = st.session_state["tab2_sel"]  # refrescar referencia
 
                 colA, colB = st.columns([1, 1])
-
                 with colA:
                     if st.button("🧹 Limpiar selección", key="tab2_btn_limpiar"):
                         st.session_state["tab2_sel"] = {}
                         st.rerun()
 
                 with colB:
-                    st.write(f"Seleccionados: **{len(sel_map)}**")
+                    st.write(f"Seleccionados: **{len(st.session_state['tab2_sel'])}**")
 
-                # ============================
-                # ➖ [cantidad] ➕ (carrito)
-                # ============================
-                hay_cero = False
+                lineas = list(st.session_state["tab2_sel"].values())
 
-                if sel_map:
-                    st.markdown("#### 🧺 Cantidades (➖ 0 ➕)")
+                # ✅ Controles − / + (no pueden ir dentro de la celda, van abajo pero sincronizados)
+                if lineas:
+                    st.markdown("### 🧮 Cantidades (− 0 +)")
 
-                    for i, art in enumerate(sorted(sel_map.keys())):
-                        it = sel_map[art]
-                        cod = str(it.get("codigo", "") or "")
-                        nombre = str(it.get("articulo", art) or art)
+                    hay_ceros = False
 
-                        try:
-                            cant_actual = int(float(it.get("cantidad", 0) or 0))
-                        except:
-                            cant_actual = 0
+                    for it in lineas:
+                        cod = it.get("codigo", "")
+                        art = it.get("articulo", "")
+                        cant_actual = int(it.get("cantidad", 0) or 0)
 
-                        c0, c1, c2, c3 = st.columns([6, 1, 2, 1])
+                        if cant_actual <= 0:
+                            hay_ceros = True
 
-                        with c0:
-                            st.write(f"**{cod}** — {nombre}")
+                        # keys cortas y seguras
+                        base = re.sub(r"[^A-Za-z0-9]+", "_", f"{cod}_{art}")[:80]
+
+                        st.markdown(f"**{cod}** — {art}")
+                        c1, c2, c3 = st.columns([0.12, 0.76, 0.12])
 
                         with c1:
-                            if st.button("➖", key=f"tab2_minus_{i}"):
-                                st.session_state["tab2_sel"][art]["cantidad"] = max(0, cant_actual - 1)
+                            if st.button("−", key=f"tab2_minus_{base}"):
+                                nuevo_cant = max(0, cant_actual - 1)
+                                # actualizar en session_state
+                                rk = f"{cod}||{art}"
+                                if rk in st.session_state["tab2_sel"]:
+                                    st.session_state["tab2_sel"][rk]["cantidad"] = nuevo_cant
                                 st.rerun()
 
                         with c2:
-                            nuevo_cant = st.number_input(
-                                "Cantidad",
+                            nuevo_val = st.number_input(
+                                "",
                                 min_value=0,
                                 step=1,
                                 value=cant_actual,
-                                key=f"tab2_qty_{i}",
+                                key=f"tab2_num_{base}",
                                 label_visibility="collapsed"
                             )
-                            nuevo_cant = int(nuevo_cant)
-                            if nuevo_cant != cant_actual:
-                                st.session_state["tab2_sel"][art]["cantidad"] = nuevo_cant
+                            # sincronizar si cambió
+                            if int(nuevo_val) != cant_actual:
+                                rk = f"{cod}||{art}"
+                                if rk in st.session_state["tab2_sel"]:
+                                    st.session_state["tab2_sel"][rk]["cantidad"] = int(nuevo_val)
 
                         with c3:
-                            if st.button("➕", key=f"tab2_plus_{i}"):
-                                st.session_state["tab2_sel"][art]["cantidad"] = cant_actual + 1
+                            if st.button("+", key=f"tab2_plus_{base}"):
+                                nuevo_cant = cant_actual + 1
+                                rk = f"{cod}||{art}"
+                                if rk in st.session_state["tab2_sel"]:
+                                    st.session_state["tab2_sel"][rk]["cantidad"] = nuevo_cant
                                 st.rerun()
 
-                    # verificar si hay 0
-                    for v in st.session_state["tab2_sel"].values():
-                        try:
-                            c = int(float(v.get("cantidad", 0) or 0))
-                        except:
-                            c = 0
-                        if c == 0:
-                            hay_cero = True
-                            break
-
-                    if hay_cero:
+                    if hay_ceros:
                         st.warning("⚠️ Tenés artículos seleccionados con cantidad 0. Ajustá la cantidad para poder enviar.")
 
                     st.markdown("#### ✅ Selección final")
-                    st.dataframe(
-                        pd.DataFrame(list(st.session_state["tab2_sel"].values()))[["codigo", "articulo", "cantidad"]],
-                        use_container_width=True
-                    )
+                    st.dataframe(pd.DataFrame(lineas)[["codigo", "articulo", "cantidad"]], use_container_width=True)
 
-                # Enviar (bloquea si hay 0)
-                if st.button(
-                    "📨 Enviar pedido",
-                    type="primary",
-                    key="tab2_btn_enviar",
-                    disabled=(len(sel_map) == 0) or hay_cero
-                ):
-                    ok, msg, _ = crear_pedido(
-                        usuario,
-                        nombre_usuario,
-                        seccion2_codigo,
-                        list(st.session_state["tab2_sel"].values()),
-                        ""
-                    )
-                    if ok:
-                        st.success(msg)
-                        st.session_state["tab2_sel"] = {}
-                        st.rerun()
-                    else:
-                        st.error(msg)
+                    btn_disabled = (len(lineas) == 0) or hay_ceros
+
+                    if st.button("📨 Enviar pedido", type="primary", key="tab2_btn_enviar", disabled=btn_disabled):
+                        ok, msg, _ = crear_pedido(
+                            usuario,
+                            nombre_usuario,
+                            seccion2_codigo,
+                            lineas,
+                            ""
+                        )
+                        if ok:
+                            st.success(msg)
+                            st.session_state["tab2_sel"] = {}
+                            st.rerun()
+                        else:
+                            st.error(msg)
 
 
     # =============================================================
@@ -753,5 +748,6 @@ def mostrar_pedidos_internos():
                     st.dataframe(df_det, use_container_width=True)
             except Exception:
                 pass
+
 
 
