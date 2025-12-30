@@ -244,19 +244,36 @@ def parsear_texto_pedido(texto: str) -> List[dict]:
     return lineas
 
 # =====================================================================
-# 🔎 SUGERENCIAS DE ARTÍCULOS (NUEVO – NO ROMPE NADA)
+# 🔎 SUGERENCIAS DE ARTÍCULOS 
 # =====================================================================
 
 def sugerir_articulos_similares(texto_articulo: str, seccion: str = "") -> List[str]:
+    """
+    Busca artículos similares en stock.
+    Usa ILIKE y búsqueda por palabras.
+    """
     if not texto_articulo or len(texto_articulo.strip()) < 3:
         return []
 
-    query = """
+    palabras = [p.strip() for p in texto_articulo.upper().split() if len(p.strip()) >= 3]
+
+    if not palabras:
+        return []
+
+    condiciones = []
+    params = []
+
+    for p in palabras:
+        condiciones.append('UPPER("ARTICULO") ILIKE %s')
+        params.append(f"%{p}%")
+
+    where_articulo = " AND ".join(condiciones)
+
+    query = f"""
         SELECT DISTINCT "ARTICULO"
         FROM stock
-        WHERE UPPER("ARTICULO") LIKE %s
+        WHERE {where_articulo}
     """
-    params = [f"%{texto_articulo.upper()}%"]
 
     if seccion:
         query += ' AND UPPER(TRIM("FAMILIA")) = %s'
@@ -265,7 +282,11 @@ def sugerir_articulos_similares(texto_articulo: str, seccion: str = "") -> List[
     query += " ORDER BY 1 LIMIT 10"
 
     df = ejecutar_consulta(query, tuple(params))
-    return df.iloc[:, 0].tolist() if df is not None and not df.empty else []
+
+    if df is None or df.empty:
+        return []
+
+    return [str(a) for a in df.iloc[:, 0].tolist()]
 
 # =====================================================================
 # INTERFAZ
@@ -325,3 +346,4 @@ def mostrar_pedidos_internos():
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
+
