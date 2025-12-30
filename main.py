@@ -1,4 +1,4 @@
-# =========================
+# # =========================
 # MAIN - ORQUESTADOR PRINCIPAL
 # =========================
 
@@ -40,32 +40,27 @@ from login_page import (
     LOGIN_CSS
 )
 
-# Inicializar base de datos de usuarios (una sola vez)
+# Inicializar base de datos de usuarios
 init_db()
 
-# Aplicar CSS del login / app
+# Aplicar CSS (login + app)
 st.markdown(LOGIN_CSS, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 # 🔒 REQUERIR AUTENTICACIÓN
-# Esto:
-# - muestra el login lindo si no hay sesión
-# - corta la ejecución con st.stop()
-# - evita bucles
+# - Si no hay sesión → muestra login lindo
+# - Corta ejecución con st.stop()
+# - Evita bucles
 # ---------------------------------------------------------------------
 require_auth()
 
 # ======================
 # USUARIO AUTENTICADO
 # ======================
-user = get_current_user()  # ← SALE DE session_state["user"]
+user = get_current_user()
 
-# Sidebar: info del usuario + logout
+# Sidebar: info del usuario
 show_user_info_sidebar(user)
-
-if st.sidebar.button("Cerrar sesión"):
-    logout()
-    st.rerun()
 
 # ======================
 # APP PRINCIPAL
@@ -74,6 +69,11 @@ if st.sidebar.button("Cerrar sesión"):
 st.title("🦋 FertiChat")
 st.caption("Sistema de Gestión de Compras")
 
+# ---------------------------------------------------------------------
+# ⬇️⬇️⬇️
+# DESDE ACÁ VA TODO TU CÓDIGO REAL DE LA APP
+# (menús, tabs, compras, stock, IA, etc.)
+# ---------------------------------------------------------------------
 
 # ======================================================
 # 🔔 CAMPANITA GLOBAL DE PEDIDOS INTERNOS
