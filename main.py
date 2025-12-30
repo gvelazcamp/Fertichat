@@ -155,6 +155,118 @@ from intent_detector import (
 # OpenAI
 from openai import OpenAI
 
+# =========================
+# UI - MANEJO DE RESPUESTAS ESPECIALES DEL ORQUESTADOR
+# =========================
+def render_orquestador_output(pregunta_original: str, respuesta: str, df: Optional[pd.DataFrame]):
+    """
+    Intercepta marcadores especiales del orquestador y los renderiza en la UI.
+    """
+    # UID para keys (evita choques de botones en reruns)
+    uid = str(abs(hash((pregunta_original or "", respuesta or ""))) % 10**8)
+
+    # -------------------------------------------------
+    # 1) SUGERENCIA IA (cuando intent_detector no entiende)
+    # -------------------------------------------------
+    if respuesta == "__MOSTRAR_SUGERENCIA__":
+        st.warning("No entendí esa pregunta tal cual. Te propongo una forma ejecutable 👇")
+
+        with st.spinner("🧠 Generando sugerencia..."):
+            sug = obtener_sugerencia_ejecutable(pregunta_original)
+
+        entendido = (sug.get("entendido") or "").strip()
+        comando = (sug.get("sugerencia") or "").strip()
+        alternativas = sug.get("alternativas") or []
+
+        if entendido:
+            st.caption(entendido)
+
+        if comando:
+            st.markdown(f"✅ **Sugerencia ejecutable:** `{comando}`")
+
+            if st.button(f"▶️ Ejecutar: {comando}", key=f"btn_exec_{uid}", use_container_width=True):
+                with st.spinner("🔎 Ejecutando..."):
+                    resp2, df2 = procesar_pregunta(comando)
+
+                # Render normal
+                st.markdown(f"**{resp2}**")
+                if df2 is not None and not df2.empty:
+                    st.dataframe(formatear_dataframe(df2), use_container_width=True, hide_index=True)
+        else:
+            st.info("No pude generar un comando ejecutable. Probá reformular.")
+            st.markdown(recomendar_como_preguntar(pregunta_original))
+
+        if alternativas:
+            st.markdown("**Alternativas:**")
+            for i, alt in enumerate(alternativas[:5]):
+                alt = str(alt).strip()
+                if not alt:
+                    continue
+                if st.button(f"➡️ {alt}", key=f"btn_alt_{uid}_{i}", use_container_width=True):
+                    with st.spinner("🔎 Ejecutando alternativa..."):
+                        resp3, df3 = procesar_pregunta(alt)
+
+                    st.markdown(f"**{resp3}**")
+                    if df3 is not None and not df3.empty:
+                        st.dataframe(formatear_dataframe(df3), use_container_width=True, hide_index=True)
+
+        return  # 👈 importante
+
+    # -------------------------------------------------
+    # 2) COMPARACIÓN (tabs proveedor/años)
+    # -------------------------------------------------
+    if respuesta == "__COMPARACION_TABS__":
+        info = st.session_state.get("comparacion_tabs", {}) or {}
+        st.markdown(f"**{info.get('titulo','📊 Comparación')}**")
+
+        tabs = st.tabs(["📌 Resumen", "📋 Detalle"])
+        with tabs[0]:
+            df_res = info.get("resumen")
+            if df_res is not None and not df_res.empty:
+                st.dataframe(df_res, use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin resumen.")
+
+        with tabs[1]:
+            df_det = info.get("detalle")
+            if df_det is not None and not df_det.empty:
+                st.dataframe(df_det, use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin detalle.")
+
+        return
+
+    # -------------------------------------------------
+    # 3) COMPARACIÓN FAMILIAS (tabs pesos/usd)
+    # -------------------------------------------------
+    if respuesta == "__COMPARACION_FAMILIA_TABS__":
+        info = st.session_state.get("comparacion_familia_tabs", {}) or {}
+        st.markdown(f"**{info.get('titulo','📊 Comparación de familias')}**")
+
+        tabs = st.tabs(["$ Pesos", "U$S USD"])
+        with tabs[0]:
+            dfp = info.get("df_pesos")
+            if dfp is not None and not dfp.empty:
+                st.dataframe(formatear_dataframe(dfp), use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin datos en pesos.")
+
+        with tabs[1]:
+            dుఫ = info.get("df_usd")
+            if duf is not None and not duf.empty:
+                st.dataframe(formatear_dataframe(duf), use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin datos en USD.")
+
+        return
+
+    # -------------------------------------------------
+    # 4) RESPUESTA NORMAL
+    # -------------------------------------------------
+    st.markdown(f"**{respuesta}**")
+    if df is not None and not df.empty:
+        st.dataframe(formatear_dataframe(df), use_container_width=True, hide_index=True)
+
 # =====================================================================
 # HELPER PARA EXPORTAR A EXCEL
 # =====================================================================
@@ -1972,7 +2084,7 @@ def mostrar_buscador():
                             pregunta_completa += f" {articulo}"
                         respuesta, df = procesar_pregunta(pregunta_completa)
                     
-                    st.markdown(f"**Respuesta:** {respuesta}")
+                    render_orquestador_output(pregunta_completa, respuesta, df)
                     
                     if df is not None and not df.empty:
                         st.dataframe(
@@ -3464,6 +3576,7 @@ def main():
 
         with st.spinner("🧠 Procesando..."):
             respuesta, df = procesar_pregunta_router(pregunta)
+            render_orquestador_output(pregunta, respuesta, df)
 
             # Caso especial: Mostrar sugerencia con botones
             if respuesta == "__MOSTRAR_SUGERENCIA__":
