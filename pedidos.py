@@ -242,6 +242,49 @@ def sugerir_articulos_similares(texto_articulo: str, seccion: str = "") -> List[
 
     return df.iloc[:, 0].astype(str).tolist()
 
+# =====================================================================
+# CONSULTAS PEDIDOS (PARA TAB "MIS PEDIDOS")
+# =====================================================================
+
+def obtener_pedidos(usuario: str = None, estado: str = None) -> pd.DataFrame:
+    query = """
+        SELECT
+            p.numero_pedido AS "Nro Pedido",
+            p.nombre_usuario AS "Usuario",
+            p.seccion AS "Sección",
+            p.estado AS "Estado",
+            TO_CHAR(p.fecha_creacion, 'DD/MM/YYYY HH24:MI') AS "Fecha",
+            p.observaciones AS "Observaciones",
+            p.id
+        FROM pedidos p
+        WHERE 1=1
+    """
+    params = []
+
+    if usuario:
+        query += " AND p.usuario = %s"
+        params.append(usuario)
+
+    if estado:
+        query += " AND p.estado = %s"
+        params.append(estado)
+
+    query += " ORDER BY p.fecha_creacion DESC LIMIT 200"
+
+    return ejecutar_consulta(query, tuple(params) if params else None)
+
+
+def obtener_detalle_pedido(pedido_id: int) -> pd.DataFrame:
+    query = """
+        SELECT
+            codigo AS "Código",
+            articulo AS "Artículo",
+            cantidad AS "Cantidad"
+        FROM pedidos_detalle
+        WHERE pedido_id = %s
+        ORDER BY id
+    """
+    return ejecutar_consulta(query, (pedido_id,))
 
 
 # =====================================================================
@@ -543,3 +586,4 @@ def mostrar_pedidos_internos():
                 else:
                     st.markdown("### 🧾 Detalle")
                     st.dataframe(df_det, hide_index=True)
+
