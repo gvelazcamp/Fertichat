@@ -263,77 +263,96 @@ def mostrar_pedidos_internos():
         "📋 Mis pedidos"
     ])
 
-# =============================================================
-# TAB 1 – TEXTO LIBRE + SUGERENCIAS (NO TOCA OTROS TABS)
-# =============================================================
-with tab1:
-    st.subheader("✍️ Escribir pedido")
+def mostrar_pedidos_internos():
 
-    seccion = st.selectbox(
-        "Sección (opcional):",
-        [""] + [f"{k} - {v}" for k, v in SECCIONES.items()]
-    )
-    seccion_codigo = seccion.split(" - ")[0] if seccion else ""
+    st.title("📥 Pedidos Internos")
 
-    texto_pedido = st.text_area("Pedido:", height=150)
+    user = st.session_state.get('user', {})
+    usuario = user.get('usuario', user.get('email', 'anonimo'))
+    nombre_usuario = user.get('nombre', usuario)
 
-    if texto_pedido:
-        if "df_pedido" not in st.session_state:
-            st.session_state.df_pedido = pd.DataFrame(
-                parsear_texto_pedido(texto_pedido)
-            )
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "✍️ Escribir pedido",
+        "✅ Seleccionar productos",
+        "📤 Subir Excel",
+        "📋 Mis pedidos"
+    ])
 
-        df_edit = st.data_editor(
-            st.session_state.df_pedido,
-            hide_index=True,
-            num_rows="dynamic",
-            key="editor_pedido"
+    # =============================================================
+    # TAB 1 – TEXTO LIBRE + SUGERENCIAS (NO TOCA OTROS TABS)
+    # =============================================================
+    with tab1:
+        st.subheader("✍️ Escribir pedido")
+
+        seccion = st.selectbox(
+            "Sección (opcional):",
+            [""] + [f"{k} - {v}" for k, v in SECCIONES.items()]
         )
+        seccion_codigo = seccion.split(" - ")[0] if seccion else ""
 
-        st.session_state.df_pedido = df_edit.copy()
+        texto_pedido = st.text_area("Pedido:", height=150)
 
-        st.markdown("### 🔎 Sugerencias")
-
-        bloquear_envio = False
-
-        for idx, fila in df_edit.iterrows():
-            art = str(fila.get("articulo", "")).strip()
-            cant = fila.get("cantidad", 1)
-
-            if not art:
-                continue
-
-            texto_limpio = limpiar_texto_para_busqueda(art)
-            sugerencias = sugerir_articulos_similares(texto_limpio, seccion_codigo)
-
-            if len(sugerencias) > 1:
-                st.warning(f"⚠️ **{art}** puede ser:")
-
-                elegido = st.selectbox(
-                    f"Seleccioná el artículo correcto para '{art}':",
-                    ["— Elegir —"] + sugerencias,
-                    key=f"sug_{idx}"
+        if texto_pedido:
+            if "df_pedido" not in st.session_state:
+                st.session_state.df_pedido = pd.DataFrame(
+                    parsear_texto_pedido(texto_pedido)
                 )
 
-                if elegido != "— Elegir —":
-                    st.session_state.df_pedido.at[idx, "articulo"] = elegido
-                else:
-                    bloquear_envio = True
-
-            elif len(sugerencias) == 1:
-                st.info(f"🔹 {art} → {sugerencias[0]}")
-                st.session_state.df_pedido.at[idx, "articulo"] = sugerencias[0]
-
-        if st.button(
-            "📨 Enviar pedido",
-            type="primary",
-            disabled=bloquear_envio
-        ):
-            ok, msg, _ = crear_pedido(
-                usuario,
-                nombre_usuario,
-                seccion_codigo,
-                st.session_state.df_pedido.to_dict("records"),
-                ""
+            df_edit = st.data_editor(
+                st.session_state.df_pedido,
+                hide_index=True,
+                num_rows="dynamic",
+                key="editor_pedido"
             )
-            st.success(msg) if ok else st.error(msg)
+
+            st.session_state.df_pedido = df_edit.copy()
+
+            st.markdown("### 🔎 Sugerencias")
+
+            bloquear_envio = False
+
+            for idx, fila in df_edit.iterrows():
+                art = str(fila.get("articulo", "")).strip()
+
+                if not art:
+                    continue
+
+                texto_limpio = limpiar_texto_para_busqueda(art)
+                sugerencias = sugerir_articulos_similares(
+                    texto_limpio,
+                    seccion_codigo
+                )
+
+                if len(sugerencias) > 1:
+                    st.warning(f"⚠️ **{art}** puede ser:")
+
+                    elegido = st.selectbox(
+                        f"Seleccioná el artículo correcto para '{art}':",
+                        ["— Elegir —"] + sugerencias,
+                        key=f"sug_{idx}"
+                    )
+
+                    if elegido != "— Elegir —":
+                        st.session_state.df_pedido.at[idx, "articulo"] = elegido
+                    else:
+                        bloquear_envio = True
+
+                elif len(sugerencias) == 1:
+                    st.info(f"🔹 {art} → {sugerencias[0]}")
+                    st.session_state.df_pedido.at[idx, "articulo"] = sugerencias[0]
+
+            if st.button(
+                "📨 Enviar pedido",
+                type="primary",
+                disabled=bloquear_envio
+            ):
+                ok, msg, _ = crear_pedido(
+                    usuario,
+                    nombre_usuario,
+                    seccion_codigo,
+                    st.session_state.df_pedido.to_dict("records"),
+                    ""
+                )
+                st.success(msg) if ok else st.error(msg)
+
+   
