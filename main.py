@@ -28,6 +28,13 @@ if st.session_state["user"] is None:
             st.error(msg)
 
     st.stop()   # ⬅️ ESTO EVITA EL BUCLE
+# ======================
+# APP PRINCIPAL
+# ======================
+user = st.session_state["user"]
+
+st.sidebar.success(f"👤 {user['nombre']} ({user['usuario']})")
+st.sidebar.caption(user["empresa"])    
 import pandas as pd
 from datetime import datetime
 from typing import Tuple, Optional
