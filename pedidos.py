@@ -503,6 +503,9 @@ def mostrar_pedidos_internos():
                         sel = False
                         cant = 0  # ✅ default 0
 
+                    if cant < 0:
+                        cant = 0
+
                     filas.append({
                         "Sel": sel,
                         "Código": codigo,
@@ -513,49 +516,41 @@ def mostrar_pedidos_internos():
 
                 df_tab2 = pd.DataFrame(filas)
 
-                # ✅ Renderer HTML (string) para evitar React error #31
+                # ✅ Renderer: muestra "−  N  +" dentro de la celda (sin HTML)
                 qty_renderer = JsCode(r"""
                 function(params) {
                     let v = params.value;
                     v = (v === null || v === undefined || v === "") ? 0 : parseInt(v);
-                    if (isNaN(v)) v = 0;
-
-                    return `
-                      <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-                        <span class="qty-minus"
-                              style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid #d0d0d0;border-radius:8px;cursor:pointer;user-select:none;font-size:18px;">
-                          −
-                        </span>
-                        <span class="qty-val"
-                              style="min-width:28px;text-align:center;font-weight:600;">
-                          ${v}
-                        </span>
-                        <span class="qty-plus"
-                              style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid #d0d0d0;border-radius:8px;cursor:pointer;user-select:none;font-size:18px;">
-                          +
-                        </span>
-                      </div>
-                    `;
+                    if (isNaN(v) || v < 0) v = 0;
+                    return "−  " + v + "  +";
                 }
                 """)
 
-                # ✅ Click handler: si clickean − o +, actualiza Cantidad en esa fila
+                # ✅ Click: si clickeás IZQ baja, si clickeás DER sube (en la misma celda)
                 on_cell_clicked = JsCode(r"""
                 function(e) {
                     try {
                         if (!e || !e.colDef || e.colDef.field !== "Cantidad") return;
-                        if (!e.event || !e.event.target) return;
+                        if (!e.event) return;
 
-                        const t = e.event.target;
-                        const isMinus = t.classList.contains("qty-minus") || (t.closest && t.closest(".qty-minus"));
-                        const isPlus  = t.classList.contains("qty-plus")  || (t.closest && t.closest(".qty-plus"));
-                        if (!isMinus && !isPlus) return;
+                        const cell = e.event.target.closest('.ag-cell');
+                        if (!cell) return;
+
+                        const rect = cell.getBoundingClientRect();
+                        const x = e.event.clientX - rect.left;
+                        const w = rect.width;
 
                         let cur = parseInt(e.value);
-                        if (isNaN(cur)) cur = 0;
+                        if (isNaN(cur) || cur < 0) cur = 0;
 
-                        if (isMinus) cur = Math.max(0, cur - 1);
-                        if (isPlus)  cur = cur + 1;
+                        // izquierda: −  | derecha: +
+                        if (x < w * 0.33) {
+                            cur = Math.max(0, cur - 1);
+                        } else if (x > w * 0.66) {
+                            cur = cur + 1;
+                        } else {
+                            return; // centro: no hace nada (si quieren, doble click para tipear)
+                        }
 
                         e.node.setDataValue("Cantidad", cur);
                     } catch(err) {}
@@ -576,13 +571,19 @@ def mostrar_pedidos_internos():
                 gb.configure_column("Artículo", editable=False, flex=2, minWidth=280)
                 gb.configure_column("Familia", editable=False, width=90)
 
-                # Cantidad: se ve como (- N +) dentro de la celda
+                # ✅ Cantidad: visual "− N +" y editable (doble click para escribir)
                 gb.configure_column(
                     "Cantidad",
-                    editable=True,                 # ✅ si quieren también pueden tipear (doble click)
+                    editable=True,
                     cellEditor="agNumberCellEditor",
                     cellRenderer=qty_renderer,
-                    width=210
+                    width=140,
+                    cellStyle={
+                        "textAlign": "center",
+                        "fontWeight": "700",
+                        "fontSize": "16px",
+                        "userSelect": "none"
+                    }
                 )
 
                 gb.configure_grid_options(
@@ -595,7 +596,7 @@ def mostrar_pedidos_internos():
                     gridOptions=gb.build(),
                     height=420,
                     theme="streamlit",
-                    update_mode=GridUpdateMode.MODEL_CHANGED,  # ✅ captura cambios por setDataValue
+                    update_mode=GridUpdateMode.MODEL_CHANGED,  # ✅ capta setDataValue
                     allow_unsafe_jscode=True,
                     key="tab2_grid"
                 )
@@ -654,7 +655,6 @@ def mostrar_pedidos_internos():
                         st.rerun()
                     else:
                         st.error(msg)
-
 
     # =============================================================
     # TAB 3 – SUBIR EXCEL/CSV (codigo/articulo/cantidad)
@@ -768,6 +768,7 @@ def mostrar_pedidos_internos():
                     st.dataframe(df_det, use_container_width=True)
             except Exception:
                 pass
+
 
 
 
