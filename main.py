@@ -3711,8 +3711,11 @@ mostrar_detalle_df(
         "where_clause": where_clause,
         "params": params_sql
     }
+)
     """
     Muestra 3 opciones al costado:
+    ...
+    """
     - 📄 Ver tabla (detalle)
     - 📈 Ver gráfico
     - 🧠 Ver explicación
