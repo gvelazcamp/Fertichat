@@ -226,9 +226,8 @@ def sugerir_articulos_similares(texto_articulo: str, seccion: str = "") -> List[
     # 👉 CLAVE: sección seleccionada + TR
     if seccion:
         query += ' AND UPPER(TRIM("FAMILIA")) IN (%s, %s)'
-        params.append(seccion.upper())
-        params.append("TR")
-
+        params.extend([seccion.upper(), 'TR'])
+    
     query += " ORDER BY 1 LIMIT 10"
 
     df = ejecutar_consulta(query, tuple(params))
@@ -304,5 +303,6 @@ def mostrar_pedidos_internos():
                     ""
                 )
                 st.success(msg) if ok else st.error(msg)
+
 
 
