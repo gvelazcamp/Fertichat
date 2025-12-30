@@ -3608,7 +3608,7 @@ def _render_explicacion_compras(df: pd.DataFrame, contexto_respuesta: str = "") 
 
 
 def mostrar_detalle_df(
-    df,
+    df: pd.DataFrame,
     titulo: str = "📋 Ver tabla (detalle)",
     key: str = "detalle_df",
     max_rows: int = 200,
@@ -3616,7 +3616,8 @@ def mostrar_detalle_df(
     enable_chart: bool = True,
     enable_explain: bool = True
 ):
-    """
+  
+      """
     Muestra 3 opciones al costado:
     - 📄 Ver tabla (detalle)
     - 📈 Ver gráfico
