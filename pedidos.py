@@ -453,7 +453,6 @@ def mostrar_pedidos_internos():
             if incluir_tr and "TR" not in familias:
                 familias.append("TR")
 
-            # Query familias dinámico
             if len(familias) == 1:
                 fam_clause = 'UPPER(TRIM("FAMILIA")) = %s'
                 fam_params = [familias[0].upper()]
@@ -482,7 +481,6 @@ def mostrar_pedidos_internos():
             if df_stock is None or df_stock.empty:
                 st.warning("No encontré artículos para esa sección/filtro.")
             else:
-                # Armar tabla editable con selección persistente
                 sel_map = st.session_state["tab2_sel"]
 
                 filas = []
@@ -496,10 +494,13 @@ def mostrar_pedidos_internos():
 
                     if articulo in sel_map:
                         sel = True
-                        cant = int(sel_map[articulo].get("cantidad", 1))
+                        try:
+                            cant = int(float(sel_map[articulo].get("cantidad", 0)))
+                        except:
+                            cant = 0
                     else:
                         sel = False
-                        cant = 1
+                        cant = 0  # ✅ default en 0
 
                     filas.append({
                         "Sel": sel,
@@ -517,7 +518,7 @@ def mostrar_pedidos_internos():
                     num_rows="fixed",
                     column_config={
                         "Sel": st.column_config.CheckboxColumn("Sel"),
-                        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=1, step=1),
+                        "Cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),  # ✅ permite 0
                     },
                     disabled=["Código", "Artículo", "Familia"],
                     key="tab2_editor"
@@ -532,11 +533,11 @@ def mostrar_pedidos_internos():
                             continue
                         cod = str(rr.get("Código", "") or "")
                         try:
-                            cant = int(float(rr.get("Cantidad", 1)))
+                            cant = int(float(rr.get("Cantidad", 0)))
                         except:
-                            cant = 1
-                        if cant < 1:
-                            cant = 1
+                            cant = 0
+                        if cant < 0:
+                            cant = 0
 
                         nuevo[art] = {"codigo": cod, "articulo": art, "cantidad": cant}
 
@@ -553,16 +554,29 @@ def mostrar_pedidos_internos():
                     lineas = list(st.session_state["tab2_sel"].values())
                     st.write(f"Seleccionados: **{len(lineas)}**")
 
+                # Mostrar selección
                 if st.session_state["tab2_sel"]:
                     st.markdown("#### ✅ Selección final")
                     st.dataframe(pd.DataFrame(lineas)[["codigo", "articulo", "cantidad"]], use_container_width=True)
+
+                # ✅ Enviar: si quedó 0, lo subo a 1 (para que no exista cantidad 0 en pedidos)
+                lineas_envio = []
+                for it in lineas:
+                    c = it.get("cantidad", 0)
+                    try:
+                        c = int(float(c))
+                    except:
+                        c = 0
+                    if c <= 0:
+                        c = 1
+                    lineas_envio.append({**it, "cantidad": c})
 
                 if st.button("📨 Enviar pedido", type="primary", key="tab2_btn_enviar", disabled=(len(lineas) == 0)):
                     ok, msg, _ = crear_pedido(
                         usuario,
                         nombre_usuario,
                         seccion2_codigo,
-                        lineas,
+                        lineas_envio,
                         ""
                     )
                     if ok:
@@ -684,3 +698,4 @@ def mostrar_pedidos_internos():
                     st.dataframe(df_det, use_container_width=True)
             except Exception:
                 pass
+
