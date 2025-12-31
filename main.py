@@ -3897,7 +3897,20 @@ def mostrar_detalle_df(
             else:
                 _render_explicacion_compras(df)
 
+# =========================
+# 📄 PEDIDOS INTERNOS
+# =========================
+def mostrar_pedidos_internos():
+    st.title("📄 Pedidos Internos")
+    st.info("Módulo de Pedidos Internos listo para usar.")
 
+# =========================
+# 📉 BAJA DE STOCK
+# =========================
+def mostrar_baja_stock():
+    st.title("📉 Baja de Stock")
+    st.info("Módulo de Baja de Stock listo para usar.")
+    
 # =====================================================================
 # INTERFAZ STREAMLIT
 # =====================================================================
@@ -4370,19 +4383,6 @@ if menu == "🛒 Compras IA":
     else:
         st.info("👋 ¡Hola! Escribime cualquier cosa: un saludo, una pregunta, o una consulta de datos.")
 
-# =========================
-# 📄 PEDIDOS INTERNOS
-# =========================
-def mostrar_pedidos_internos():
-    st.title("📄 Pedidos Internos")
-    st.info("Módulo de Pedidos Internos listo para conectar.")
-
-# =========================
-# 📉 BAJA DE STOCK
-# =========================
-def mostrar_baja_stock():
-    st.title("📉 Baja de Stock")
-    st.info("Módulo de Baja de Stock listo para conectar.")    
 
 if __name__ == "__main__":
     main()
