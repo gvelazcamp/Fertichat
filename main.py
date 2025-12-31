@@ -3175,6 +3175,78 @@ def mostrar_resumen_compras_rotativo():
         opacity: 0.75;
         margin: 4px 0 0 0;
       }
+def mostrar_resumen_compras_rotativo():
+    # 🔁 re-ejecuta cada 5 segundos
+    tick = 0
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        tick = st_autorefresh(interval=5000, key="__rotar_proveedor_5s__") or 0
+    except Exception:
+        tick = 0  # si no está instalado, queda fijo
+
+    anio = datetime.now().year
+    mes_key = datetime.now().strftime("%Y-%m")
+
+    tot_anio = _get_totales_anio(anio)
+    tot_mes = _get_totales_mes(mes_key)
+    dfp = _get_top_proveedores_anio(anio, top_n=20)
+
+    prov_nom = "—"
+    prov_pesos = 0.0
+    prov_usd = 0.0
+
+    if dfp is not None and not dfp.empty:
+        idx = int(tick) % len(dfp)
+        row = dfp.iloc[idx]
+
+        for col in dfp.columns:
+            if col.lower() == "proveedor":
+                nombre = str(row[col]) if pd.notna(row[col]) else "—"
+                prov_nom = " ".join(nombre.split()[:2])  # 👈 SOLO 2 PALABRAS
+            elif col.lower() == "total_$":
+                prov_pesos = _safe_float(row[col])
+            elif col.lower() == "total_usd":
+                prov_usd = _safe_float(row[col])
+
+    # 🎨 CSS con tamaño FIJO
+    st.markdown("""
+    <style>
+      .mini-resumen {
+        display: flex;
+        gap: 14px;
+        margin: 10px 0 14px 0;
+      }
+      .mini-card {
+        flex: 1;
+        min-width: 0;
+        height: 120px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: rgba(255,255,255,0.85);
+        border: 1px solid #e5e7eb;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .mini-t {
+        font-size: 0.78rem;
+        font-weight: 600;
+        opacity: 0.75;
+        margin: 0;
+      }
+      .mini-v {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin: 2px 0 0 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mini-s {
+        font-size: 0.8rem;
+        opacity: 0.7;
+        margin: 0;
+      }
     </style>
     """, unsafe_allow_html=True)
 
@@ -3186,7 +3258,6 @@ def mostrar_resumen_compras_rotativo():
     mes_txt = f"$ {_fmt_num_latam(tot_mes['pesos'], 0)}"
     mes_sub = f"U$S {_fmt_num_latam(tot_mes['usd'], 0)}"
 
-    # ✅ IMPORTANTE: SOLO UNA VEZ (acá estaba duplicado)
     st.markdown(f"""
       <div class="mini-resumen">
         <div class="mini-card">
@@ -3194,11 +3265,13 @@ def mostrar_resumen_compras_rotativo():
           <p class="mini-v">{total_anio_txt}</p>
           <p class="mini-s">{total_anio_sub}</p>
         </div>
+
         <div class="mini-card">
           <p class="mini-t">🏭 Proveedor</p>
-          <p class="mini-v">{prov_nom}</p>
+          <p class="mini-v" title="{prov_nom}">{prov_nom}</p>
           <p class="mini-s">{prov_sub}</p>
         </div>
+
         <div class="mini-card">
           <p class="mini-t">🗓️ Mes actual</p>
           <p class="mini-v">{mes_txt}</p>
@@ -3206,7 +3279,6 @@ def mostrar_resumen_compras_rotativo():
         </div>
       </div>
     """, unsafe_allow_html=True)
-
 
 # =========================
 # CSS RESPONSIVE (CELULAR)
