@@ -3252,7 +3252,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-        
+
 def mostrar_resumen_compras_rotativo():
     # 🔁 re-ejecuta cada 5 segundos
     tick = 0
