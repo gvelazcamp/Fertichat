@@ -4017,8 +4017,6 @@ elif menu == "📄 Pedidos Internos":
 elif menu == "📉 Baja de Stock":
     mostrar_baja_stock()
     return
-        mostrar_pedidos_internos()
-        return
 
     # =========================
     # 🛒 COMPRAS IA (DEFAULT)
