@@ -3945,12 +3945,16 @@ with st.sidebar:
 
     st.markdown("---")
 
-    if st.button("🚪 Cerrar sesión", use_container_width=True, type="secondary"):
+    if st.button(
+        "🚪 Cerrar sesión",
+        key="btn_logout_sidebar",   # ✅ CLAVE ÚNICA
+        use_container_width=True,
+        type="secondary"
+    ):
         logout()
         st.rerun()
 
     st.markdown("---")
-    
 # =========================   
 # MENÚ PRINCIPAL (SIDEBAR)
 # =========================
