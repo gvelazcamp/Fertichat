@@ -3006,11 +3006,9 @@ def mostrar_indicadores_ia():
     )
 
 
-# =========================
+# ========================
 # 📊 RESUMEN RÁPIDO
-# =========================
-
-anio = datetime.now().year
+# ========================
 def _safe_float(x) -> float:
     try:
         if x is None:
@@ -3114,6 +3112,7 @@ def _get_top_proveedores_anio(anio: int, top_n: int = 20) -> pd.DataFrame:
 # =========================
 # 🧾 RESUMEN COMPRAS (ROTATIVO)
 # =========================
+anio = datetime.now().year 
 def mostrar_resumen_compras_rotativo():
 
     # 🔄 re-ejecuta cada 5 segundos
