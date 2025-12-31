@@ -3971,12 +3971,6 @@ menu = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 
-    # DEBUG VISIBLE - QUÉ BUSCÓ LA APP
-    if DEBUG_MODE:
-        with st.expander("🐞 Debug – Última búsqueda", expanded=False):
-            if "debug" in st.session_state:
-                st.json(st.session_state.debug)
-
     # =========================
     # TARJETAS SEGÚN MENÚ
     # =========================
