@@ -12,6 +12,7 @@ import io
 import plotly.express as px
 import plotly.graph_objects as go
 from pedidos import mostrar_pedidos_internos
+from bajastock import mostrar_baja_stock
 
 from supabase_client import supabase
 
