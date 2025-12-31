@@ -54,7 +54,7 @@ require_auth()
 # ======================
 # USUARIO AUTENTICADO
 # ======================
-user = get_current_user()
+user = get_current_user() or {}
 
 # Sidebar: info del usuario
 show_user_info_sidebar(user)
