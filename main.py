@@ -3978,6 +3978,9 @@ st.sidebar.markdown("---")
 # =========================
 # TARJETAS SEGÚN MENÚ
 # =========================
+
+header_slot = st.container()
+
 if menu == "🛒 Compras IA":
     with header_slot.container():
         mostrar_resumen_compras_rotativo()
@@ -3988,7 +3991,9 @@ elif menu == "📦 Stock IA":
         st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
 else:
-  st.markdown("---")
+    header_slot.empty()
+
+st.markdown("---")
   
 # =========================
 # ROUTER DE MÓDULOS
