@@ -3286,51 +3286,6 @@ def mostrar_resumen_compras_rotativo():
             elif col.lower() == "total_usd":
                 prov_usd = _safe_float(row[col])
 
-    # 🎨 CSS con tamaño FIJO
-    st.markdown(
-        """
-        <style>
-          .mini-resumen {
-            display: flex;
-            gap: 14px;
-            margin: 10px 0 14px 0;
-          }
-          .mini-card {
-            flex: 1;
-            min-width: 0;
-            height: 120px;
-            border-radius: 14px;
-            padding: 12px 14px;
-            background: rgba(255,255,255,0.85);
-            border: 1px solid #e5e7eb;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-          }
-          .mini-t {
-            font-size: 0.78rem;
-            font-weight: 600;
-            opacity: 0.75;
-            margin: 0;
-          }
-          .mini-v {
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin: 2px 0 0 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .mini-s {
-            font-size: 0.8rem;
-            opacity: 0.7;
-            margin: 0;
-          }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
     total_anio_txt = f"$ {_fmt_num_latam(tot_anio['pesos'], 0)}"
     total_anio_sub = f"U$S {_fmt_num_latam(tot_anio['usd'], 0)}"
 
