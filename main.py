@@ -1968,7 +1968,7 @@ def buscar_comprobantes(
         return pd.DataFrame()
 
 
-def mostrar_buscador():
+def mostrar_buscador_ia():
     """Pantalla del Buscador de Comprobantes - CON INTENCIONES IA"""
 
     st.title("🔍 Buscador de Comprobantes")
