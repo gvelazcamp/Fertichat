@@ -43,9 +43,6 @@ from login_page import (
 # Inicializar base de datos de usuarios
 init_db()
 
-# Aplicar CSS (login + app)
-st.markdown(LOGIN_CSS, unsafe_allow_html=True)
-
 # ---------------------------------------------------------------------
 # 🔒 REQUERIR AUTENTICACIÓN
 # - Si no hay sesión → muestra login lindo
