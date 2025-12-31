@@ -3009,6 +3009,8 @@ def mostrar_indicadores_ia():
 # =========================
 # 📊 RESUMEN RÁPIDO
 # =========================
+
+anio = datetime.now().year
 def _safe_float(x) -> float:
     try:
         if x is None:
