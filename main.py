@@ -3984,11 +3984,8 @@ elif menu == "📦 Stock IA":
         st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
 else:
-    header_slot.empty()
-
-st.markdown("---")("❌ Error cargando pedidos.py (abajo va el error REAL):")
-            st.code(traceback.format_exc())
-            return
+  st.markdown("---")
+  
 # =========================
 # ROUTER DE MÓDULOS
 # =========================
