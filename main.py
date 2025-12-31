@@ -3972,21 +3972,21 @@ menu = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # =========================
-    # TARJETAS SEGÚN MENÚ
-    # =========================
-    if menu == "🛒 Compras IA":
-        with header_slot.container():
-            mostrar_resumen_compras_rotativo()
+# TARJETAS SEGÚN MENÚ
+# =========================
+if menu == "🛒 Compras IA":
+    with header_slot.container():
+        mostrar_resumen_compras_rotativo()
 
-    elif menu == "📦 Stock IA":
-        with header_slot.container():
-            mostrar_resumen_stock_rotativo(dias_vencer=30)
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+elif menu == "📦 Stock IA":
+    with header_slot.container():
+        mostrar_resumen_stock_rotativo(dias_vencer=30)
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
-    else:
-        header_slot.empty()
+else:
+    header_slot.empty()
 
-    st.markdown("---")
+st.markdown("---")
 
     # =========================
     # ROUTER DE MÓDULOS
