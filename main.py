@@ -1871,7 +1871,7 @@ def ejecutar_consulta_buscador(intencion: str, proveedor: str, articulo: str,
         params = []
         
         if prov_clean:
-            sql += " AND LOWER(TRIM(Proveedor)) LIKE LOWER(%s)"
+            sql += " AND 9(TRIM(Proveedor)) LIKE LOWER(%s)"
             params.append(f"%{prov_clean}%")
         
         if art_clean:
@@ -3967,22 +3967,24 @@ def main():
         st.session_state.pop("ir_a_pedidos")
 
     # =========================
-    # MENÚ ÚNICO (HORIZONTAL)
-    # =========================
-    menu = st.radio(
-        "Menú:",
-        [
-            "🛒 Compras IA",
-            "📦 Stock IA",
-            "🔎 Buscador IA",
-            "📊 Dashboard",
-            "📈 Indicadores IA",
-            "📄 Pedidos Internos",
-            "📉 Baja de Stock"
-        ],
-        horizontal=True,
-        key="menu_ui"
-    )
+# MENÚ PRINCIPAL (SIDEBAR)
+# =========================
+menu = st.sidebar.radio(
+    "Menú",
+    [
+        "🛒 Compras IA",
+        "📦 Stock IA",
+        "🔎 Buscador IA",
+        "📊 Dashboard",
+        "📈 Indicadores IA",
+        "📄 Pedidos Internos",
+        "📉 Baja de Stock",
+    ],
+    index=0
+)
+
+st.sidebar.markdown("---")
+
 
     # 🔁 Sincronizar menú UI con menú lógico (evita crash de Streamlit)
     if "menu_principal" not in st.session_state:
@@ -4016,41 +4018,41 @@ def main():
     st.markdown("---")
 
 
-    # =========================
-    # ROUTER DE MÓDULOS
-    # =========================
-    if menu == "📦 Stock IA":
-        mostrar_stock_ia()
+# =========================
+# ROUTER DE MÓDULOS
+# =========================
+if menu == "📦 Stock IA":
+    mostrar_stock_ia()
+    return
+
+elif menu == "🔎 Buscador IA":
+    mostrar_buscador()
+    return
+
+elif menu == "📊 Dashboard":
+    mostrar_dashboard()
+    return
+
+elif menu == "📈 Indicadores IA":
+    mostrar_indicadores_ia()
+    return
+
+elif menu == "📄 Pedidos Internos":
+    try:
+        from pedidos import mostrar_pedidos_internos
+    except Exception:
+        import traceback
+        st.error("❌ Error cargando pedidos.py (abajo va el error REAL):")
+        st.code(traceback.format_exc())
         return
 
-    elif menu == "🔎 Buscador IA":
-        mostrar_buscador()
-        return
+    mostrar_pedidos_internos()
+    return
 
-    elif menu == "📊 Dashboard":
-        mostrar_dashboard()
-        return
-
-    elif menu == "📈 Indicadores IA":
-        mostrar_indicadores_ia()
-        return
-    
-    elif menu == "📄 Pedidos Internos":
-        try:
-            from pedidos import mostrar_pedidos_internos
-        except Exception:
-            import traceback
-            st.error("❌ Error cargando pedidos.py (abajo va el error REAL):")
-            st.code(traceback.format_exc())
-            return
-
-        mostrar_pedidos_internos()
-        return
-
-    elif menu == "📉 Baja de Stock":
-        from bajastock import mostrar_baja_stock
-        mostrar_baja_stock()
-        return
+elif menu == "📉 Baja de Stock":
+    from bajastock import mostrar_baja_stock
+    mostrar_baja_stock()
+    return
 
     # =========================
     # 🛒 COMPRAS IA
