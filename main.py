@@ -3988,6 +3988,38 @@ if "menu_principal" not in st.session_state:
 if DEBUG_MODE:
     st.sidebar.info("✅ Sidebar renderizando (DEBUG)")
 
+# =========================
+# DEBUG (DIAGNÓSTICO MENÚ)
+# Pegar ESTE BLOQUE justo ANTES del st.sidebar.radio(...)
+# =========================
+if DEBUG_MODE:
+    # 1) Marca visible en pantalla (si NO aparece, no estás llegando a esta parte del código)
+    st.write("🧪 DEBUG: llegué a la sección del menú (antes del sidebar.radio)")
+
+    # 2) Marca dentro del sidebar (si NO aparece, el sidebar está oculto por CSS o colapsado/forzado)
+    st.sidebar.success("🧪 DEBUG: Sidebar activo (si ves esto, el sidebar NO está oculto)")
+
+    # 3) Mostrar estado relevante
+    st.sidebar.write("DEBUG session_state keys:", list(st.session_state.keys()))
+    st.sidebar.write("menu_principal actual:", st.session_state.get("menu_principal", "(no existe)"))
+    st.sidebar.write("rol:", st.session_state.get("rol", "(no existe)"))
+    st.sidebar.write("logueado:", st.session_state.get("logueado", "(no existe)"))
+    st.sidebar.write("modo_avanzado:", st.session_state.get("modo_avanzado", "(no existe)"))
+
+    # 4) Fuerza visual del sidebar SOLO para diagnosticar si el CSS lo está ocultando
+    st.markdown("""
+    <style>
+    /* DEBUG: si algún CSS ocultó el sidebar, esto lo vuelve visible */
+    [data-testid="stSidebar"] { 
+        display: block !important; 
+        visibility: visible !important; 
+        opacity: 1 !important;
+        width: auto !important;
+        transform: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 menu = st.sidebar.radio(
     "Menú",
     [
