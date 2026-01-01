@@ -4032,9 +4032,9 @@ with st.sidebar:
     ]
 
     # default seguro
-    default_opt = st.session_state.get("menu_principal", "🛒 Compras IA)
+    default_opt = st.session_state.get("menu_principal", "🛒Compras IA)
     if default_opt not in opciones:
-        default_opt = "🛒 Compras IA"
+        default_opt = "🛒Compras IA"
 
     menu = st.radio(
         "Ir a:",
@@ -4055,8 +4055,8 @@ with st.sidebar:
 # -------------------------
 # Router
 # -------------------------
-if menu == "🛒 Compras IA ":
-    _pantalla_Compras_IA()
+if menu == "🛒Compras IA ":
+    mostrar_pantalla_🛒 Compras_IA()
 
 elif menu == "🔍 Buscador IA":
     mostrar_buscador_ia()
@@ -4082,7 +4082,7 @@ elif menu == "📈 Indicadores (Power BI)":
     mostrar_indicadores_ia()
 
 # =========================
-# 🛒 Compras IA (DEFAULT)
+# 🛒Compras IA (DEFAULT)
 # =========================
 if menu == "🛒 Compras IA":
     st.title("🛒 Compras IA")
