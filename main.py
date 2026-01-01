@@ -3975,88 +3975,109 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    
-# =========================
-# MENÚ PRINCIPAL (SIDEBAR)
-# =========================
-
-# Si la campanita pidió ir a pedidos
-if st.session_state.get("ir_a_pedidos"):
-    st.session_state["menu_principal"] = "🧾 Pedidos internos"
-    st.session_state["ir_a_pedidos"] = False
-
-# Opciones del menú
-opciones_menu = [
-    "🏠 Inicio",
-    "🔍 Buscador",
-    "📦 Stock IA",
-    "📉 Baja de stock",
-    "🧾 Pedidos internos",
-    "📊 Dashboard",
-    "📈 Indicadores (Power BI)",
-]
-
-# Selección (persistente)
-seleccion = st.sidebar.radio(
-    "Menú",
-    opciones_menu,
-    index=opciones_menu.index(st.session_state.get("menu_principal", "🏠 Inicio"))
-    if st.session_state.get("menu_principal", "🏠 Inicio") in opciones_menu else 0,
-    key="menu_principal",
-)
-
-st.sidebar.markdown("---")
-show_user_info_sidebar()
-
-if st.sidebar.button("Salir", use_container_width=True):
-    logout()
-    st.rerun()
 
 # =========================
-# TARJETAS SEGÚN MENÚ
+# Def pantalla
 # =========================
 
-header_slot = st.container()
+def _pantalla_chat_compras():
+    """Chat simple usando tu orquestador procesar_pregunta_router + render_orquestador_output."""
+    st.subheader("💬 Chat Compras")
 
-if menu == "🛒 Compras IA":
-    with header_slot.container():
-        mostrar_resumen_compras_rotativo()
+    if "chat_historial" not in st.session_state:
+        st.session_state.chat_historial = []
 
-elif menu == "📦 Stock IA":
-    with header_slot.container():
-        mostrar_resumen_stock_rotativo(dias_vencer=30)
-        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+    # Mostrar historial (últimos 15)
+    for msg in st.session_state.chat_historial[-15:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-else:
-    header_slot.empty()
+    prompt = st.chat_input("Escribí tu consulta… (ej: compras roche noviembre 2025)")
 
-st.markdown("---")
+    if prompt:
+        st.session_state.chat_historial.append({"role": "user", "content": prompt})
 
-# =========================
-# ROUTER DE PÁGINAS
-# =========================
-if seleccion == "🏠 Inicio":
-    st.subheader("Resumen rápido")
-    # Si querés mostrar algo fijo en inicio:
-    mostrar_resumen_stock_rotativo(dias_vencer=30)
+        with st.chat_message("assistant"):
+            with st.spinner("🔎 Procesando..."):
+                resp, df = procesar_pregunta_router(prompt)
+                # Render especial (tabs/sugerencias/etc)
+                render_orquestador_output(prompt, resp, df)
 
-elif seleccion == "🔍 Buscador":
+        # Guardar “texto” también en historial (lo que se ve)
+        st.session_state.chat_historial.append({"role": "assistant", "content": resp})
+
+with st.sidebar:
+    try:
+        show_user_info_sidebar()
+    except Exception:
+        pass
+
+    st.markdown("---")
+    st.markdown("## 📌 Menú")
+
+    # Si tocaste campanita, entrar directo a pedidos
+    if st.session_state.get("ir_a_pedidos"):
+        st.session_state["menu_principal"] = "🧾 Pedidos internos"
+        st.session_state["ir_a_pedidos"] = False
+
+    opciones = [
+        "💬 Chat compras",
+        "🔍 Buscador IA",
+        "📦 Stock IA",
+        "📊 Dashboard",
+        "🧾 Pedidos internos",
+        "📉 Baja de stock",
+        "📈 Indicadores (Power BI)",
+    ]
+
+    # default seguro
+    default_opt = st.session_state.get("menu_principal", "💬 Chat compras")
+    if default_opt not in opciones:
+        default_opt = "💬 Chat compras"
+
+    menu = st.radio(
+        "Ir a:",
+        opciones,
+        index=opciones.index(default_opt),
+        key="menu_principal",
+    )
+
+    st.markdown("---")
+    try:
+        if st.button("🚪 Cerrar sesión", use_container_width=True):
+            logout()
+            st.rerun()
+    except Exception:
+        pass
+
+
+# -------------------------
+# Router
+# -------------------------
+if menu == "💬 Chat compras":
+    _pantalla_chat_compras()
+
+elif menu == "🔍 Buscador IA":
     mostrar_buscador_ia()
 
-elif seleccion == "📦 Stock IA":
-    mostrar_resumen_stock_rotativo(dias_vencer=30)
+elif menu == "📦 Stock IA":
+    # Rotativo SOLO en esta pantalla (evita que te “resetee” otras pantallas)
+    try:
+        mostrar_resumen_stock_rotativo(dias_vencer=30)
+    except Exception:
+        pass
     mostrar_stock_ia()
 
-elif seleccion == "📉 Baja de stock":
-    mostrar_baja_stock()
-
-elif seleccion == "🧾 Pedidos internos":
-    mostrar_pedidos_internos()
-
-elif seleccion == "📊 Dashboard":
+elif menu == "📊 Dashboard":
     mostrar_dashboard()
 
-elif seleccion == "📈 Indicadores (Power BI)":
+elif menu == "🧾 Pedidos internos":
+    mostrar_pedidos_internos()
+
+elif menu == "📉 Baja de stock":
+    mostrar_baja_stock()
+
+elif menu == "📈 Indicadores (Power BI)":
     mostrar_indicadores_ia()
 
 # =========================
