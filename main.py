@@ -3984,6 +3984,7 @@ with st.sidebar:
 def Compras_IA():
     """Chat simple usando tu orquestador procesar_pregunta_router + render_orquestador_output."""
     st.subheader("🛒 Compras IA")
+    st.markdown("*Integrado con OpenAI*")
 
     if "chat_historial" not in st.session_state:
         st.session_state.chat_historial = []
