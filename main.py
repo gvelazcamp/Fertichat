@@ -3975,9 +3975,19 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-# =========================   
+    
+# =========================
 # MENÚ PRINCIPAL (SIDEBAR)
 # =========================
+
+# ✅ Default del menú (solo 1 vez, no se pisa en cada rerun)
+if "menu_principal" not in st.session_state:
+    st.session_state["menu_principal"] = "🛒 Compras IA"
+
+# ✅ Diagnóstico opcional (si NO ves esto, el sidebar está oculto por CSS o no se ejecuta este bloque)
+if DEBUG_MODE:
+    st.sidebar.info("✅ Sidebar renderizando (DEBUG)")
+
 menu = st.sidebar.radio(
     "Menú",
     [
@@ -4014,7 +4024,7 @@ else:
     header_slot.empty()
 
 st.markdown("---")
-  
+
 # =========================
 # ROUTER DE MÓDULOS
 # =========================
@@ -4044,16 +4054,16 @@ if menu == "🛒 Compras IA":
     st.title("🛒 Compras IA")
     st.markdown("*Integrado con OpenAI*")
 
-    if 'historial' not in st.session_state:
-        st.session_state.historial = []
+    if "historial" not in st.session_state:
+        st.session_state["historial"] = []
 
-        st.markdown("---")
+    st.markdown("---")
 
-        if st.button("🗑️ Limpiar historial", use_container_width=True):
-            st.session_state.historial = []
-            st.rerun()
+    if st.button("🗑️ Limpiar historial", use_container_width=True):
+        st.session_state["historial"] = []
+        st.rerun()
 
-        st.markdown("---")
+    st.markdown("---")
 
     if DEBUG_MODE:
         col1, col2 = st.columns(2)
@@ -4091,6 +4101,7 @@ if menu == "🛒 Compras IA":
 
     with col2:
         enviar = st.button("Enviar", type="primary", use_container_width=True)
+
 
     # =========================================================================
     # MANEJAR CLICK EN BOTÓN "SÍ" DE SUGERENCIA
