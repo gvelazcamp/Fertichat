@@ -4007,6 +4007,7 @@ def Compras_IA():
         # Guardar “texto” también en historial (lo que se ve)
         st.session_state.chat_historial.append({"role": "assistant", "content": resp})
 
+
 with st.sidebar:
     try:
         show_user_info_sidebar()
@@ -4018,7 +4019,7 @@ with st.sidebar:
 
     # Si tocaste campanita, entrar directo a pedidos
     if st.session_state.get("ir_a_pedidos"):
-        st.session_state["menu_principal"] = "🧾 Pedidos internos"
+        st.session_state["menu_principal"] = "📄 Pedidos internos"
         st.session_state["ir_a_pedidos"] = False
 
     opciones = [
@@ -4060,24 +4061,19 @@ with st.sidebar:
 if menu == "🛒 Compras IA":
     Compras_IA()
 
-elif menu == "🔍 Buscador IA":
+elif menu == "🔎 Buscador IA":
     mostrar_buscador_ia()
 
 elif menu == "📦 Stock IA":
-    # Rotativo SOLO en esta pantalla (evita que te “resetee” otras pantallas)
-    try:
-        mostrar_resumen_stock_rotativo(dias_vencer=30)
-    except Exception:
-        pass
     mostrar_stock_ia()
 
 elif menu == "📊 Dashboard":
     mostrar_dashboard()
 
-elif menu == "🧾 Pedidos internos":
+elif menu == "📄 Pedidos internos":
     mostrar_pedidos_internos()
 
-elif menu == "📉 Baja de stock":
+elif menu == "🧾 Baja de stock":
     mostrar_baja_stock()
 
 elif menu == "📈 Indicadores (Power BI)":
