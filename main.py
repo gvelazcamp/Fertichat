@@ -3981,9 +3981,9 @@ with st.sidebar:
 # Def pantalla
 # =========================
 
-def _pantalla_chat_compras():
+def _pantalla_Compras_IA():
     """Chat simple usando tu orquestador procesar_pregunta_router + render_orquestador_output."""
-    st.subheader("💬 Chat Compras")
+    st.subheader("Compras IA")
 
     if "chat_historial" not in st.session_state:
         st.session_state.chat_historial = []
@@ -4022,7 +4022,7 @@ with st.sidebar:
         st.session_state["ir_a_pedidos"] = False
 
     opciones = [
-        "💬 Chat compras",
+        "Compras IA",
         "🔍 Buscador IA",
         "📦 Stock IA",
         "📊 Dashboard",
@@ -4034,7 +4034,7 @@ with st.sidebar:
     # default seguro
     default_opt = st.session_state.get("menu_principal", "💬 Chat compras")
     if default_opt not in opciones:
-        default_opt = "💬 Chat compras"
+        default_opt = "Compras IA"
 
     menu = st.radio(
         "Ir a:",
@@ -4055,8 +4055,8 @@ with st.sidebar:
 # -------------------------
 # Router
 # -------------------------
-if menu == "💬 Chat compras":
-    _pantalla_chat_compras()
+if menu == "Compras IA ":
+    _pantalla_Compras_IA()
 
 elif menu == "🔍 Buscador IA":
     mostrar_buscador_ia()
