@@ -3983,7 +3983,7 @@ with st.sidebar:
 
 def _pantalla_Compras_IA():
     """Chat simple usando tu orquestador procesar_pregunta_router + render_orquestador_output."""
-    st.subheader("Compras IA")
+    st.subheader("🛒 Compras IA")
 
     if "chat_historial" not in st.session_state:
         st.session_state.chat_historial = []
@@ -4022,7 +4022,7 @@ with st.sidebar:
         st.session_state["ir_a_pedidos"] = False
 
     opciones = [
-        "Compras IA",
+        "🛒 Compras IA",
         "🔍 Buscador IA",
         "📦 Stock IA",
         "📊 Dashboard",
@@ -4032,9 +4032,9 @@ with st.sidebar:
     ]
 
     # default seguro
-    default_opt = st.session_state.get("menu_principal", "Compras IA")
+    default_opt = st.session_state.get("menu_principal", "🛒 Compras IA)
     if default_opt not in opciones:
-        default_opt = "Compras IA"
+        default_opt = "🛒 Compras IA"
 
     menu = st.radio(
         "Ir a:",
@@ -4055,7 +4055,7 @@ with st.sidebar:
 # -------------------------
 # Router
 # -------------------------
-if menu == "Compras IA ":
+if menu == "🛒 Compras IA ":
     _pantalla_Compras_IA()
 
 elif menu == "🔍 Buscador IA":
@@ -4082,7 +4082,7 @@ elif menu == "📈 Indicadores (Power BI)":
     mostrar_indicadores_ia()
 
 # =========================
-# 🛒 COMPRAS IA (DEFAULT)
+# 🛒 Compras IA (DEFAULT)
 # =========================
 if menu == "🛒 Compras IA":
     st.title("🛒 Compras IA")
