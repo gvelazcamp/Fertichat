@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - MENÚ HAMBURGUESA ARRIBA (ESTILO GNS+)
+# MAIN.PY - MENÚ HAMBURGUESA ARRIBA (ARREGLADO PARA MÓVIL)
 # =========================
 
 import streamlit as st
@@ -111,7 +111,7 @@ def inject_css():
                 display: none !important;
             }
 
-            /* Padding para el header móvil (el menú se renderiza aparte) */
+            /* Padding para el header móvil */
             .block-container{
                 padding-top: 70px !important;
             }
@@ -130,13 +130,25 @@ def inject_css():
 
 
 # =========================
-# MENÚ MÓVIL HTML
+# MENÚ MÓVIL HTML - ARREGLADO
 # =========================
 def render_mobile_menu():
     import streamlit.components.v1 as components
     
     user = st.session_state.get("user", {})
     menu_actual = st.session_state.get("radio_menu", "🏠 Inicio")
+    
+    # Generar items del menú como string
+    menu_items_html = ""
+    for opcion in MENU_OPTIONS:
+        active_class = "active" if opcion == menu_actual else ""
+        # Escapar comillas simples en la opción
+        opcion_safe = opcion.replace("'", "\\'")
+        menu_items_html += f"""
+            <div class="mobile-menu-item {active_class}" onclick="navegarMenu('{opcion_safe}')">
+                {opcion}
+            </div>
+        """
     
     menu_html = f"""
     <!DOCTYPE html>
@@ -158,7 +170,7 @@ def render_mobile_menu():
                 right: 0;
                 height: 56px;
                 background: #0b3b60;
-                z-index: 9999;
+                z-index: 99999;
                 display: flex;
                 align-items: center;
                 padding: 0 12px;
@@ -167,8 +179,8 @@ def render_mobile_menu():
 
             /* Botón hamburguesa */
             #menu-toggle{{
-                width: 40px;
-                height: 40px;
+                width: 44px;
+                height: 44px;
                 background: transparent;
                 border: none;
                 cursor: pointer;
@@ -178,6 +190,7 @@ def render_mobile_menu():
                 align-items: center;
                 gap: 5px;
                 padding: 0;
+                -webkit-tap-highlight-color: transparent;
             }}
 
             #menu-toggle span{{
@@ -220,7 +233,7 @@ def render_mobile_menu():
                 box-shadow: 4px 0 12px rgba(0,0,0,0.15);
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
-                z-index: 9998;
+                z-index: 99998;
                 overflow-y: auto;
                 padding: 16px;
             }}
@@ -237,7 +250,7 @@ def render_mobile_menu():
                 right: 0;
                 bottom: 0;
                 background: rgba(0,0,0,0.5);
-                z-index: 9997;
+                z-index: 99997;
                 opacity: 0;
                 visibility: hidden;
                 transition: all 0.3s;
@@ -250,7 +263,7 @@ def render_mobile_menu():
 
             /* Items del menú móvil */
             .mobile-menu-item{{
-                padding: 12px 14px;
+                padding: 14px 16px;
                 margin: 6px 0;
                 border-radius: 10px;
                 background: rgba(248,250,252,0.8);
@@ -260,11 +273,11 @@ def render_mobile_menu():
                 font-size: 15px;
                 font-weight: 500;
                 transition: all 0.15s;
-                display: block;
-                text-decoration: none;
+                -webkit-tap-highlight-color: transparent;
             }}
 
-            .mobile-menu-item:hover{{
+            .mobile-menu-item:hover,
+            .mobile-menu-item:active{{
                 background: rgba(245,158,11,0.1);
                 border-color: rgba(245,158,11,0.2);
             }}
@@ -289,6 +302,23 @@ def render_mobile_menu():
                 color: #0f172a;
                 font-size: 14px;
                 margin: 4px 0;
+            }}
+            
+            .mobile-logout{{
+                padding: 14px 16px;
+                margin: 16px 0 6px 0;
+                border-radius: 10px;
+                background: rgba(244,63,94,0.08);
+                border: 1px solid rgba(244,63,94,0.2);
+                cursor: pointer;
+                color: #dc2626;
+                font-size: 15px;
+                font-weight: 600;
+                -webkit-tap-highlight-color: transparent;
+            }}
+            
+            .mobile-logout:active{{
+                background: rgba(244,63,94,0.15);
             }}
             
             /* Ocultar en PC */
@@ -326,35 +356,53 @@ def render_mobile_menu():
             <div style="color:#64748b;font-size:11px;font-weight:800;text-transform:uppercase;margin:12px 0 8px 4px;">
                 📌 Menú
             </div>
-    """
-    
-    # Generar items del menú
-    for opcion in MENU_OPTIONS:
-        active_class = "active" if opcion == menu_actual else ""
-        menu_html += f"""
-            <a href="?menu={opcion}" class="mobile-menu-item {active_class}">
-                {opcion}
-            </a>
-        """
-    
-    menu_html += """
-            <a href="?logout=1" class="mobile-menu-item" style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
+            
+            {menu_items_html}
+            
+            <div class="mobile-logout" onclick="cerrarSesion()">
                 🚪 Cerrar sesión
-            </a>
+            </div>
         </div>
 
         <script>
-            function toggleMenu() {
+            function toggleMenu() {{
                 document.getElementById('menu-toggle').classList.toggle('open');
                 document.getElementById('mobile-menu').classList.toggle('open');
                 document.getElementById('mobile-overlay').classList.toggle('open');
-            }
+            }}
+            
+            // *** CLAVE: usar window.parent para salir del iframe ***
+            function navegarMenu(opcion) {{
+                try {{
+                    var parentUrl = window.parent.location.href;
+                    var url = new URL(parentUrl);
+                    // Limpiar otros params
+                    url.search = '';
+                    url.searchParams.set('menu', opcion);
+                    window.parent.location.href = url.toString();
+                }} catch(e) {{
+                    window.parent.location.href = '/?menu=' + encodeURIComponent(opcion);
+                }}
+            }}
+            
+            function cerrarSesion() {{
+                try {{
+                    var parentUrl = window.parent.location.href;
+                    var url = new URL(parentUrl);
+                    url.search = '';
+                    url.searchParams.set('logout', '1');
+                    window.parent.location.href = url.toString();
+                }} catch(e) {{
+                    window.parent.location.href = '/?logout=1';
+                }}
+            }}
         </script>
     </body>
     </html>
     """
     
-    components.html(menu_html, height=0)
+    # IMPORTANTE: height mayor que 0 para que funcione el fixed positioning
+    components.html(menu_html, height=60, scrolling=False)
 
 
 # =========================
@@ -370,7 +418,7 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
-# Manejar navegación desde menú móvil
+# Manejar navegación desde menú móvil y tarjetas
 try:
     menu_param = st.query_params.get("menu")
     if menu_param and menu_param in MENU_OPTIONS:
