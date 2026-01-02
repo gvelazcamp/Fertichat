@@ -57,21 +57,21 @@ def inject_css_responsive():
         """
         <style>
         /* =========================
-           OCULTAR BARRA SUPERIOR STREAMLIT (Share / menú / icons)
+           OCULTAR BARRA SUPERIOR STREAMLIT (Share / menú / icons / barra blanca)
         ========================= */
-        div[data-testid="stToolbar"]{
-          display: none !important;
-          height: 0 !important;
-        }
-        header[data-testid="stHeader"]{
-          display: none !important;
-          height: 0 !important;
-        }
-        #MainMenu{
-          display: none !important;
-        }
+        div.stAppToolbar,
+        div[data-testid="stToolbar"],
+        div[data-testid="stToolbarActions"],
+        header,
+        header[data-testid="stHeader"],
+        div[data-testid="stDecoration"],
+        #MainMenu,
         footer{
           display: none !important;
+          height: 0 !important;
+          min-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
 
         /* =========================
@@ -122,7 +122,7 @@ def inject_css_responsive():
             background-position: center bottom;
         }
 
-        /* ✅ AJUSTE: como ocultamos stHeader, dejamos un padding-top normal */
+        /* ✅ Como ocultamos stHeader/stToolbar, dejamos padding-top normal */
         .block-container{
             max-width: 1240px;
             padding-top: 1.25rem;
