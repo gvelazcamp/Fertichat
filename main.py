@@ -57,6 +57,24 @@ def inject_css_responsive():
         """
         <style>
         /* =========================
+           OCULTAR BARRA SUPERIOR STREAMLIT (Share / menú / icons)
+        ========================= */
+        div[data-testid="stToolbar"]{
+          display: none !important;
+          height: 0 !important;
+        }
+        header[data-testid="stHeader"]{
+          display: none !important;
+          height: 0 !important;
+        }
+        #MainMenu{
+          display: none !important;
+        }
+        footer{
+          display: none !important;
+        }
+
+        /* =========================
            THEME (look & feel tipo mockup)
         ========================= */
 
@@ -104,10 +122,10 @@ def inject_css_responsive():
             background-position: center bottom;
         }
 
-        /* ✅ AJUSTE: más espacio arriba para que no “corte” el header */
+        /* ✅ AJUSTE: como ocultamos stHeader, dejamos un padding-top normal */
         .block-container{
             max-width: 1240px;
-            padding-top: 3.25rem;   /* <-- antes 1.25rem */
+            padding-top: 1.25rem;
             padding-bottom: 2.25rem;
         }
 
@@ -177,7 +195,7 @@ def inject_css_responsive():
         ========================= */
         @media (max-width: 768px){
             .block-container{
-                padding-top: 2.6rem !important;  /* <-- antes 0.9rem */
+                padding-top: 0.9rem !important;
                 padding-left: 0.8rem !important;
                 padding-right: 0.8rem !important;
                 padding-bottom: 4.5rem !important;
@@ -236,28 +254,6 @@ init_db()
 require_auth()
 
 user = get_current_user() or {}
-
-/* Ocultar toolbar superior (Share / menú / icons) */
-div[data-testid="stToolbar"]{
-  display: none !important;
-  height: 0 !important;
-}
-
-/* Ocultar el menú de 3 puntitos (MainMenu) si quedara */
-#MainMenu{
-  display: none !important;
-}
-
-/* Ocultar footer/branding si aparece */
-footer{
-  display: none !important;
-}
-
-/* Opcional: si queda un “espacio” arriba, lo eliminamos */
-header{
-  visibility: hidden !important;
-  height: 0 !important;
-}
 
 # =========================
 # TÍTULO Y CAMPANITA
