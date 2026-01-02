@@ -1,9 +1,8 @@
 # =========================
-# MAIN.PY - SIDEBAR CON CONTROL MANUAL
+# MAIN.PY - SIDEBAR CON CONTROL MANUAL (MÓVIL)
 # =========================
 
 import streamlit as st
-import streamlit.components.v1 as components
 from datetime import datetime
 
 st.set_page_config(
@@ -50,61 +49,6 @@ if "sidebar_open" not in st.session_state:
 
 
 # =========================
-# BOTÓN OCULTO PARA CERRAR (lo dispara el overlay)
-# =========================
-if st.session_state["sidebar_open"]:
-    if st.button("cerrar", key="__btn_close_sidebar__", help="__CLOSE_SIDEBAR__"):
-        st.session_state["sidebar_open"] = False
-        st.rerun()
-
-
-# =========================
-# OVERLAY CLICK FUERA (solo móvil) -> dispara el botón oculto
-# =========================
-# Esto NO recarga la página, NO toca logout, NO cambia radio_menu.
-components.html(
-    f"""
-    <script>
-    (function() {{
-      const overlayId = "fc-overlay-click-outside";
-      const isMobile = parent.window.matchMedia("(max-width: 768px)").matches;
-      const shouldShow = {str(bool(st.session_state["sidebar_open"])).lower()} && isMobile;
-
-      let overlay = parent.document.getElementById(overlayId);
-
-      if (!shouldShow) {{
-        if (overlay) overlay.remove();
-        return;
-      }}
-
-      if (!overlay) {{
-        overlay = parent.document.createElement("div");
-        overlay.id = overlayId;
-        overlay.style.position = "fixed";
-        overlay.style.top = "0";
-        overlay.style.left = "0";
-        overlay.style.right = "0";
-        overlay.style.bottom = "0";
-        overlay.style.background = "rgba(0,0,0,0.5)";
-        overlay.style.zIndex = "999998"; // debajo del sidebar (999999)
-        overlay.style.cursor = "pointer";
-
-        overlay.addEventListener("click", function() {{
-          const btn = parent.document.querySelector('button[title="__CLOSE_SIDEBAR__"]');
-          if (btn) btn.click();
-        }});
-
-        parent.document.body.appendChild(overlay);
-      }}
-    }})();
-    </script>
-    """,
-    height=0,
-    width=0,
-)
-
-
-# =========================
 # CSS
 # =========================
 sidebar_state = "open" if st.session_state["sidebar_open"] else "closed"
@@ -128,7 +72,7 @@ html, body {{ font-family: Inter, system-ui, sans-serif; color: #0f172a; }}
 [data-testid="stAppViewContainer"] {{ background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }}
 .block-container {{ max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }}
 
-/* Sidebar */
+/* Sidebar (PC normal) */
 section[data-testid="stSidebar"] {{ border-right: 1px solid rgba(15, 23, 42, 0.08); }}
 section[data-testid="stSidebar"] > div {{
     background: rgba(255,255,255,0.70);
@@ -144,27 +88,15 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
 }}
 
 /* Header móvil */
-#mobile-header {{
-    display: none;
-}}
+#mobile-header {{ display: none; }}
 
-/* Ocultar el botón oculto de cierre (siempre) */
-button[title="__CLOSE_SIDEBAR__"] {{
-    display: none !important;
-}}
-div[data-testid="stButton"]:has(button[title="__CLOSE_SIDEBAR__"]) {{
-    display: none !important;
-}}
+/* Hamburguesa: OCULTA en PC */
+#fc-hamburger-wrap {{ display: none !important; }}
 
-/* Botón hamburguesa: oculto por defecto (desktop) */
-button[title="__HAMBURGER__"] {{
-    display: none !important;
-}}
-div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
-    display: none !important;
-}}
+/* Overlay-botón: OCULTO en PC */
+#fc-overlay-wrap {{ display: none !important; }}
 
-/* Móvil */
+/* MÓVIL */
 @media (max-width: 768px) {{
     .block-container {{ padding-top: 70px !important; }}
 
@@ -180,7 +112,6 @@ div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
         padding: 0 16px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }}
-
     #mobile-header .logo {{
         color: white;
         font-size: 20px;
@@ -188,7 +119,7 @@ div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
         margin-left: 12px;
     }}
 
-    /* Sidebar móvil */
+    /* Sidebar móvil con tu estado */
     section[data-testid="stSidebar"] {{
         position: fixed !important;
         top: 0 !important;
@@ -201,14 +132,13 @@ div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
         transform: translateX({'-100%' if sidebar_state == 'closed' else '0'});
         transition: transform 0.3s ease;
     }}
-
     section[data-testid="stSidebar"] > div {{
         overflow-y: auto !important;
         height: 100% !important;
         padding-top: 20px !important;
     }}
 
-    /* Ocultar flecha nativa de Streamlit (no controla sidebar_open) */
+    /* Ocultar flecha nativa de Streamlit (no controla tu sidebar_open) */
     div[data-testid="collapsedControl"],
     button[data-testid="stSidebarCollapseButton"],
     button[data-testid="stSidebarExpandButton"],
@@ -217,23 +147,41 @@ div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
         display: none !important;
     }}
 
-    /* Mostrar hamburguesa SOLO en móvil y fijarla arriba */
-    button[title="__HAMBURGER__"] {{
-        display: inline-flex !important;
-        position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 1000000 !important;
-        border-radius: 12px !important;
-    }}
-    div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
+    /* ✅ Hamburguesa SOLO en móvil */
+    #fc-hamburger-wrap {{
         display: block !important;
         position: fixed !important;
         top: 12px !important;
         left: 12px !important;
         z-index: 1000000 !important;
-        margin: 0 !important;
+    }}
+    #fc-hamburger-wrap button {{
+        border-radius: 12px !important;
+        padding: 0.4rem 0.65rem !important;
+    }}
+
+    /* ✅ Overlay SOLO en móvil cuando sidebar está open */
+    #fc-overlay-wrap {{
+        display: {'block' if sidebar_state == 'open' else 'none'} !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 999998 !important; /* debajo del sidebar (999999) */
+    }}
+    #fc-overlay-wrap button {{
+        width: 100% !important;
+        height: 100% !important;
+        background: rgba(0,0,0,0.5) !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
         padding: 0 !important;
+        margin: 0 !important;
+    }}
+    /* esconder el texto del botón overlay */
+    #fc-overlay-wrap button * {{
+        opacity: 0 !important;
     }}
 }}
 </style>
@@ -241,15 +189,32 @@ div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
 
 
 # =========================
-# BOTÓN HAMBURGUESA (Streamlit) - se oculta en PC por CSS
+# OVERLAY CLICK AFUERA (SIN JS) -> botón pantalla completa
 # =========================
-if st.button("☰", key="hamburger_btn", help="__HAMBURGER__"):
-    st.session_state["sidebar_open"] = not st.session_state["sidebar_open"]
-    st.rerun()
+if st.session_state["sidebar_open"]:
+    ov = st.container()
+    with ov:
+        st.markdown('<div id="fc-overlay-wrap">', unsafe_allow_html=True)
+        if st.button("overlay_close", key="fc_overlay_close_btn"):
+            st.session_state["sidebar_open"] = False
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =========================
-# HEADER MÓVIL (solo visual)
+# HAMBURGUESA (SOLO MÓVIL POR CSS)
+# =========================
+hb = st.container()
+with hb:
+    st.markdown('<div id="fc-hamburger-wrap">', unsafe_allow_html=True)
+    if st.button("☰", key="hamburger_btn"):
+        st.session_state["sidebar_open"] = not st.session_state["sidebar_open"]
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# =========================
+# HEADER MÓVIL (visual)
 # =========================
 st.markdown("""
 <div id="mobile-header">
@@ -303,74 +268,4 @@ with st.sidebar:
             padding: 16px;
             border-radius: 18px;
             margin-bottom: 14px;
-            border: 1px solid rgba(15, 23, 42, 0.10);
-            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
-        '>
-            <div style='display:flex; align-items:center; gap:10px; justify-content:center;'>
-                <div style='font-size: 26px;'>🦋</div>
-                <div style='font-size: 20px; font-weight: 800; color:#0f172a;'>FertiChat</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.text_input("Buscar...", key="sidebar_search", label_visibility="collapsed", placeholder="Buscar...")
-
-    st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
-    if user.get('empresa'):
-        st.markdown(f"🏢 {user.get('empresa')}")
-    st.markdown(f"📧 _{user.get('Usuario', user.get('usuario', ''))}_")
-
-    st.markdown("---")
-
-    if st.button("🚪 Cerrar sesión", key="btn_logout_sidebar", use_container_width=True):
-        logout()
-        st.rerun()
-
-    st.markdown("---")
-    st.markdown("## 📌 Menú")
-
-    # Al seleccionar una opción, cerrar el sidebar en móvil
-    old_menu = st.session_state["radio_menu"]
-    menu = st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
-
-    # Si cambió el menú, cerrar sidebar en móvil
-    if menu != old_menu and st.session_state["sidebar_open"]:
-        st.session_state["sidebar_open"] = False
-        st.rerun()
-
-
-# =========================
-# ROUTER
-# =========================
-menu_actual = st.session_state["radio_menu"]
-
-if menu_actual == "🏠 Inicio":
-    mostrar_inicio()
-elif menu_actual == "🛒 Compras IA":
-    mostrar_resumen_compras_rotativo()
-    Compras_IA()
-elif menu_actual == "📦 Stock IA":
-    mostrar_resumen_stock_rotativo()
-    mostrar_stock_ia()
-elif menu_actual == "🔎 Buscador IA":
-    mostrar_buscador_ia()
-elif menu_actual == "📥 Ingreso de comprobantes":
-    mostrar_ingreso_comprobantes()
-elif menu_actual == "📊 Dashboard":
-    mostrar_dashboard()
-elif menu_actual == "📄 Pedidos internos":
-    mostrar_pedidos_internos()
-elif menu_actual == "🧾 Baja de stock":
-    mostrar_baja_stock()
-elif menu_actual == "📈 Indicadores (Power BI)":
-    mostrar_indicadores_ia()
-elif menu_actual == "📦 Órdenes de compra":
-    mostrar_ordenes_compra()
-elif menu_actual == "📒 Ficha de stock":
-    mostrar_ficha_stock()
-elif menu_actual == "📚 Artículos":
-    mostrar_articulos()
-elif menu_actual == "🏬 Depósitos":
-    mostrar_depositos()
-elif menu_actual == "🧩 Familias":
-    mostrar_familias()
+            border: 1px solid rgba(15, 23, 42,
