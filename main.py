@@ -49,6 +49,25 @@ if "sidebar_open" not in st.session_state:
 
 
 # =========================
+# CIERRE POR CLICK FUERA (SIN JS) USANDO QUERY PARAM
+# =========================
+close_sidebar_param = ""
+try:
+    close_sidebar_param = st.query_params.get("close_sidebar", "")
+except Exception:
+    qp = st.experimental_get_query_params()
+    close_sidebar_param = (qp.get("close_sidebar", [""])[0] if isinstance(qp.get("close_sidebar", [""]), list) else qp.get("close_sidebar", ""))
+
+if str(close_sidebar_param) == "1":
+    st.session_state["sidebar_open"] = False
+    # Limpiar el query param para que no quede pegado en la URL
+    try:
+        st.query_params.clear()
+    except Exception:
+        st.experimental_set_query_params()
+
+
+# =========================
 # CSS
 # =========================
 sidebar_state = "open" if st.session_state["sidebar_open"] else "closed"
@@ -92,18 +111,14 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
     display: none;
 }}
 
+/* Overlay (por defecto oculto) */
+#sidebar-overlay {{
+    display: none;
+}}
+
 /* Móvil */
 @media (max-width: 768px) {{
     .block-container {{ padding-top: 70px !important; }}
-
-    /* Ocultar flecha/collapse nativo de Streamlit en móvil (no controla sidebar_open) */
-    button[title="Close sidebar"],
-    button[title="Open sidebar"],
-    button[data-testid="stSidebarCollapseButton"],
-    button[data-testid="stSidebarExpandButton"],
-    div[data-testid="collapsedControl"] {{
-        display: none !important;
-    }}
 
     /* Header fijo */
     #mobile-header {{
@@ -145,18 +160,20 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         padding-top: 20px !important;
     }}
 
-    /* Overlay visual */
+    /* Overlay clickeable (click fuera del menú lo cierra) */
     #sidebar-overlay {{
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(0,0,0,0.5);
         z-index: 999998;
         display: {'block' if sidebar_state == 'open' else 'none'};
+        cursor: pointer;
+        text-decoration: none !important;
     }}
 }}
 </style>
 
-<div id="sidebar-overlay"></div>
+<a id="sidebar-overlay" href="?close_sidebar=1"></a>
 """, unsafe_allow_html=True)
 
 
@@ -218,14 +235,6 @@ st.markdown("<hr>", unsafe_allow_html=True)
 # SIDEBAR
 # =========================
 with st.sidebar:
-    # ✅ Botón de cierre para MÓVIL cuando el sidebar está abierto
-    # (Soluciona el caso: abrís, el sidebar tapa el ☰ y la flecha nativa no cierra tu sidebar_open)
-    if st.session_state.get("sidebar_open", False):
-        if st.button("✕ Cerrar menú", key="btn_close_sidebar_mobile", use_container_width=True):
-            st.session_state["sidebar_open"] = False
-            st.rerun()
-        st.markdown("---")
-
     st.markdown(f"""
         <div style='
             background: rgba(255,255,255,0.85);
