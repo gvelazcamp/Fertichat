@@ -172,20 +172,28 @@ with st.sidebar:
     st.markdown("## 📌 Menú")
 
     if st.session_state.get("ir_a_pedidos"):
-        st.session_state["navegacion_destino"] = "📄 Pedidos internos"
+        st.session_state["menu_seleccionado"] = "📄 Pedidos internos"
         st.session_state["ir_a_pedidos"] = False
 
     # Manejar navegación desde pantalla de inicio
     if st.session_state.get("navegacion_destino"):
-        default_opt = st.session_state["navegacion_destino"]
+        st.session_state["menu_seleccionado"] = st.session_state["navegacion_destino"]
         del st.session_state["navegacion_destino"]
-    else:
-        default_opt = st.session_state.get("menu_principal", "🏠 Inicio")
     
-    if default_opt not in MENU_OPTIONS:
-        default_opt = MENU_OPTIONS[0]
+    # Obtener menú actual
+    menu_actual = st.session_state.get("menu_seleccionado", "🏠 Inicio")
+    if menu_actual not in MENU_OPTIONS:
+        menu_actual = MENU_OPTIONS[0]
 
-    menu = st.radio("Ir a:", MENU_OPTIONS, index=MENU_OPTIONS.index(default_opt), key="menu_principal")
+    menu = st.radio(
+        "Ir a:", 
+        MENU_OPTIONS, 
+        index=MENU_OPTIONS.index(menu_actual),
+        key="radio_menu"
+    )
+    
+    # Guardar selección del radio
+    st.session_state["menu_seleccionado"] = menu
 
 # =========================
 # ROUTER
