@@ -30,6 +30,7 @@ MENU_OPTIONS = [
     "📦 Órdenes de compra",
     "📚 Artículos",
     "📒 Ficha de stock",
+    "🏬 Depósitos":,
 ]
 
 # Power BI URL
