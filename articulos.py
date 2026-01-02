@@ -177,6 +177,38 @@ def _cache_articulos_por_tipo(tipo: str) -> pd.DataFrame:
     df = df[ARTICULO_COLS].copy()
     return df
 
+@st.cache_data(ttl=60)
+def _cache_unicos_chatbot_raw() -> pd.DataFrame:
+    """
+    Devuelve listado único desde public.chatbot_raw:
+    - Articulo (único)
+    - Familia
+    - Tipo Articulo (si existe)
+    """
+    try:
+        # OJO: "Tipo Articulo" tiene espacio -> va entre comillas
+        df = _sb_select("chatbot_raw", 'Articulo,Familia,"Tipo Articulo"', order=("Articulo", True))
+    except Exception:
+        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
+
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
+
+    # Normalizar strings
+    for c in ["Articulo", "Familia", "Tipo Articulo"]:
+        if c in df.columns:
+            df[c] = df[c].astype(str).fillna("").str.strip()
+
+    # Filtrar vacíos
+    df = df[df["Articulo"].astype(str).str.strip() != ""].copy()
+    if df.empty:
+        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
+
+    # Únicos por Articulo
+    df = df.drop_duplicates(subset=["Articulo"], keep="first").reset_index(drop=True)
+
+    return df
+
 
 @st.cache_data(ttl=60)
 def _cache_sugerencias_desde_chatbot_raw() -> pd.DataFrame:
@@ -362,7 +394,11 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
         if not match.empty:
             current_row = match.iloc[0].to_dict()
 
-    base = current_row or {}
+    prefill = None
+    if (not is_edit) and ("articulos_prefill" in st.session_state):
+        prefill = st.session_state.get("articulos_prefill") or None
+
+    base = current_row or prefill or {}
 
     # Botones arriba (mejor UX)
     b1, b2, b3 = st.columns(3)
@@ -544,6 +580,7 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
 
     _invalidate_caches()
     st.success("Guardado.")
+    st.session_state["articulos_prefill"] = None
 
     # Devolver ID guardado
     if row and row.get("id"):
@@ -729,6 +766,7 @@ def mostrar_articulos():
             if sel and sel.get("id"):
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
+
 
 
 
