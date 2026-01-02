@@ -135,18 +135,6 @@ def render_orquestador_output(pregunta_original: str, respuesta: str, df: Option
     if df is not None and not df.empty:
         st.dataframe(formatear_dataframe(df), use_container_width=True, hide_index=True)
 
-        texto_lower = normalizar_texto(pregunta)
-
-        # Excluir saludos simples de la IA (ya se manejan arriba)
-        saludos = ['hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'gracias', 'chau', 'adios']
-        es_saludo = any(s in texto_lower for s in saludos) and len(texto_lower.split()) <= 3
-
-        if es_saludo:
-            return "👋 ¡Hola! ¿En qué te puedo ayudar?", None
-
-        # Para TODO lo demás → Mostrar sugerencia con IA
-        return "__MOSTRAR_SUGERENCIA__", None
-
 
 def mostrar_detalle_df(
     df,
