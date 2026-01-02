@@ -102,8 +102,33 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     border: 1px solid rgba(245,158,11,0.18);
 }
 
-/* Móvil: sidebar se puede abrir */
+/* Móvil: FORZAR que el sidebar sea visible y funcional */
 @media (max-width: 768px) {
+    /* Mostrar el botón de abrir sidebar */
+    button[kind="header"] {
+        display: flex !important;
+    }
+    
+    /* El sidebar debe poder abrirse */
+    section[data-testid="stSidebar"] {
+        display: block !important;
+    }
+    
+    /* Cuando está colapsado, ocultarlo completamente */
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        transform: translateX(-100%);
+    }
+    
+    /* Cuando está expandido, mostrarlo */
+    section[data-testid="stSidebar"][aria-expanded="true"] {
+        transform: translateX(0);
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 999999;
+    }
+    
     .block-container {
         padding-top: 1.25rem;
     }
