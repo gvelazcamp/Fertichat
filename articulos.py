@@ -149,10 +149,18 @@ def _sb_upload_storage(bucket: str, path: str, content_bytes: bytes, mime: str) 
 # =====================================================================
 @st.cache_data(ttl=30)
 def _cache_proveedores() -> pd.DataFrame:
-    # Si tu tabla proveedores se llama distinto, cambiá SOLO este select.
-    df = _sb_select("proveedores", "id,nombre", order=("nombre", True))
+    """
+    Proveedores para selector.
+    - Si NO existe la tabla public.proveedores, devuelve vacío y NO rompe el módulo.
+    """
+    try:
+        df = _sb_select("proveedores", "id,nombre", order=("nombre", True))
+    except Exception:
+        return pd.DataFrame(columns=["id", "nombre"])
+
     if df.empty:
         return df
+
     df["id"] = df["id"].astype(str)
     df["nombre"] = df["nombre"].astype(str)
     return df
@@ -170,9 +178,39 @@ def _cache_articulos_por_tipo(tipo: str) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=60)
+def _cache_sugerencias_desde_chatbot_raw() -> pd.DataFrame:
+    """
+    Sugerencias: valores únicos de chatbot_raw.Articulo
+    (y trae Familia / Tipo Articulo si existen).
+    """
+    try:
+        df = _sb_select("chatbot_raw", "Articulo,Familia,Tipo Articulo", order=("Articulo", True))
+    except Exception:
+        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
+
+    if df.empty:
+        return df
+
+    # Normalizar
+    for c in ["Articulo", "Familia", "Tipo Articulo"]:
+        if c in df.columns:
+            df[c] = df[c].astype(str).fillna("").str.strip()
+
+    df = df[df["Articulo"].astype(str).str.strip() != ""].copy()
+    if df.empty:
+        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
+
+    # Unificar por Articulo (primera ocurrencia)
+    df = df.drop_duplicates(subset=["Articulo"], keep="first").reset_index(drop=True)
+    return df
+
+
 def _invalidate_caches():
     _cache_proveedores.clear()
     _cache_articulos_por_tipo.clear()
+    _cache_sugerencias_desde_chatbot_raw.clear()
+
 
 
 # =====================================================================
@@ -609,3 +647,4 @@ def mostrar_articulos():
             if sel and sel.get("id"):
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
+
