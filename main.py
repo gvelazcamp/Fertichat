@@ -103,86 +103,134 @@ def inject_css():
         }
 
         /* ========================================
-           RESPONSIVE MÓVIL - SIDEBAR NATIVO FORZADO
+           RESPONSIVE MÓVIL - SIDEBAR FORZADO AL MÁXIMO
         ======================================== */
         @media (max-width: 768px){
             
-            /* NO ocultar sidebar - dejarlo funcionar nativo */
-            section[data-testid="stSidebar"]{
-                display: block !important;
-                visibility: visible !important;
-            }
-
-            /* Sidebar cuando está abierto */
-            section[data-testid="stSidebar"][aria-expanded="true"]{
+            /* ✅ FORZAR SIDEBAR VISIBLE - MUY AGRESIVO */
+            section[data-testid="stSidebar"],
+            [data-testid="stSidebar"],
+            aside[data-testid="stSidebar"]{
                 display: block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
+            }
+
+            /* Sidebar abierto */
+            section[data-testid="stSidebar"][aria-expanded="true"],
+            section[data-testid="stSidebar"].expanded{
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                transform: translateX(0) !important;
                 background: rgba(255,255,255,0.98) !important;
                 backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                box-shadow: 8px 0 24px rgba(0,0,0,0.15) !important;
             }
 
-            /* Textos del sidebar NEGROS */
+            /* Sidebar cerrado - solo moverlo fuera de pantalla */
+            section[data-testid="stSidebar"][aria-expanded="false"],
+            section[data-testid="stSidebar"].collapsed{
+                display: block !important;
+                visibility: visible !important;
+                transform: translateX(-100%) !important;
+            }
+
+            /* Contenedor del sidebar */
+            section[data-testid="stSidebar"] > div,
+            div[data-testid="stSidebarContent"]{
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                background: transparent !important;
+            }
+
+            /* TODO el contenido visible */
             section[data-testid="stSidebar"] *{
+                visibility: visible !important;
+                opacity: 1 !important;
                 color: #0f172a !important;
+                -webkit-text-fill-color: #0f172a !important;
             }
 
-            /* Items del menú radio */
+            /* Items del menú */
             section[data-testid="stSidebar"] div[role="radiogroup"] label{
-                background: rgba(248,250,252,0.8) !important;
-                border: 1px solid rgba(15,23,42,0.1) !important;
+                display: flex !important;
+                visibility: visible !important;
+                background: rgba(248,250,252,0.9) !important;
+                border: 1px solid rgba(15,23,42,0.12) !important;
                 border-radius: 10px !important;
                 padding: 10px 12px !important;
                 margin: 4px 0 !important;
             }
 
             section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
-                background: rgba(245,158,11,0.15) !important;
-                border-color: rgba(245,158,11,0.3) !important;
+                background: rgba(245,158,11,0.18) !important;
+                border-color: rgba(245,158,11,0.35) !important;
                 font-weight: 700 !important;
             }
 
             /* Ocultar círculo del radio */
-            section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
+            section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"],
+            section[data-testid="stSidebar"] input[type="radio"]{
                 display: none !important;
             }
 
-            /* BOTÓN HAMBURGUESA - SÚPER VISIBLE */
+            /* ✅ BOTÓN HAMBURGUESA - TODOS LOS SELECTORES POSIBLES */
             button[data-testid="stExpandSidebarButton"],
             button[data-testid="stSidebarCollapsedControl"],
             button[data-testid="stSidebarCollapseButton"],
             button[data-testid="baseButton-header"],
             button[kind="header"],
-            button[kind="headerNoPadding"]{
+            button[kind="headerNoPadding"],
+            div[data-testid="collapsedControl"],
+            div[data-testid="collapsedControl"] button,
+            header button,
+            header[data-testid="stHeader"] button{
                 display: flex !important;
                 position: fixed !important;
-                top: 12px !important;
-                left: 12px !important;
+                top: 10px !important;
+                left: 10px !important;
                 z-index: 999999 !important;
-                width: 52px !important;
-                height: 52px !important;
+                width: 54px !important;
+                height: 54px !important;
+                min-width: 54px !important;
+                min-height: 54px !important;
                 background: #ffffff !important;
-                border: 2px solid #0b3b60 !important;
+                border: 3px solid #0b3b60 !important;
                 border-radius: 14px !important;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
                 visibility: visible !important;
                 opacity: 1 !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
             
+            /* SVG del botón */
             button[data-testid="stExpandSidebarButton"] svg,
             button[data-testid="stSidebarCollapsedControl"] svg,
             button[data-testid="stSidebarCollapseButton"] svg,
             button[data-testid="baseButton-header"] svg,
-            button[kind="header"] svg{
+            button[kind="header"] svg,
+            button[kind="headerNoPadding"] svg,
+            div[data-testid="collapsedControl"] svg,
+            header button svg{
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
                 color: #0b3b60 !important;
                 fill: #0b3b60 !important;
-                width: 26px !important;
-                height: 26px !important;
+                stroke: #0b3b60 !important;
+                width: 28px !important;
+                height: 28px !important;
             }
 
-            /* Padding para el contenido */
+            /* Padding del contenido */
             .block-container{
-                padding-top: 1.5rem !important;
+                padding-top: 1.8rem !important;
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
             }
@@ -238,7 +286,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # =========================
-# SIDEBAR (SOLO PC)
+# SIDEBAR (PC Y MÓVIL)
 # =========================
 with st.sidebar:
     st.markdown(f"""
@@ -272,6 +320,10 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("## 📌 Menú")
+
+    # Inicializar si no existe
+    if "radio_menu" not in st.session_state:
+        st.session_state["radio_menu"] = "🏠 Inicio"
 
     menu = st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
