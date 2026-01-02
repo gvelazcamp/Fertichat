@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - SIDEBAR CON CONTROL MANUAL (MÓVIL)
+# MAIN.PY - SIDEBAR NATIVO (PC ABIERTO / MÓVIL AUTO + CIERRE TOCANDO FUERA)
 # =========================
 
 import streamlit as st
@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
     layout="wide",
-    initial_sidebar_state="collapsed"  # Empieza cerrado en móvil
+    initial_sidebar_state="auto"  # ✅ PC abierto / Móvil cerrado al cargar
 )
 
 # =========================
@@ -44,177 +44,109 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
-if "sidebar_open" not in st.session_state:
-    st.session_state["sidebar_open"] = False
-
 
 # =========================
 # CSS
 # =========================
-sidebar_state = "open" if st.session_state["sidebar_open"] else "closed"
-
-st.markdown(f"""
+st.markdown(r"""
 <style>
 /* Ocultar UI de Streamlit */
 div.stAppToolbar, div[data-testid="stToolbar"], div[data-testid="stToolbarActions"],
-div[data-testid="stDecoration"], #MainMenu, footer {{
+div[data-testid="stDecoration"], #MainMenu, footer {
   display: none !important;
-}}
-header[data-testid="stHeader"] {{ height: 0 !important; background: transparent !important; }}
+}
+header[data-testid="stHeader"] { height: 0 !important; background: transparent !important; }
 
 /* Theme general */
-:root {{
+:root {
     --fc-bg-1: #f6f4ef; --fc-bg-2: #f3f6fb;
     --fc-primary: #0b3b60; --fc-accent: #f59e0b;
-}}
+}
 
-html, body {{ font-family: Inter, system-ui, sans-serif; color: #0f172a; }}
-[data-testid="stAppViewContainer"] {{ background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }}
-.block-container {{ max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }}
+html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
+[data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
+.block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
 
-/* Sidebar (PC normal) */
-section[data-testid="stSidebar"] {{ border-right: 1px solid rgba(15, 23, 42, 0.08); }}
-section[data-testid="stSidebar"] > div {{
+/* Sidebar look */
+section[data-testid="stSidebar"] { border-right: 1px solid rgba(15, 23, 42, 0.08); }
+section[data-testid="stSidebar"] > div {
     background: rgba(255,255,255,0.70);
     backdrop-filter: blur(8px);
-}}
+}
 
-div[data-testid="stSidebar"] div[role="radiogroup"] label {{
+div[data-testid="stSidebar"] div[role="radiogroup"] label {
     border-radius: 12px; padding: 8px 10px; margin: 3px 0; border: 1px solid transparent;
-}}
-div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{ background: rgba(37,99,235,0.06); }}
-div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
+}
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: rgba(37,99,235,0.06); }
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18);
-}}
+}
 
 /* Header móvil */
-#mobile-header {{ display: none; }}
+#mobile-header { display: none; }
 
-/* Hamburguesa: OCULTA en PC */
-#fc-hamburger-wrap {{ display: none !important; }}
+/* -------------------------
+   DESKTOP: sidebar siempre visible, sin botones de colapsar
+------------------------- */
+@media (min-width: 768px) {
+  /* Botón hamburguesa/expand */
+  div[data-testid="collapsedControl"] { display: none !important; }
 
-/* Overlay-botón: OCULTO en PC */
-#fc-overlay-wrap {{ display: none !important; }}
+  /* Botón colapsar dentro del sidebar (si aparece) */
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Close sidebar"],
+  button[title="Open sidebar"] {
+    display: none !important;
+  }
+}
 
-/* MÓVIL */
-@media (max-width: 768px) {{
-    .block-container {{ padding-top: 70px !important; }}
+/* -------------------------
+   MÓVIL: sidebar nativo (auto)
+   - se abre con la hamburguesa nativa de Streamlit
+   - se cierra tocando fuera (overlay nativo)
+   - ocultar flecha gris extra dentro del sidebar
+------------------------- */
+@media (max-width: 767px) {
+  .block-container { padding-top: 70px !important; }
 
-    /* Header fijo */
-    #mobile-header {{
-        display: flex !important;
-        position: fixed;
-        top: 0; left: 0; right: 0;
-        height: 60px;
-        background: #0b3b60;
-        z-index: 999998;
-        align-items: center;
-        padding: 0 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }}
-    #mobile-header .logo {{
-        color: white;
-        font-size: 20px;
-        font-weight: 800;
-        margin-left: 12px;
-    }}
+  /* Header fijo */
+  #mobile-header {
+    display: flex !important;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: #0b3b60;
+    z-index: 999998;
+    align-items: center;
+    padding: 0 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #mobile-header .logo {
+    color: white;
+    font-size: 20px;
+    font-weight: 800;
+    margin-left: 12px;
+  }
 
-    /* Sidebar móvil con tu estado */
-    section[data-testid="stSidebar"] {{
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        height: 100vh !important;
-        width: 320px !important;
-        max-width: 85vw !important;
-        z-index: 999999 !important;
-        box-shadow: 4px 0 12px rgba(0,0,0,0.2);
-        transform: translateX({'-100%' if sidebar_state == 'closed' else '0'});
-        transition: transform 0.3s ease;
-    }}
-    section[data-testid="stSidebar"] > div {{
-        overflow-y: auto !important;
-        height: 100% !important;
-        padding-top: 20px !important;
-    }}
+  /* Asegurar que la hamburguesa nativa quede arriba del header */
+  div[data-testid="collapsedControl"] {
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 1000000 !important;
+  }
 
-    /* Ocultar flecha nativa de Streamlit (no controla tu sidebar_open) */
-    div[data-testid="collapsedControl"],
-    button[data-testid="stSidebarCollapseButton"],
-    button[data-testid="stSidebarExpandButton"],
-    button[title="Close sidebar"],
-    button[title="Open sidebar"] {{
-        display: none !important;
-    }}
-
-    /* ✅ Hamburguesa SOLO en móvil */
-    #fc-hamburger-wrap {{
-        display: block !important;
-        position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 1000000 !important;
-    }}
-    #fc-hamburger-wrap button {{
-        border-radius: 12px !important;
-        padding: 0.4rem 0.65rem !important;
-    }}
-
-    /* ✅ Overlay SOLO en móvil cuando sidebar está open */
-    #fc-overlay-wrap {{
-        display: {'block' if sidebar_state == 'open' else 'none'} !important;
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 999998 !important; /* debajo del sidebar (999999) */
-    }}
-    #fc-overlay-wrap button {{
-        width: 100% !important;
-        height: 100% !important;
-        background: rgba(0,0,0,0.5) !important;
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }}
-    /* esconder el texto del botón overlay */
-    #fc-overlay-wrap button * {{
-        opacity: 0 !important;
-    }}
-}}
+  /* ✅ Ocultar la flecha gris + texto "Cerrar menú" dentro del sidebar */
+  [data-testid="baseButton-header"] { display: none !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 # =========================
-# OVERLAY CLICK AFUERA (SIN JS) -> botón pantalla completa
-# =========================
-if st.session_state["sidebar_open"]:
-    ov = st.container()
-    with ov:
-        st.markdown('<div id="fc-overlay-wrap">', unsafe_allow_html=True)
-        if st.button("overlay_close", key="fc_overlay_close_btn"):
-            st.session_state["sidebar_open"] = False
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-# =========================
-# HAMBURGUESA (SOLO MÓVIL POR CSS)
-# =========================
-hb = st.container()
-with hb:
-    st.markdown('<div id="fc-hamburger-wrap">', unsafe_allow_html=True)
-    if st.button("☰", key="hamburger_btn"):
-        st.session_state["sidebar_open"] = not st.session_state["sidebar_open"]
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-# =========================
-# HEADER MÓVIL (visual)
+# HEADER MÓVIL (solo visual)
 # =========================
 st.markdown("""
 <div id="mobile-header">
@@ -294,13 +226,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## 📌 Menú")
 
-    old_menu = st.session_state["radio_menu"]
-    menu = st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
-
-    # Si cambió el menú, cerrar sidebar en móvil
-    if menu != old_menu and st.session_state["sidebar_open"]:
-        st.session_state["sidebar_open"] = False
-        st.rerun()
+    st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
 
 # =========================
