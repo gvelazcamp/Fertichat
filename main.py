@@ -116,28 +116,34 @@ user = get_current_user() or {}
 # =========================
 # TÍTULO Y CAMPANITA
 # =========================
-st.title("🦋 FertiChat")
-st.caption("Sistema de Gestión de Compras")
-
 usuario_actual = user.get("usuario", user.get("email", ""))
-
+cant_pendientes = 0
 if usuario_actual:
     cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
-    col_notif, col_space = st.columns([1, 9])
 
-    with col_notif:
-        if cant_pendientes > 0:
-            if st.button(
-                f"🔔 {cant_pendientes}",
-                key="campanita_global",
-                help="Tenés pedidos internos pendientes"
-            ):
-                st.session_state["ir_a_pedidos"] = True
-                st.rerun()
-        else:
-            st.markdown("🔔")
+# Header con campanita integrada
+col_logo, col_spacer, col_notif = st.columns([6, 3, 1])
 
-    st.markdown("---")
+with col_logo:
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 42px;">🦋</span>
+            <div>
+                <h1 style="margin: 0; font-size: 32px; font-weight: 700; color: #1e293b;">FertiChat</h1>
+                <p style="margin: 0; font-size: 14px; color: #64748b;">Sistema de Gestión de Compras</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_notif:
+    if cant_pendientes > 0:
+        if st.button(f"🔔 {cant_pendientes}", key="campanita_global", help="Tenés pedidos internos pendientes"):
+            st.session_state["ir_a_pedidos"] = True
+            st.rerun()
+    else:
+        st.markdown("<div style='text-align: right; font-size: 24px; padding-top: 10px;'>🔔</div>", unsafe_allow_html=True)
+
+st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # =========================
 # SIDEBAR
