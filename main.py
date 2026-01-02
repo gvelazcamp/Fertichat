@@ -103,7 +103,7 @@ def inject_css():
         }
 
         /* ========================================
-           MÓVIL - SELECTBOX FLOTANTE
+           MÓVIL - SELECTBOX FLOTANTE MEJORADO
         ======================================== */
         @media (max-width: 768px){
             
@@ -114,36 +114,81 @@ def inject_css():
 
             /* Padding arriba para el selectbox */
             .block-container{
-                padding-top: 80px !important;
+                padding-top: 90px !important;
             }
 
-            /* Selectbox móvil flotante */
+            /* Container del selectbox móvil flotante */
             div[data-testid="stSelectbox"]:first-of-type{
                 position: fixed !important;
-                top: 12px !important;
-                left: 12px !important;
-                right: 12px !important;
+                top: 10px !important;
+                left: 10px !important;
+                right: 10px !important;
                 z-index: 9999 !important;
                 background: white !important;
-                padding: 8px !important;
-                border-radius: 12px !important;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
+                padding: 10px 12px !important;
+                border-radius: 14px !important;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+                border: 2px solid #0b3b60 !important;
             }
 
-            /* Estilo del select */
+            /* Ocultar label */
+            div[data-testid="stSelectbox"]:first-of-type label{
+                display: none !important;
+            }
+
+            /* Estilo del select/dropdown */
             div[data-testid="stSelectbox"]:first-of-type select,
-            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"]{
+            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"],
+            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"] > div{
                 background: white !important;
                 color: #0f172a !important;
-                font-size: 16px !important;
-                font-weight: 600 !important;
-                border: 2px solid #0b3b60 !important;
+                font-size: 17px !important;
+                font-weight: 700 !important;
+                border: none !important;
+                padding: 8px 12px !important;
                 border-radius: 10px !important;
             }
 
-            /* Ocultar label del selectbox */
-            div[data-testid="stSelectbox"]:first-of-type label{
-                display: none !important;
+            /* Agregar ícono ☰ antes del texto */
+            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"]::before{
+                content: "☰";
+                font-size: 22px;
+                margin-right: 10px;
+                color: #0b3b60;
+            }
+
+            /* Flecha del dropdown */
+            div[data-testid="stSelectbox"]:first-of-type svg{
+                color: #0b3b60 !important;
+                width: 24px !important;
+                height: 24px !important;
+            }
+
+            /* Dropdown abierto */
+            div[data-baseweb="popover"]{
+                z-index: 10000 !important;
+            }
+
+            div[data-baseweb="popover"] ul{
+                background: white !important;
+                border: 2px solid #0b3b60 !important;
+                border-radius: 12px !important;
+                box-shadow: 0 12px 32px rgba(0,0,0,0.3) !important;
+                max-height: 70vh !important;
+            }
+
+            div[data-baseweb="popover"] li{
+                color: #0f172a !important;
+                font-size: 16px !important;
+                padding: 12px 16px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+
+            div[data-baseweb="popover"] li:hover,
+            div[data-baseweb="popover"] li[aria-selected="true"]{
+                background: rgba(245,158,11,0.15) !important;
+                color: #0b3b60 !important;
+                font-weight: 700 !important;
             }
         }
 
