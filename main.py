@@ -272,72 +272,182 @@ def inject_css_responsive():
         }
 
         /* =========================
-           RESPONSIVE (MÓVIL)
-           - Sidebar blanco como PC
-           - Quita el “punto/radio” gigante
-           - Botón flotante de abrir sidebar con look pro
+           RESPONSIVE (MÓVIL) - MEJORADO
+           - Sidebar completamente visible y funcional
+           - Botón hamburguesa prominente
+           - Menú accesible
         ========================= */
         @media (max-width: 768px){
 
-            /* Contenido */
+            /* Contenido principal con padding para el botón */
             .block-container{
-                padding-top: 0.9rem !important;
+                padding-top: 70px !important;
                 padding-left: 0.8rem !important;
                 padding-right: 0.8rem !important;
                 padding-bottom: 4.5rem !important;
             }
 
-            /* ✅ Sidebar drawer blanco (cuando se abre en móvil) */
+            /* =========================
+               ✅ SIDEBAR - FORZAR VISIBILIDAD TOTAL
+            ========================= */
+            
+            /* Base del sidebar */
             section[data-testid="stSidebar"]{
-                background: transparent !important;
+                background: rgba(255,255,255,0.96) !important;
+                border-right: 1px solid rgba(15, 23, 42, 0.10) !important;
+                box-shadow: 12px 0 32px rgba(2, 6, 23, 0.15) !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 999998 !important;
             }
+            
+            /* Contenedor interno del sidebar */
             section[data-testid="stSidebar"] > div,
-            div[data-testid="stSidebarContent"]{
-                background: rgba(255,255,255,0.88) !important;
-                backdrop-filter: blur(10px) !important;
-                -webkit-backdrop-filter: blur(10px) !important;
-            }
-
-            /* Inputs del sidebar (evita que se vean “negros”) */
-            section[data-testid="stSidebar"] .stTextInput input{
-                background: rgba(255,255,255,0.92) !important;
-                color: #0f172a !important;
-                -webkit-text-fill-color: #0f172a !important;
-                border: 1px solid rgba(15,23,42,0.12) !important;
-            }
-
-            /* ✅ Botón flotante para abrir sidebar (varía según versión) */
-            button[data-testid="stExpandSidebarButton"],
-            button[data-testid="stSidebarCollapsedControl"],
-            button[data-testid="stSidebarCollapseButton"]{
-                display: flex !important;
-                position: fixed !important;
-                top: 12px !important;
-                left: 12px !important;
-                z-index: 999999 !important;
-                width: 44px !important;
-                height: 44px !important;
-                border-radius: 14px !important;
-                background: rgba(255,255,255,0.88) !important;
-                border: 1px solid rgba(15,23,42,0.12) !important;
-                box-shadow: 0 10px 26px rgba(2, 6, 23, 0.12) !important;
-            }
-            button[data-testid="stExpandSidebarButton"] svg,
-            button[data-testid="stSidebarCollapsedControl"] svg,
-            button[data-testid="stSidebarCollapseButton"] svg{
-                color: #0f172a !important;
+            div[data-testid="stSidebarContent"],
+            section[data-testid="stSidebar"] > div > div{
+                background: rgba(255,255,255,0.96) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                display: block !important;
+                visibility: visible !important;
                 opacity: 1 !important;
             }
 
-            /* ✅ Quitar el radio “punto” gigante del menú en móvil */
+            /* Forzar que todo el contenido del sidebar sea visible */
+            section[data-testid="stSidebar"] *{
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+
+            /* =========================
+               ✅ TEXTOS DEL SIDEBAR - TODO NEGRO Y LEGIBLE
+            ========================= */
+            section[data-testid="stSidebar"] .stMarkdown,
+            section[data-testid="stSidebar"] .stMarkdown *,
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] label *,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span,
+            section[data-testid="stSidebar"] div{
+                color: #0f172a !important;
+                -webkit-text-fill-color: #0f172a !important;
+            }
+
+            /* =========================
+               ✅ MENÚ RADIO (navegación principal)
+            ========================= */
+            
+            /* Quitar el círculo/punto del radio */
             section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
                 display: none !important;
             }
+            
+            /* Labels del menú */
             section[data-testid="stSidebar"] div[role="radiogroup"] label{
-                padding-left: 10px !important;
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                padding: 10px 12px !important;
+                padding-left: 12px !important;
+                margin: 4px 0 !important;
+                border-radius: 12px !important;
+                background: rgba(255,255,255,0.5) !important;
+                border: 1px solid rgba(15,23,42,0.08) !important;
+                cursor: pointer !important;
+            }
+            
+            /* Texto dentro del label */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label > div{
+                color: #0f172a !important;
+                -webkit-text-fill-color: #0f172a !important;
+                font-size: 0.95rem !important;
+                font-weight: 500 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Item seleccionado */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+                background: rgba(245,158,11,0.12) !important;
+                border: 1px solid rgba(245,158,11,0.25) !important;
+            }
+            
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) > div{
+                color: var(--fc-primary) !important;
+                -webkit-text-fill-color: var(--fc-primary) !important;
+                font-weight: 700 !important;
             }
 
-            /* Tipografías */
+            /* =========================
+               ✅ INPUTS DEL SIDEBAR
+            ========================= */
+            section[data-testid="stSidebar"] .stTextInput input,
+            section[data-testid="stSidebar"] input,
+            section[data-testid="stSidebar"] textarea{
+                background: rgba(248,250,252,0.95) !important;
+                color: #0f172a !important;
+                -webkit-text-fill-color: #0f172a !important;
+                border: 1px solid rgba(15,23,42,0.12) !important;
+                font-size: 0.95rem !important;
+            }
+
+            section[data-testid="stSidebar"] input::placeholder{
+                color: #64748b !important;
+                -webkit-text-fill-color: #64748b !important;
+            }
+
+            /* =========================
+               ✅ BOTÓN HAMBURGUESA - MUY VISIBLE
+            ========================= */
+            button[data-testid="stExpandSidebarButton"],
+            button[data-testid="stSidebarCollapsedControl"],
+            button[data-testid="stSidebarCollapseButton"],
+            button[kind="header"]{
+                display: flex !important;
+                position: fixed !important;
+                top: 14px !important;
+                left: 14px !important;
+                z-index: 999999 !important;
+                width: 48px !important;
+                height: 48px !important;
+                min-width: 48px !important;
+                min-height: 48px !important;
+                border-radius: 16px !important;
+                background: rgba(255,255,255,0.96) !important;
+                border: 2px solid rgba(11,59,96,0.20) !important;
+                box-shadow: 0 12px 32px rgba(2, 6, 23, 0.18) !important;
+                padding: 0 !important;
+                align-items: center !important;
+                justify-content: center !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            button[data-testid="stExpandSidebarButton"] svg,
+            button[data-testid="stSidebarCollapsedControl"] svg,
+            button[data-testid="stSidebarCollapseButton"] svg,
+            button[kind="header"] svg{
+                color: #0b3b60 !important;
+                fill: #0b3b60 !important;
+                opacity: 1 !important;
+                width: 24px !important;
+                height: 24px !important;
+            }
+
+            /* Hover del botón */
+            button[data-testid="stExpandSidebarButton"]:hover,
+            button[data-testid="stSidebarCollapsedControl"]:hover,
+            button[data-testid="stSidebarCollapseButton"]:hover{
+                background: rgba(245,158,11,0.15) !important;
+                border-color: rgba(245,158,11,0.35) !important;
+                transform: scale(1.05) !important;
+            }
+
+            /* =========================
+               TIPOGRAFÍAS RESPONSIVE
+            ========================= */
             h1 { font-size: 1.35rem !important; line-height: 1.2 !important; }
             h2 { font-size: 1.15rem !important; line-height: 1.2 !important; }
             h3 { font-size: 1.05rem !important; line-height: 1.2 !important; }
@@ -349,11 +459,6 @@ def inject_css_responsive():
 
             div[data-testid="stContainer"]{
                 padding: 0.55rem !important;
-            }
-
-            div[role="radiogroup"] label{
-                font-size: 0.95rem !important;
-                margin-bottom: 0.25rem !important;
             }
 
             input, textarea{
@@ -384,50 +489,6 @@ def inject_css_responsive():
                 min-width: 280px !important;
                 flex: 1 1 280px !important;
             }
-        }
-
-        /* =========================
-           FIX: Sidebar móvil visible (igual que PC)
-           - Fondo blanco / blur
-           - Texto negro (menú y labels)
-        ========================= */
-        @media (max-width: 768px){
-
-          section[data-testid="stSidebar"],
-          section[data-testid="stSidebar"] > div,
-          div[data-testid="stSidebarContent"]{
-              background: rgba(255,255,255,0.90) !important;
-              backdrop-filter: blur(10px) !important;
-              -webkit-backdrop-filter: blur(10px) !important;
-              opacity: 1 !important;
-              visibility: visible !important;
-          }
-
-          section[data-testid="stSidebar"]{
-              border-right: 1px solid rgba(15, 23, 42, 0.10) !important;
-              box-shadow: 12px 0 28px rgba(2, 6, 23, 0.12) !important;
-          }
-
-          section[data-testid="stSidebar"] .stMarkdown,
-          section[data-testid="stSidebar"] .stMarkdown * ,
-          section[data-testid="stSidebar"] label,
-          section[data-testid="stSidebar"] label * ,
-          section[data-testid="stSidebar"] p,
-          section[data-testid="stSidebar"] span{
-              color: #0f172a !important;
-          }
-
-          section[data-testid="stSidebar"] div[role="radiogroup"] label > div{
-              color: #0f172a !important;
-          }
-          section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) > div{
-              color: var(--fc-primary) !important;
-              font-weight: 700 !important;
-          }
-
-          section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
-              display: none !important;
-          }
         }
 
         </style>
