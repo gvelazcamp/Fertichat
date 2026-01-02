@@ -270,7 +270,7 @@ col_logo, col_spacer, col_notif = st.columns([6, 3, 1])
 with col_logo:
     st.markdown("""
         <div class="fc-brand" style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 42px;">🦋</span>
+            <span style="font-size: 42px;"></span>
             <div>
                 <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">FertiChat</h1>
                 <p class="fc-subtitle" style="margin: 0; font-size: 14px;">Sistema de Gestión de Compras</p>
