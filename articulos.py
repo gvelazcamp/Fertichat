@@ -97,52 +97,143 @@ ARTICULO_COLS = [
 # =====================================================================
 # HELPERS SUPABASE (mínimos)
 # =====================================================================
-def _sb_select(table: str, columns: str = "*", filters: Optional[List[Tuple[str, str, Any]]] = None,
-              order: Optional[Tuple[str, bool]] = None) -> pd.DataFrame:
-    q = supabase.table(table).select(columns)
-    if filters:
-        for col, op, val in filters:
-            if op == "eq":
-                q = q.eq(col, val)
-            elif op == "ilike":
-                q = q.ilike(col, val)
-            elif op == "is":
-                q = q.is_(col, val)
-    if order:
-        col, asc = order
-        q = q.order(col, desc=not asc)
-    res = q.execute()
+def _sb_select(
+    table: str,
+    columns: str = "*",
+    filters: Optional[List[Tuple[str, str, Any]]] = None,
+    order: Optional[Tuple[str, bool]] = None
+) -> pd.DataFrame:
+    """
+    Select robusto:
+    - Intenta con filtros + order.
+    - Si falla por columna inexistente (42703), reintenta:
+        1) mismos filtros sin order
+        2) sin filtros y sin order
+    """
+    def _build_query(_filters: Optional[List[Tuple[str, str, Any]]], _order: Optional[Tuple[str, bool]]):
+        q = supabase.table(table).select(columns)
+        if _filters:
+            for col, op, val in _filters:
+                if op == "eq":
+                    q = q.eq(col, val)
+                elif op == "ilike":
+                    q = q.ilike(col, val)
+                elif op == "is":
+                    q = q.is_(col, val)
+        if _order:
+            col, asc = _order
+            q = q.order(col, desc=not asc)
+        return q
+
+    # 1) Intento normal
+    try:
+        res = _build_query(filters, order).execute()
+        data = getattr(res, "data", None) or []
+        return pd.DataFrame(data)
+    except Exception as e:
+        msg = str(e) or ""
+        # 42703 = undefined_column (Postgres)
+        if ("42703" in msg) or ("does not exist" in msg.lower()) or ("undefined_column" in msg.lower()):
+            pass
+        else:
+            raise
+
+    # 2) Reintento sin order (manteniendo filtros)
+    try:
+        res = _build_query(filters, None).execute()
+        data = getattr(res, "data", None) or []
+        return pd.DataFrame(data)
+    except Exception as e2:
+        msg2 = str(e2) or ""
+        if ("42703" in msg2) or ("does not exist" in msg2.lower()) or ("undefined_column" in msg2.lower()):
+            pass
+        else:
+            raise
+
+    # 3) Reintento sin filtros y sin order
+    res = _build_query(None, None).execute()
     data = getattr(res, "data", None) or []
     return pd.DataFrame(data)
 
 
-def _sb_upsert_articulo(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    try:
-        res = supabase.table("articulos").upsert(payload).execute()
-        data = getattr(res, "data", None) or []
-        return True, "OK", (data[0] if len(data) > 0 else None)
-    except Exception as e:
-        return False, str(e), None
+def _normalizar_articulos_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Mapea columnas reales de tu tabla public.articulos (ej: 'Descripción', 'Código Int.')
+    a las columnas esperadas por el módulo (nombre, codigo_interno, etc).
+    NO borra columnas existentes; solo agrega/deriva.
+    """
+    if df is None or df.empty:
+        return df
 
+    # Helper: encontrar columna alternativa existente
+    def _first_col(cands: List[str]) -> Optional[str]:
+        for c in cands:
+            if c in df.columns:
+                return c
+        return None
 
-def _sb_insert_archivo(payload: Dict[str, Any]) -> Tuple[bool, str]:
-    try:
-        supabase.table("articulo_archivos").insert(payload).execute()
-        return True, "OK"
-    except Exception as e:
-        return False, str(e)
+    # Nombre
+    if "nombre" not in df.columns:
+        src = _first_col(["Descripción", "Descripcion", "descripcion", "Articulo", "Artículo", "Nombre", "nombre"])
+        if src:
+            df["nombre"] = df[src].astype(str)
 
+    # Familia / Subfamilia / Equipo
+    if "familia" not in df.columns:
+        src = _first_col(["Familia", "familia"])
+        if src:
+            df["familia"] = df[src].astype(str)
 
-def _sb_upload_storage(bucket: str, path: str, content_bytes: bytes, mime: str) -> Tuple[bool, str]:
-    try:
-        supabase.storage.from_(bucket).upload(
-            path,
-            content_bytes,
-            file_options={"content-type": mime or "application/octet-stream"},
-        )
-        return True, "OK"
-    except Exception as e:
-        return False, str(e)
+    if "subfamilia" not in df.columns:
+        src = _first_col(["Subfamilia", "subfamilia"])
+        if src:
+            df["subfamilia"] = df[src].astype(str)
+
+    if "equipo" not in df.columns:
+        src = _first_col(["Equipo", "equipo"])
+        if src:
+            df["equipo"] = df[src].astype(str)
+
+    # Códigos
+    if "codigo_interno" not in df.columns:
+        src = _first_col(["Código Int.", "Codigo Int.", "codigo_int", "codigo_interno", "Código Interno"])
+        if src:
+            df["codigo_interno"] = df[src].astype(str)
+
+    if "codigo_barra" not in df.columns:
+        src = _first_col(["Código Ext.", "Codigo Ext.", "codigo_ext", "codigo_barra", "Código Barra"])
+        if src:
+            df["codigo_barra"] = df[src].astype(str)
+
+    # Unidad (si existe)
+    if "unidad_base" not in df.columns:
+        src = _first_col(["Unidad", "unidad"])
+        if src:
+            df["unidad_base"] = df[src].astype(str)
+
+    if "unidad_compra" not in df.columns:
+        src = _first_col(["Unidad", "unidad"])
+        if src:
+            df["unidad_compra"] = df[src].astype(str)
+
+    # Tipo (si tu tabla trae 'Tipo Articulo' numérico o texto)
+    if "tipo" not in df.columns:
+        src = _first_col(['Tipo Articulo', 'Tipo Artículo', 'tipo'])
+        if src:
+            df["tipo"] = df[src]
+
+    # Campos que tu tabla probablemente no tenga -> dejarlos como None (para no romper el resto)
+    for c in ARTICULO_COLS:
+        if c not in df.columns:
+            df[c] = None
+
+    # Asegurar id como string si existe
+    if "id" in df.columns:
+        df["id"] = df["id"].astype(str)
+
+    # Reordenar a estructura esperada del módulo
+    df = df[ARTICULO_COLS].copy()
+    return df
 
 
 # =====================================================================
@@ -169,19 +260,50 @@ def _cache_proveedores() -> pd.DataFrame:
 
 @st.cache_data(ttl=30)
 def _cache_articulos_por_tipo(tipo: Optional[str]) -> pd.DataFrame:
-    # ✅ AGREGADO: si tipo es None => traer todos
-    if not tipo:
-        df = _sb_select("articulos", "*", order=("nombre", True))
+    """
+    - Si existe columna 'tipo' real en DB y coincide, filtra server-side.
+    - Si NO existe o falla, trae todo y filtra local (si puede).
+    - Normaliza columnas (Descripción -> nombre, etc) para que el listado muestre algo.
+    """
+    # Intento 1: server-side (puede fallar si la columna no existe)
+    if tipo:
+        df_raw = _sb_select("articulos", "*", filters=[("tipo", "eq", tipo)], order=("nombre", True))
     else:
-        df = _sb_select("articulos", "*", filters=[("tipo", "eq", tipo)], order=("nombre", True))
+        df_raw = _sb_select("articulos", "*", order=("nombre", True))
 
-    if df.empty:
-        return df
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame(columns=ARTICULO_COLS)
 
-    for c in ARTICULO_COLS:
-        if c not in df.columns:
-            df[c] = None
-    df = df[ARTICULO_COLS].copy()
+    # Normalizar columnas al formato del módulo
+    df = _normalizar_articulos_df(df_raw)
+
+    # Si pediste tipo y no se pudo filtrar server-side (porque tu DB usa otro campo o numérico),
+    # intentamos filtrar local usando df['tipo'] si trae algo.
+    if tipo and df is not None and not df.empty and "tipo" in df.columns:
+        try:
+            # Caso 1: coincide texto directo
+            df_tipo = df[df["tipo"].astype(str).str.strip().str.lower() == str(tipo).strip().lower()].copy()
+
+            # Caso 2: si en tu tabla 'Tipo Articulo' es 1/2/3, probamos mapeo típico
+            if df_tipo.empty:
+                map_num = {"ingreso": "1", "egreso": "2", "gasto_fijo": "3"}
+                target = map_num.get(tipo)
+                if target is not None:
+                    df_tipo = df[df["tipo"].astype(str).str.strip() == target].copy()
+
+            # Si no matchea nada, devolvemos igual el df sin filtrar (para que al menos veas listado)
+            if not df_tipo.empty:
+                df = df_tipo
+        except Exception:
+            pass
+
+    # Orden local por nombre si existe
+    try:
+        if "nombre" in df.columns:
+            df = df.sort_values("nombre", kind="stable")
+    except Exception:
+        pass
+
     return df
 
 
@@ -778,3 +900,4 @@ def mostrar_articulos():
             if sel and sel.get("id"):
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
+
