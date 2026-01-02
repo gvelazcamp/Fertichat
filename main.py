@@ -102,35 +102,96 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     border: 1px solid rgba(245,158,11,0.18);
 }
 
-/* Móvil: FORZAR que el sidebar sea visible y funcional */
+/* Móvil: sidebar lateral completo */
 @media (max-width: 768px) {
-    /* Mostrar el botón de abrir sidebar */
-    button[kind="header"] {
-        display: flex !important;
-    }
-    
-    /* El sidebar debe poder abrirse */
-    section[data-testid="stSidebar"] {
-        display: block !important;
-    }
-    
-    /* Cuando está colapsado, ocultarlo completamente */
-    section[data-testid="stSidebar"][aria-expanded="false"] {
-        transform: translateX(-100%);
-    }
-    
-    /* Cuando está expandido, mostrarlo */
-    section[data-testid="stSidebar"][aria-expanded="true"] {
-        transform: translateX(0);
-        position: fixed;
-        left: 0;
-        top: 0;
-        height: 100vh;
-        z-index: 999999;
-    }
-    
+    /* Espacio para el header custom */
     .block-container {
-        padding-top: 1.25rem;
+        padding-top: 70px !important;
+    }
+    
+    /* Header fijo con botón hamburguesa */
+    #mobile-menu-toggle {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: #0b3b60;
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    #mobile-menu-toggle button {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    #mobile-menu-toggle button span {
+        width: 24px;
+        height: 3px;
+        background: white;
+        border-radius: 2px;
+        display: block;
+        transition: all 0.3s;
+    }
+    
+    #mobile-menu-toggle .logo {
+        color: white;
+        font-size: 20px;
+        font-weight: 800;
+        margin-left: 12px;
+    }
+    
+    /* Sidebar móvil */
+    section[data-testid="stSidebar"] {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100vh !important;
+        width: 320px !important;
+        max-width: 85vw !important;
+        z-index: 999999 !important;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 4px 0 12px rgba(0,0,0,0.2);
+    }
+    
+    section[data-testid="stSidebar"].open {
+        transform: translateX(0) !important;
+    }
+    
+    /* Overlay oscuro */
+    #sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999998;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+    
+    #sidebar-overlay.open {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    /* Hacer scroll en el sidebar */
+    section[data-testid="stSidebar"] > div {
+        overflow-y: auto !important;
+        height: 100% !important;
+        padding-top: 20px !important;
     }
 }
 </style>
@@ -147,6 +208,57 @@ user = get_current_user() or {}
 
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
+
+
+# =========================
+# HEADER MÓVIL CON BOTÓN HAMBURGUESA
+# =========================
+st.markdown("""
+<div id="mobile-menu-toggle">
+    <button onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    <div class="logo">🦋 FertiChat</div>
+</div>
+
+<div id="sidebar-overlay" onclick="closeMobileMenu()"></div>
+
+<script>
+function toggleMobileMenu() {
+    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('open');
+    }
+}
+
+function closeMobileMenu() {
+    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (sidebar && overlay) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+    }
+}
+
+// Cerrar sidebar al hacer click en una opción
+window.addEventListener('load', function() {
+    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+    if (sidebar) {
+        sidebar.addEventListener('click', function(e) {
+            if (e.target.closest('input[type="radio"]')) {
+                setTimeout(closeMobileMenu, 300);
+            }
+        });
+    }
+});
+</script>
+""", unsafe_allow_html=True)
 
 
 # =========================
