@@ -263,33 +263,36 @@ cant_pendientes = 0
 if usuario_actual:
     cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
-# Header con campanita integrada
+# Header con campanita integrada (SIN mariposa arriba)
 st.markdown("<div class='fc-header'>", unsafe_allow_html=True)
-col_logo, col_spacer, col_notif = st.columns([6, 3, 1])
+
+col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
 with col_logo:
     st.markdown("""
         <div class="fc-brand" style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 42px;"></span>
             <div>
-                <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">FertiChat</h1>
-                <p class="fc-subtitle" style="margin: 0; font-size: 14px;">Sistema de Gestión de Compras</p>
+                <h1 style="margin: 0; font-size: 38px; font-weight: 900; color: #0f172a; letter-spacing: -0.02em;">
+                    FertiChat
+                </h1>
+                <p class="fc-subtitle" style="margin: 4px 0 0 0; font-size: 15px;">
+                    Sistema de Gestión de Compras
+                </p>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 with col_notif:
-    st.markdown("<div class='fc-notif'>", unsafe_allow_html=True)
+    st.markdown("<div class='fc-notif' style='display:flex; justify-content:flex-end; align-items:center; height:100%;'>", unsafe_allow_html=True)
     if cant_pendientes > 0:
         if st.button(f"🔔 {cant_pendientes}", key="campanita_global", help="Tenés pedidos internos pendientes"):
             st.session_state["ir_a_pedidos"] = True
             st.rerun()
     else:
-        st.markdown("<div style='text-align: right; font-size: 24px; padding-top: 10px;'>🔔</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:right; font-size:26px; padding-top:6px;'>🔔</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
-
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # =========================
