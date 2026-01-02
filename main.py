@@ -272,318 +272,130 @@ def inject_css_responsive():
         }
 
         /* =========================
-           RESPONSIVE (MÓVIL) - MEJORADO
-           - Sidebar completamente visible y funcional
-           - Botón hamburguesa prominente
-           - Menú accesible
+           RESPONSIVE (MÓVIL) - SIMPLIFICADO Y FUNCIONAL
         ========================= */
         @media (max-width: 768px){
 
-            /* Contenido principal con padding para el botón */
+            /* Contenido principal */
             .block-container{
-                padding-top: 70px !important;
-                padding-left: 0.8rem !important;
-                padding-right: 0.8rem !important;
-                padding-bottom: 4.5rem !important;
+                padding-top: 1.5rem !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                padding-bottom: 4rem !important;
             }
 
             /* =========================
-               ✅ SIDEBAR - FORZAR VISIBILIDAD TOTAL (SUPER AGRESIVO)
+               ✅ BOTÓN HAMBURGUESA - MÁXIMA VISIBILIDAD
             ========================= */
             
-            /* Base del sidebar - TODAS las variantes posibles */
-            section[data-testid="stSidebar"],
-            [data-testid="stSidebar"],
-            aside[data-testid="stSidebar"],
-            div[data-testid="stSidebar"]{
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                height: 100vh !important;
-                width: 21rem !important;
-                max-width: 21rem !important;
-                background: rgba(255,255,255,0.96) !important;
-                border-right: 1px solid rgba(15, 23, 42, 0.10) !important;
-                box-shadow: 12px 0 32px rgba(2, 6, 23, 0.15) !important;
-                z-index: 999998 !important;
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-                transform: translateX(0) !important;
-                transition: transform 0.3s ease !important;
-            }
-
-            /* Cuando está "colapsado" - mantener accesible */
-            section[data-testid="stSidebar"][aria-expanded="false"],
-            section[data-testid="stSidebar"].collapsed{
-                transform: translateX(-100%) !important;
-            }
-
-            section[data-testid="stSidebar"][aria-expanded="true"],
-            section[data-testid="stSidebar"].expanded{
-                transform: translateX(0) !important;
-            }
-            
-            /* Contenedor interno del sidebar - TODOS los niveles */
-            section[data-testid="stSidebar"] > div,
-            section[data-testid="stSidebar"] > div > div,
-            section[data-testid="stSidebar"] > div > div > div,
-            div[data-testid="stSidebarContent"],
-            div[data-testid="stSidebarUserContent"]{
-                background: transparent !important;
-                backdrop-filter: blur(12px) !important;
-                -webkit-backdrop-filter: blur(12px) !important;
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                width: 100% !important;
-            }
-
-            /* Forzar que TODO el contenido del sidebar sea visible */
-            section[data-testid="stSidebar"] *,
-            section[data-testid="stSidebar"] * > *{
-                visibility: visible !important;
-                opacity: 1 !important;
-            }
-
-            /* =========================
-               ✅ TEXTOS DEL SIDEBAR - TODO NEGRO Y LEGIBLE
-            ========================= */
-            section[data-testid="stSidebar"] h1,
-            section[data-testid="stSidebar"] h2,
-            section[data-testid="stSidebar"] h3,
-            section[data-testid="stSidebar"] h4,
-            section[data-testid="stSidebar"] h5,
-            section[data-testid="stSidebar"] h6,
-            section[data-testid="stSidebar"] .stMarkdown,
-            section[data-testid="stSidebar"] .stMarkdown *,
-            section[data-testid="stSidebar"] label,
-            section[data-testid="stSidebar"] label *,
-            section[data-testid="stSidebar"] p,
-            section[data-testid="stSidebar"] span,
-            section[data-testid="stSidebar"] div,
-            section[data-testid="stSidebar"] strong,
-            section[data-testid="stSidebar"] em{
-                color: #0f172a !important;
-                -webkit-text-fill-color: #0f172a !important;
-            }
-
-            /* =========================
-               ✅ MENÚ RADIO (navegación principal)
-            ========================= */
-            
-            /* Container del radiogroup */
-            section[data-testid="stSidebar"] div[role="radiogroup"]{
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 2px !important;
-                width: 100% !important;
-            }
-            
-            /* Quitar el círculo/punto del radio - TODAS las variantes */
-            section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"],
-            section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"],
-            section[data-testid="stSidebar"] div[role="radiogroup"] svg{
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-                opacity: 0 !important;
-            }
-            
-            /* Labels del menú */
-            section[data-testid="stSidebar"] div[role="radiogroup"] label{
-                display: flex !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                padding: 10px 12px !important;
-                margin: 2px 0 !important;
-                border-radius: 12px !important;
-                background: rgba(255,255,255,0.6) !important;
-                border: 1px solid rgba(15,23,42,0.08) !important;
-                cursor: pointer !important;
-                width: 100% !important;
-                align-items: center !important;
-            }
-            
-            /* Texto dentro del label */
-            section[data-testid="stSidebar"] div[role="radiogroup"] label > div,
-            section[data-testid="stSidebar"] div[role="radiogroup"] label span{
-                color: #0f172a !important;
-                -webkit-text-fill-color: #0f172a !important;
-                font-size: 0.95rem !important;
-                font-weight: 500 !important;
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-            }
-            
-            /* Item seleccionado */
-            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked),
-            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"]{
-                background: rgba(245,158,11,0.14) !important;
-                border: 1px solid rgba(245,158,11,0.28) !important;
-            }
-            
-            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) > div,
-            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span,
-            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] > div,
-            section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] span{
-                color: var(--fc-primary) !important;
-                -webkit-text-fill-color: var(--fc-primary) !important;
-                font-weight: 700 !important;
-            }
-
-            /* =========================
-               ✅ INPUTS DEL SIDEBAR
-            ========================= */
-            section[data-testid="stSidebar"] .stTextInput,
-            section[data-testid="stSidebar"] .stTextInput input,
-            section[data-testid="stSidebar"] input,
-            section[data-testid="stSidebar"] textarea{
-                background: rgba(248,250,252,0.95) !important;
-                color: #0f172a !important;
-                -webkit-text-fill-color: #0f172a !important;
-                border: 1px solid rgba(15,23,42,0.12) !important;
-                font-size: 0.95rem !important;
-            }
-
-            section[data-testid="stSidebar"] input::placeholder,
-            section[data-testid="stSidebar"] textarea::placeholder{
-                color: #64748b !important;
-                -webkit-text-fill-color: #64748b !important;
-            }
-
-            /* Botones del sidebar */
-            section[data-testid="stSidebar"] .stButton button,
-            section[data-testid="stSidebar"] button{
-                width: 100% !important;
-                color: #0f172a !important;
-                -webkit-text-fill-color: #0f172a !important;
-            }
-
-            /* =========================
-               ✅ BOTÓN HAMBURGUESA - SÚPER VISIBLE
-            ========================= */
+            /* Botón hamburguesa - TODOS los selectores posibles */
             button[data-testid="stExpandSidebarButton"],
             button[data-testid="stSidebarCollapsedControl"],
             button[data-testid="stSidebarCollapseButton"],
             button[data-testid="baseButton-header"],
             button[kind="header"],
-            [data-testid="stSidebarNav"] button{
+            button[kind="headerNoPadding"],
+            div[data-testid="collapsedControl"] button,
+            header button[kind="header"]{
                 display: flex !important;
                 position: fixed !important;
-                top: 14px !important;
-                left: 14px !important;
+                top: 10px !important;
+                left: 10px !important;
                 z-index: 999999 !important;
-                width: 50px !important;
-                height: 50px !important;
-                min-width: 50px !important;
-                min-height: 50px !important;
-                max-width: 50px !important;
-                max-height: 50px !important;
-                border-radius: 16px !important;
-                background: rgba(255,255,255,0.98) !important;
-                border: 2px solid rgba(11,59,96,0.25) !important;
-                box-shadow: 0 14px 36px rgba(2, 6, 23, 0.22) !important;
+                width: 54px !important;
+                height: 54px !important;
+                min-width: 54px !important;
+                min-height: 54px !important;
+                border-radius: 14px !important;
+                background: #ffffff !important;
+                border: 2px solid #0b3b60 !important;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
                 padding: 0 !important;
-                margin: 0 !important;
                 align-items: center !important;
                 justify-content: center !important;
                 visibility: visible !important;
                 opacity: 1 !important;
+                cursor: pointer !important;
             }
             
+            /* Icono del botón */
             button[data-testid="stExpandSidebarButton"] svg,
             button[data-testid="stSidebarCollapsedControl"] svg,
             button[data-testid="stSidebarCollapseButton"] svg,
             button[data-testid="baseButton-header"] svg,
             button[kind="header"] svg,
-            [data-testid="stSidebarNav"] button svg{
+            button[kind="headerNoPadding"] svg,
+            div[data-testid="collapsedControl"] button svg,
+            header button[kind="header"] svg{
                 color: #0b3b60 !important;
                 fill: #0b3b60 !important;
                 stroke: #0b3b60 !important;
                 opacity: 1 !important;
-                width: 26px !important;
-                height: 26px !important;
-                min-width: 26px !important;
-                min-height: 26px !important;
-            }
-
-            /* Hover del botón */
-            button[data-testid="stExpandSidebarButton"]:hover,
-            button[data-testid="stSidebarCollapsedControl"]:hover,
-            button[data-testid="stSidebarCollapseButton"]:hover,
-            button[data-testid="baseButton-header"]:hover,
-            button[kind="header"]:hover{
-                background: rgba(245,158,11,0.18) !important;
-                border-color: rgba(245,158,11,0.40) !important;
-                transform: scale(1.06) !important;
+                width: 28px !important;
+                height: 28px !important;
             }
 
             /* =========================
-               OVERLAY cuando sidebar está abierto
+               ✅ SIDEBAR cuando se ABRE
             ========================= */
-            div[data-testid="stSidebarNav"]::before{
-                content: "";
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.3);
-                z-index: 999997;
-                display: none;
+            
+            /* Sidebar container */
+            section[data-testid="stSidebar"]{
+                background: rgba(255,255,255,0.98) !important;
+                border-right: 1px solid rgba(15, 23, 42, 0.12) !important;
+                box-shadow: 8px 0 24px rgba(0, 0, 0, 0.15) !important;
+            }
+            
+            /* Contenido del sidebar */
+            section[data-testid="stSidebar"] > div{
+                background: rgba(255,255,255,0.98) !important;
             }
 
-            section[data-testid="stSidebar"][aria-expanded="true"] ~ div[data-testid="stSidebarNav"]::before{
-                display: block;
+            /* TEXTOS del sidebar - NEGRO */
+            section[data-testid="stSidebar"],
+            section[data-testid="stSidebar"] *{
+                color: #0f172a !important;
+            }
+
+            /* Labels del menú radio */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label{
+                background: rgba(248,250,252,0.8) !important;
+                border: 1px solid rgba(15,23,42,0.1) !important;
+                border-radius: 10px !important;
+                padding: 8px 12px !important;
+                margin: 3px 0 !important;
+                color: #0f172a !important;
+            }
+
+            /* Item seleccionado */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+                background: rgba(245,158,11,0.15) !important;
+                border-color: rgba(245,158,11,0.3) !important;
+                font-weight: 700 !important;
+            }
+
+            /* Ocultar círculo del radio */
+            section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
+                display: none !important;
+            }
+
+            /* Inputs */
+            section[data-testid="stSidebar"] input{
+                background: #ffffff !important;
+                color: #0f172a !important;
+                border: 1px solid rgba(15,23,42,0.15) !important;
             }
 
             /* =========================
-               TIPOGRAFÍAS RESPONSIVE
+               TIPOGRAFÍAS
             ========================= */
-            h1 { font-size: 1.35rem !important; line-height: 1.2 !important; }
-            h2 { font-size: 1.15rem !important; line-height: 1.2 !important; }
-            h3 { font-size: 1.05rem !important; line-height: 1.2 !important; }
-
-            .stMarkdown, .stText, .stCaption, p, li{
-                font-size: 0.95rem !important;
-                line-height: 1.25 !important;
-            }
-
-            div[data-testid="stContainer"]{
-                padding: 0.55rem !important;
-            }
-
-            input, textarea{
-                font-size: 1rem !important;
-            }
+            h1 { font-size: 1.4rem !important; }
+            h2 { font-size: 1.2rem !important; }
+            h3 { font-size: 1.05rem !important; }
 
             .stButton > button{
                 width: 100% !important;
-                padding: 0.60rem 0.9rem !important;
-                font-size: 1rem !important;
-            }
-
-            div[data-testid="stDataFrame"],
-            div[data-testid="stDataFrame"] *{
-                font-size: 0.85rem !important;
-            }
-
-            details summary{
-                font-size: 0.95rem !important;
-            }
-
-            div[data-testid="stHorizontalBlock"]{
-                flex-wrap: wrap !important;
-                gap: 0.5rem !important;
-            }
-
-            div[data-testid="column"]{
-                min-width: 280px !important;
-                flex: 1 1 280px !important;
+                padding: 0.6rem 1rem !important;
             }
         }
 
