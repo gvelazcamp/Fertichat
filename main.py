@@ -35,7 +35,7 @@ from familias import mostrar_familias
 
 
 # =========================
-# CSS + MENÚ MÓVIL (SIN JS)
+# CSS + MENÚ MÓVIL (SIN JS) - FIX: evita que el HTML se renderice como "code"
 # =========================
 def inject_css_and_mobile_menu(user: dict, menu_actual: str):
     # Menú móvil: links con query param URL-encoded
@@ -43,320 +43,320 @@ def inject_css_and_mobile_menu(user: dict, menu_actual: str):
     for opcion in MENU_OPTIONS:
         active_class = "fc-active" if opcion == menu_actual else ""
         href = f"?menu={quote(opcion)}"
-        menu_items_html += f"""
-            <a class="fc-menu-item {active_class}" href="{href}">{opcion}</a>
-        """
+        menu_items_html += f'<a class="fc-menu-item {active_class}" href="{href}">{opcion}</a>\n'
 
-    st.markdown(
-        f"""
-        <style>
-        /* =========================
-           OCULTAR UI DE STREAMLIT
-        ========================= */
-        div.stAppToolbar,
-        div[data-testid="stToolbar"],
-        div[data-testid="stToolbarActions"],
-        div[data-testid="stDecoration"],
-        #MainMenu,
-        footer {{
-          display: none !important;
-        }}
+    html = f"""
+<style>
+/* =========================
+   OCULTAR UI DE STREAMLIT
+========================= */
+div.stAppToolbar,
+div[data-testid="stToolbar"],
+div[data-testid="stToolbarActions"],
+div[data-testid="stDecoration"],
+#MainMenu,
+footer {{
+  display: none !important;
+}}
 
-        header[data-testid="stHeader"] {{
-          height: 0 !important;
-          background: transparent !important;
-        }}
+header[data-testid="stHeader"] {{
+  height: 0 !important;
+  background: transparent !important;
+}}
 
-        /* =========================
-           THEME GENERAL
-        ========================= */
-        :root {{
-            --fc-bg-1: #f6f4ef;
-            --fc-bg-2: #f3f6fb;
-            --fc-primary: #0b3b60;
-            --fc-accent: #f59e0b;
-        }}
+/* =========================
+   THEME GENERAL
+========================= */
+:root {{
+    --fc-bg-1: #f6f4ef;
+    --fc-bg-2: #f3f6fb;
+    --fc-primary: #0b3b60;
+    --fc-accent: #f59e0b;
+}}
 
-        html, body {{
-            font-family: Inter, system-ui, sans-serif;
-            color: #0f172a;
-        }}
+html, body {{
+    font-family: Inter, system-ui, sans-serif;
+    color: #0f172a;
+}}
 
-        [data-testid="stAppViewContainer"] {{
-            background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
-        }}
+[data-testid="stAppViewContainer"] {{
+    background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
+}}
 
-        .block-container {{
-            max-width: 1240px;
-            padding-top: 1.25rem;
-            padding-bottom: 2.25rem;
-        }}
+.block-container {{
+    max-width: 1240px;
+    padding-top: 1.25rem;
+    padding-bottom: 2.25rem;
+}}
 
-        /* =========================
-           SIDEBAR PC (tu estilo)
-        ========================= */
-        section[data-testid="stSidebar"] {{
-            border-right: 1px solid rgba(15, 23, 42, 0.08);
-        }}
-        section[data-testid="stSidebar"] > div {{
-            background: rgba(255,255,255,0.70);
-            backdrop-filter: blur(8px);
-        }}
+/* =========================
+   SIDEBAR PC (tu estilo)
+========================= */
+section[data-testid="stSidebar"] {{
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+}}
+section[data-testid="stSidebar"] > div {{
+    background: rgba(255,255,255,0.70);
+    backdrop-filter: blur(8px);
+}}
 
-        div[data-testid="stSidebar"] div[role="radiogroup"] label {{
-            border-radius: 12px;
-            padding: 8px 10px;
-            margin: 3px 0;
-            border: 1px solid transparent;
-        }}
-        div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
-            background: rgba(37,99,235,0.06);
-        }}
-        div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
-            background: rgba(245,158,11,0.10);
-            border: 1px solid rgba(245,158,11,0.18);
-        }}
+div[data-testid="stSidebar"] div[role="radiogroup"] label {{
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin: 3px 0;
+    border: 1px solid transparent;
+}}
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
+    background: rgba(37,99,235,0.06);
+}}
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
+    background: rgba(245,158,11,0.10);
+    border: 1px solid rgba(245,158,11,0.18);
+}}
 
-        /* =========================
-           PC: ocultar menú móvil
-        ========================= */
-        @media (min-width: 769px) {{
-            #fc-menu-cb,
-            #fc-mobile-header,
-            #fc-mobile-menu,
-            #fc-mobile-overlay {{
-                display: none !important;
-            }}
-        }}
+/* =========================
+   PC: ocultar menú móvil
+========================= */
+@media (min-width: 769px) {{
+    #fc-menu-cb,
+    #fc-mobile-header,
+    #fc-mobile-menu,
+    #fc-mobile-overlay {{
+        display: none !important;
+    }}
+}}
 
-        /* =========================
-           MÓVIL: menú propio + ocultar sidebar nativo
-        ========================= */
-        @media (max-width: 768px) {{
+/* =========================
+   MÓVIL: menú propio + ocultar sidebar nativo
+========================= */
+@media (max-width: 768px) {{
 
-            /* Ocultar sidebar nativo SOLO en móvil */
-            section[data-testid="stSidebar"] {{
-                display: none !important;
-            }}
+    /* Ocultar sidebar nativo SOLO en móvil */
+    section[data-testid="stSidebar"] {{
+        display: none !important;
+    }}
 
-            /* Dejar espacio para header móvil fijo */
-            .block-container {{
-                padding-top: 70px !important;
-            }}
+    /* Dejar espacio para header móvil fijo */
+    .block-container {{
+        padding-top: 70px !important;
+    }}
 
-            /* Checkbox escondido (controla open/close) */
-            #fc-menu-cb {{
-                position: fixed;
-                left: -9999px;
-                top: -9999px;
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }}
+    /* Checkbox escondido (controla open/close) */
+    #fc-menu-cb {{
+        position: fixed;
+        left: -9999px;
+        top: -9999px;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }}
 
-            /* Header móvil fijo */
-            #fc-mobile-header {{
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 56px;
-                background: #0b3b60;
-                z-index: 999999;
-                display: flex;
-                align-items: center;
-                padding: 0 12px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            }}
+    /* Header móvil fijo */
+    #fc-mobile-header {{
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        background: #0b3b60;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }}
 
-            /* Botón hamburguesa (es un LABEL del checkbox) */
-            #fc-menu-toggle {{
-                width: 44px;
-                height: 44px;
-                background: transparent;
-                border: none;
-                cursor: pointer;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                gap: 5px;
-                padding: 0;
-                -webkit-tap-highlight-color: transparent;
-            }}
+    /* Botón hamburguesa (es un LABEL del checkbox) */
+    #fc-menu-toggle {{
+        width: 44px;
+        height: 44px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+    }}
 
-            #fc-menu-toggle span {{
-                width: 24px;
-                height: 3px;
-                background: white;
-                border-radius: 2px;
-                transition: all 0.20s;
-                display: block;
-            }}
+    #fc-menu-toggle span {{
+        width: 24px;
+        height: 3px;
+        background: white;
+        border-radius: 2px;
+        transition: all 0.20s;
+        display: block;
+    }}
 
-            #fc-mobile-logo {{
-                color: white;
-                font-size: 18px;
-                font-weight: 800;
-                margin-left: 12px;
-                letter-spacing: -0.01em;
-            }}
+    #fc-mobile-logo {{
+        color: white;
+        font-size: 18px;
+        font-weight: 800;
+        margin-left: 12px;
+        letter-spacing: -0.01em;
+    }}
 
-            /* Overlay (es un LABEL del checkbox para cerrar) */
-            #fc-mobile-overlay {{
-                position: fixed;
-                top: 56px;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.5);
-                z-index: 999998;
-                opacity: 0;
-                visibility: hidden;
-                transition: all 0.20s;
-            }}
+    /* Overlay (es un LABEL del checkbox para cerrar) */
+    #fc-mobile-overlay {{
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999998;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.20s;
+    }}
 
-            /* Drawer */
-            #fc-mobile-menu {{
-                position: fixed;
-                top: 56px;
-                left: 0;
-                width: 290px;
-                height: calc(100vh - 56px);
-                height: calc(100dvh - 56px);
-                background: rgba(255,255,255,0.98);
-                box-shadow: 4px 0 12px rgba(0,0,0,0.15);
-                transform: translateX(-100%);
-                transition: transform 0.20s ease;
-                z-index: 999999;
-                overflow-y: auto;
-                padding: 16px;
-            }}
+    /* Drawer */
+    #fc-mobile-menu {{
+        position: fixed;
+        top: 56px;
+        left: 0;
+        width: 290px;
+        height: calc(100vh - 56px);
+        height: calc(100dvh - 56px);
+        background: rgba(255,255,255,0.98);
+        box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+        transform: translateX(-100%);
+        transition: transform 0.20s ease;
+        z-index: 999999;
+        overflow-y: auto;
+        padding: 16px;
+    }}
 
-            /* OPEN (controlado por checkbox) */
-            #fc-menu-cb:checked ~ #fc-mobile-overlay {{
-                opacity: 1;
-                visibility: visible;
-            }}
-            #fc-menu-cb:checked ~ #fc-mobile-menu {{
-                transform: translateX(0);
-            }}
+    /* OPEN (controlado por checkbox) */
+    #fc-menu-cb:checked ~ #fc-mobile-overlay {{
+        opacity: 1;
+        visibility: visible;
+    }}
+    #fc-menu-cb:checked ~ #fc-mobile-menu {{
+        transform: translateX(0);
+    }}
 
-            /* Animación del icono a X */
-            #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(1) {{
-                transform: rotate(45deg) translate(6px, 6px);
-            }}
-            #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(2) {{
-                opacity: 0;
-            }}
-            #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(3) {{
-                transform: rotate(-45deg) translate(6px, -6px);
-            }}
+    /* Animación del icono a X */
+    #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(1) {{
+        transform: rotate(45deg) translate(6px, 6px);
+    }}
+    #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(2) {{
+        opacity: 0;
+    }}
+    #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(3) {{
+        transform: rotate(-45deg) translate(6px, -6px);
+    }}
 
-            /* Info usuario */
-            .fc-user-info {{
-                background: rgba(248,250,252,0.95);
-                padding: 14px;
-                border-radius: 12px;
-                margin-bottom: 14px;
-                border: 1px solid rgba(15,23,42,0.10);
-            }}
+    /* Info usuario */
+    .fc-user-info {{
+        background: rgba(248,250,252,0.95);
+        padding: 14px;
+        border-radius: 12px;
+        margin-bottom: 14px;
+        border: 1px solid rgba(15,23,42,0.10);
+    }}
 
-            .fc-user-line {{
-                color: #0f172a;
-                font-size: 14px;
-                margin: 4px 0;
-                line-height: 1.2;
-            }}
+    .fc-user-line {{
+        color: #0f172a;
+        font-size: 14px;
+        margin: 4px 0;
+        line-height: 1.2;
+    }}
 
-            .fc-user-sub {{
-                color: #64748b;
-                font-size: 12px;
-            }}
+    .fc-user-sub {{
+        color: #64748b;
+        font-size: 12px;
+    }}
 
-            .fc-section-label {{
-                color: #64748b;
-                font-size: 11px;
-                font-weight: 800;
-                text-transform: uppercase;
-                margin: 12px 0 8px 4px;
-            }}
+    .fc-section-label {{
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin: 12px 0 8px 4px;
+    }}
 
-            /* Items menú */
-            .fc-menu-item {{
-                display: block;
-                padding: 14px 14px;
-                margin: 6px 0;
-                border-radius: 10px;
-                background: rgba(248,250,252,0.92);
-                border: 1px solid rgba(15,23,42,0.10);
-                cursor: pointer;
-                color: #0f172a !important;
-                font-size: 15px;
-                font-weight: 500;
-                text-decoration: none !important;
-                -webkit-tap-highlight-color: transparent;
-            }}
+    /* Items menú */
+    .fc-menu-item {{
+        display: block;
+        padding: 14px 14px;
+        margin: 6px 0;
+        border-radius: 10px;
+        background: rgba(248,250,252,0.92);
+        border: 1px solid rgba(15,23,42,0.10);
+        cursor: pointer;
+        color: #0f172a !important;
+        font-size: 15px;
+        font-weight: 500;
+        text-decoration: none !important;
+        -webkit-tap-highlight-color: transparent;
+    }}
 
-            .fc-menu-item:active {{
-                background: rgba(245,158,11,0.10);
-                border-color: rgba(245,158,11,0.20);
-            }}
+    .fc-menu-item:active {{
+        background: rgba(245,158,11,0.10);
+        border-color: rgba(245,158,11,0.20);
+    }}
 
-            .fc-menu-item.fc-active {{
-                background: rgba(245,158,11,0.15);
-                border-color: rgba(245,158,11,0.30);
-                font-weight: 800;
-                color: #0b3b60 !important;
-            }}
+    .fc-menu-item.fc-active {{
+        background: rgba(245,158,11,0.15);
+        border-color: rgba(245,158,11,0.30);
+        font-weight: 800;
+        color: #0b3b60 !important;
+    }}
 
-            .fc-logout {{
-                display: block;
-                padding: 14px 14px;
-                margin: 14px 0 6px 0;
-                border-radius: 10px;
-                background: rgba(244,63,94,0.08);
-                border: 1px solid rgba(244,63,94,0.20);
-                cursor: pointer;
-                color: #dc2626 !important;
-                font-size: 15px;
-                font-weight: 700;
-                text-decoration: none !important;
-            }}
-        }}
-        </style>
+    .fc-logout {{
+        display: block;
+        padding: 14px 14px;
+        margin: 14px 0 6px 0;
+        border-radius: 10px;
+        background: rgba(244,63,94,0.08);
+        border: 1px solid rgba(244,63,94,0.20);
+        cursor: pointer;
+        color: #dc2626 !important;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none !important;
+    }}
+}}
+</style>
 
-        <!-- CHECKBOX CONTROL -->
-        <input type="checkbox" id="fc-menu-cb" />
+<!-- CHECKBOX CONTROL -->
+<input type="checkbox" id="fc-menu-cb" />
 
-        <!-- HEADER MÓVIL -->
-        <div id="fc-mobile-header">
-            <label id="fc-menu-toggle" for="fc-menu-cb" aria-label="Abrir menú">
-                <span></span><span></span><span></span>
-            </label>
-            <div id="fc-mobile-logo">🦋 FertiChat</div>
-        </div>
+<!-- HEADER MÓVIL -->
+<div id="fc-mobile-header">
+  <label id="fc-menu-toggle" for="fc-menu-cb" aria-label="Abrir menú">
+    <span></span><span></span><span></span>
+  </label>
+  <div id="fc-mobile-logo">🦋 FertiChat</div>
+</div>
 
-        <!-- OVERLAY (clic cierra) -->
-        <label id="fc-mobile-overlay" for="fc-menu-cb"></label>
+<!-- OVERLAY (clic cierra) -->
+<label id="fc-mobile-overlay" for="fc-menu-cb"></label>
 
-        <!-- MENÚ LATERAL -->
-        <div id="fc-mobile-menu">
-            <div class="fc-user-info">
-                <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
-                <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
-                <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
-            </div>
+<!-- MENÚ LATERAL -->
+<div id="fc-mobile-menu">
+  <div class="fc-user-info">
+    <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
+    <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
+    <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
+  </div>
 
-            <div class="fc-section-label">Menú</div>
+  <div class="fc-section-label">Menú</div>
 
-            {menu_items_html}
+  {menu_items_html}
 
-            <a class="fc-logout" href="?logout=1">🚪 Cerrar sesión</a>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+  <a class="fc-logout" href="?logout=1">🚪 Cerrar sesión</a>
+</div>
+"""
+
+    # ✅ CLAVE: sin indentación -> no se muestra como bloque de código en móvil
+    html = "\n".join(line.lstrip() for line in html.splitlines())
+
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # =========================
@@ -370,6 +370,7 @@ user = get_current_user() or {}
 # Inicializar menú
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
+
 
 # =========================
 # NAVEGACIÓN POR QUERY PARAMS (MENÚ MÓVIL)
@@ -397,6 +398,7 @@ try:
 
 except Exception:
     pass
+
 
 # Inyectar CSS + menú móvil
 inject_css_and_mobile_menu(user=user, menu_actual=st.session_state["radio_menu"])
@@ -484,31 +486,44 @@ menu_actual = st.session_state["radio_menu"]
 
 if menu_actual == "🏠 Inicio":
     mostrar_inicio()
+
 elif menu_actual == "🛒 Compras IA":
     mostrar_resumen_compras_rotativo()
     Compras_IA()
+
 elif menu_actual == "📦 Stock IA":
     mostrar_resumen_stock_rotativo()
     mostrar_stock_ia()
+
 elif menu_actual == "🔎 Buscador IA":
     mostrar_buscador_ia()
+
 elif menu_actual == "📥 Ingreso de comprobantes":
     mostrar_ingreso_comprobantes()
+
 elif menu_actual == "📊 Dashboard":
     mostrar_dashboard()
+
 elif menu_actual == "📄 Pedidos internos":
     mostrar_pedidos_internos()
+
 elif menu_actual == "🧾 Baja de stock":
     mostrar_baja_stock()
+
 elif menu_actual == "📈 Indicadores (Power BI)":
     mostrar_indicadores_ia()
+
 elif menu_actual == "📦 Órdenes de compra":
     mostrar_ordenes_compra()
+
 elif menu_actual == "📒 Ficha de stock":
     mostrar_ficha_stock()
+
 elif menu_actual == "📚 Artículos":
     mostrar_articulos()
+
 elif menu_actual == "🏬 Depósitos":
     mostrar_depositos()
+
 elif menu_actual == "🧩 Familias":
     mostrar_familias()
