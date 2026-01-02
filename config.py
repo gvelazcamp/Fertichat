@@ -19,6 +19,7 @@ OPENAI_MODEL = "gpt-4o-mini"
 # OPCIONES DE MENÚ
 # =========================
 MENU_OPTIONS = [
+    "🏠 Inicio",
     "🛒 Compras IA",
     "🔎 Buscador IA",
     "📦 Stock IA",
