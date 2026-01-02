@@ -104,6 +104,9 @@ Responde en español de forma concisa pero completa."""
         max_tok = 500
 
     try:
+        if not OPENAI_API_KEY:
+            return "⚠️ La API de OpenAI no está configurada. Configurá OPENAI_API_KEY en las variables de entorno."
+        
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
@@ -114,8 +117,9 @@ Responde en español de forma concisa pero completa."""
             max_tokens=max_tok
         )
         return response.choices[0].message.content.strip()
-    except Exception:
-        return "No pude procesar tu pregunta."
+    except Exception as e:
+        print(f"❌ Error OpenAI: {e}")
+        return f"⚠️ Error al conectar con OpenAI: {str(e)[:100]}"
 
 def recomendar_como_preguntar(pregunta: str) -> str:
     system_prompt = """
@@ -151,6 +155,7 @@ Usa frases como:
         return response.choices[0].message.content.strip()
     except Exception:
         return "No pude ayudarte a reformular la pregunta."
+
 
 def obtener_sugerencia_ejecutable(pregunta: str) -> dict:
     """
@@ -365,4 +370,3 @@ Responde SOLO con JSON:
 
     except Exception:
         return None, None, None
-
