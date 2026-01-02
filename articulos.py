@@ -631,54 +631,92 @@ def mostrar_articulos():
     if "articulos_sel" not in st.session_state:
         st.session_state["articulos_sel"] = None
 
+    if "articulos_busqueda" not in st.session_state:
+        st.session_state["articulos_busqueda"] = ""
+
     # Selector de tipo (submenú)
     tipo_label = st.radio("Categoría", list(TIPOS.keys()), horizontal=True)
     tipo = TIPOS[tipo_label]
 
-    # Buscar
-    filtro = st.text_input("Buscar (nombre / códigos / familia / subfamilia / equipo)", value="", placeholder="Escribí para filtrar…")
+    # Tabs para que no quede “desparramado”
+    tab_listado, tab_form = st.tabs(["📋 Listado", "📝 Nuevo / Editar"])
 
-    colL, colR = st.columns([1.2, 1.8])
-
-    with colL:
-        st.subheader("Acciones")
-        if st.button("➕ Nuevo artículo", use_container_width=True):
-            st.session_state["articulos_sel"] = None
-            st.rerun()
+    # -------------------------
+    # TAB LISTADO
+    # -------------------------
+    with tab_listado:
+        c1, c2 = st.columns([0.86, 0.14])
+        with c1:
+            filtro = st.text_input(
+                "Buscar (nombre / códigos / familia / subfamilia / equipo)",
+                key="articulos_busqueda",
+                placeholder="Vacío = muestra todos",
+            )
+        with c2:
+            if st.button("🧹 Limpiar", use_container_width=True):
+                st.session_state["articulos_busqueda"] = ""
+                st.rerun()
 
         if st.button("🔄 Recargar listado", use_container_width=True):
             _invalidate_caches()
             st.rerun()
 
-    df = _cache_articulos_por_tipo(tipo)
+        df = _cache_articulos_por_tipo(tipo)
 
-    # Filtro local (sin tocar SQL)
-    if not df.empty and filtro.strip():
-        t = filtro.strip().lower()
+        # Filtro local robusto (literal, no regex)
+        if df is not None and not df.empty and (filtro or "").strip():
+            t = (filtro or "").strip().lower()
 
-        def _s(x):
-            return str(x or "").lower()
+            def _col_as_str(s: pd.Series) -> pd.Series:
+                return s.fillna("").astype(str).str.lower()
 
-        mask = (
-            df["nombre"].apply(_s).str.contains(t, na=False)
-            | df["codigo_interno"].apply(_s).str.contains(t, na=False)
-            | df["codigo_barra"].apply(_s).str.contains(t, na=False)
-            | df["familia"].apply(_s).str.contains(t, na=False)
-            | df["subfamilia"].apply(_s).str.contains(t, na=False)
-            | df["equipo"].apply(_s).str.contains(t, na=False)
-        )
-        df = df[mask].copy()
+            # Columnas donde buscar (incluye campos numéricos pasados a str)
+            cols_busqueda = [
+                "nombre",
+                "codigo_interno",
+                "codigo_barra",
+                "familia",
+                "subfamilia",
+                "equipo",
+                "unidad_base",
+                "unidad_compra",
+                "iva",
+                "moneda_actual",
+                "precio_actual",
+                "stock_min",
+                "stock_max",
+            ]
 
-    with colR:
-        st.subheader("Listado")
+            for c in cols_busqueda:
+                if c not in df.columns:
+                    df[c] = ""
+
+            mask = False
+            for c in cols_busqueda:
+                mask = mask | _col_as_str(df[c]).str.contains(t, na=False, regex=False)
+
+            df = df[mask].copy()
+
         selected_row = _grid(df)
 
         if selected_row and selected_row.get("id"):
             st.session_state["articulos_sel"] = {"id": selected_row["id"]}
+            st.info("Artículo seleccionado. Abrí la pestaña “Nuevo / Editar” para modificarlo.")
 
-        st.markdown("---")
+    # -------------------------
+    # TAB FORM
+    # -------------------------
+    with tab_form:
+        cA, cB = st.columns(2)
+        with cA:
+            if st.button("➕ Nuevo artículo", use_container_width=True):
+                st.session_state["articulos_sel"] = None
+                st.rerun()
+        with cB:
+            if st.button("🔄 Recargar", use_container_width=True):
+                _invalidate_caches()
+                st.rerun()
 
-        # Formulario (nuevo/editar)
         saved_id = _form_articulo(tipo, st.session_state.get("articulos_sel"))
 
         if saved_id:
@@ -686,11 +724,11 @@ def mostrar_articulos():
             st.markdown("---")
             _ui_archivos(saved_id)
         else:
-            # Si hay seleccionado, mostrar archivos
             sel = st.session_state.get("articulos_sel")
             if sel and sel.get("id"):
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
+
 
 
 
