@@ -59,8 +59,12 @@ from sql_queries import (
     get_lotes_vencidos,
     get_stock_bajo,
     get_stock_lote_especifico,
-    guardar_chat_log,
 )
+
+# Placeholder para guardar_chat_log si no existe
+def guardar_chat_log(**kwargs):
+    """Placeholder - implementar en sql_queries si se necesita logging"""
+    pass
 
 from intent_detector import (
     detectar_intencion,
