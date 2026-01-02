@@ -3,6 +3,7 @@
 # =========================
 
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime
 
 st.set_page_config(
@@ -49,14 +50,58 @@ if "sidebar_open" not in st.session_state:
 
 
 # =========================
-# OVERLAY CLICK (SIN JS, SIN RECARGA COMPLETA)
+# BOTÓN OCULTO PARA CERRAR (lo dispara el overlay)
 # =========================
-# Se renderiza SOLO si el sidebar está abierto.
-# Al tocar fuera del menú (zona oscura), dispara un rerun y mantiene la sesión + menú seleccionado.
 if st.session_state["sidebar_open"]:
-    if st.button(" ", key="__overlay_close_btn__", help="__overlay_close__"):
+    if st.button("cerrar", key="__btn_close_sidebar__", help="__CLOSE_SIDEBAR__"):
         st.session_state["sidebar_open"] = False
         st.rerun()
+
+
+# =========================
+# OVERLAY CLICK FUERA (solo móvil) -> dispara el botón oculto
+# =========================
+# Esto NO recarga la página, NO toca logout, NO cambia radio_menu.
+components.html(
+    f"""
+    <script>
+    (function() {{
+      const overlayId = "fc-overlay-click-outside";
+      const isMobile = parent.window.matchMedia("(max-width: 768px)").matches;
+      const shouldShow = {str(bool(st.session_state["sidebar_open"])).lower()} && isMobile;
+
+      let overlay = parent.document.getElementById(overlayId);
+
+      if (!shouldShow) {{
+        if (overlay) overlay.remove();
+        return;
+      }}
+
+      if (!overlay) {{
+        overlay = parent.document.createElement("div");
+        overlay.id = overlayId;
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.right = "0";
+        overlay.style.bottom = "0";
+        overlay.style.background = "rgba(0,0,0,0.5)";
+        overlay.style.zIndex = "999998"; // debajo del sidebar (999999)
+        overlay.style.cursor = "pointer";
+
+        overlay.addEventListener("click", function() {{
+          const btn = parent.document.querySelector('button[title="__CLOSE_SIDEBAR__"]');
+          if (btn) btn.click();
+        }});
+
+        parent.document.body.appendChild(overlay);
+      }}
+    }})();
+    </script>
+    """,
+    height=0,
+    width=0,
+)
 
 
 # =========================
@@ -103,6 +148,22 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
     display: none;
 }}
 
+/* Ocultar el botón oculto de cierre (siempre) */
+button[title="__CLOSE_SIDEBAR__"] {{
+    display: none !important;
+}}
+div[data-testid="stButton"]:has(button[title="__CLOSE_SIDEBAR__"]) {{
+    display: none !important;
+}}
+
+/* Botón hamburguesa: oculto por defecto (desktop) */
+button[title="__HAMBURGER__"] {{
+    display: none !important;
+}}
+div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
+    display: none !important;
+}}
+
 /* Móvil */
 @media (max-width: 768px) {{
     .block-container {{ padding-top: 70px !important; }}
@@ -147,7 +208,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         padding-top: 20px !important;
     }}
 
-    /* Ocultar control nativo (la flechita gris) para que no confunda */
+    /* Ocultar flecha nativa de Streamlit (no controla sidebar_open) */
     div[data-testid="collapsedControl"],
     button[data-testid="stSidebarCollapseButton"],
     button[data-testid="stSidebarExpandButton"],
@@ -156,24 +217,23 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         display: none !important;
     }}
 
-    /* OVERLAY clickeable (botón invisible a pantalla completa)
-       - NO recarga la página
-       - NO pierde sesión
-       - NO cambia radio_menu
-    */
-    button[title="__overlay_close__"] {{
-        display: {'block' if sidebar_state == 'open' else 'none'} !important;
+    /* Mostrar hamburguesa SOLO en móvil y fijarla arriba */
+    button[title="__HAMBURGER__"] {{
+        display: inline-flex !important;
         position: fixed !important;
-        inset: 0 !important;                 /* top/right/bottom/left = 0 */
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 999998 !important;          /* debajo del sidebar (999999) */
-        background: rgba(0,0,0,0.5) !important;
-        border: none !important;
-        padding: 0 !important;
+        top: 12px !important;
+        left: 12px !important;
+        z-index: 1000000 !important;
+        border-radius: 12px !important;
+    }}
+    div[data-testid="stButton"]:has(button[title="__HAMBURGER__"]) {{
+        display: block !important;
+        position: fixed !important;
+        top: 12px !important;
+        left: 12px !important;
+        z-index: 1000000 !important;
         margin: 0 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
+        padding: 0 !important;
     }}
 }}
 </style>
@@ -181,22 +241,21 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
 
 
 # =========================
-# HEADER MÓVIL CON BOTÓN
+# BOTÓN HAMBURGUESA (Streamlit) - se oculta en PC por CSS
 # =========================
-col1, col2 = st.columns([1, 20])
+if st.button("☰", key="hamburger_btn", help="__HAMBURGER__"):
+    st.session_state["sidebar_open"] = not st.session_state["sidebar_open"]
+    st.rerun()
 
-with col1:
-    # Botón hamburguesa que cambia el estado
-    if st.button("☰", key="hamburger_btn", help="Abrir/Cerrar menú"):
-        st.session_state["sidebar_open"] = not st.session_state["sidebar_open"]
-        st.rerun()
 
-with col2:
-    st.markdown("""
-    <div id="mobile-header">
-        <div class="logo">🦋 FertiChat</div>
-    </div>
-    """, unsafe_allow_html=True)
+# =========================
+# HEADER MÓVIL (solo visual)
+# =========================
+st.markdown("""
+<div id="mobile-header">
+    <div class="logo">🦋 FertiChat</div>
+</div>
+""", unsafe_allow_html=True)
 
 
 # =========================
