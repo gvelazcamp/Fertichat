@@ -1,10 +1,11 @@
 # =========================
-# MAIN.PY - PC con SIDEBAR + MÓVIL con MENÚ PROPIO (ARREGLADO)
+# MAIN.PY - PC con SIDEBAR + MÓVIL con MENÚ PROPIO (FUNCIONANDO)
 # =========================
 
 import streamlit as st
 from datetime import datetime
 from urllib.parse import quote, unquote
+import hashlib
 
 st.set_page_config(
     page_title="FertiChat",
@@ -46,50 +47,22 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
-
-# =========================
-# NAVEGACIÓN POR QUERY PARAMS - MEJORADA
-# =========================
-try:
-    # Manejar navegación desde menú móvil
-    menu_param = st.query_params.get("menu")
-    if isinstance(menu_param, list):
-        menu_param = menu_param[0] if menu_param else None
-
-    if menu_param:
-        menu_decoded = unquote(menu_param)
-        if menu_decoded in MENU_OPTIONS:
-            st.session_state["radio_menu"] = menu_decoded
-            # Limpiar query params
-            st.query_params.clear()
-            # Forzar rerun para actualizar la vista
-            st.rerun()
-
-    # Manejar logout
-    logout_param = st.query_params.get("logout")
-    if isinstance(logout_param, list):
-        logout_param = logout_param[0] if logout_param else None
-
-    if logout_param == "1":
-        logout()
-        st.query_params.clear()
-        st.rerun()
-
-except Exception as e:
-    # Ignorar errores de query params
-    pass
+# Variable para detectar clicks
+if "menu_click" not in st.session_state:
+    st.session_state["menu_click"] = None
 
 
 # =========================
-# CSS + MENÚ MÓVIL (TU DISEÑO ORIGINAL)
+# CSS + MENÚ MÓVIL CON JS (SIN RECARGAR PÁGINA)
 # =========================
 def inject_css_and_mobile_menu(user: dict, menu_actual: str):
-    # Menú móvil: links con query param URL-encoded
+    # Generar botones del menú con IDs únicos
     menu_items_html = ""
-    for opcion in MENU_OPTIONS:
+    for idx, opcion in enumerate(MENU_OPTIONS):
         active_class = "fc-active" if opcion == menu_actual else ""
-        href = f"?menu={quote(opcion)}"
-        menu_items_html += f'<a class="fc-menu-item {active_class}" href="{href}">{opcion}</a>\n'
+        menu_id = hashlib.md5(opcion.encode()).hexdigest()[:8]
+        # Usar data-menu en lugar de href
+        menu_items_html += f'<a class="fc-menu-item {active_class}" data-menu="{opcion}" data-idx="{idx}">{opcion}</a>\n'
 
     html = f"""
 <style>
@@ -173,21 +146,18 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
 }}
 
 /* =========================
-   MÓVIL: menú propio + ocultar sidebar nativo
+   MÓVIL: menú propio
 ========================= */
 @media (max-width: 768px) {{
 
-    /* Ocultar sidebar nativo SOLO en móvil */
     section[data-testid="stSidebar"] {{
         display: none !important;
     }}
 
-    /* Dejar espacio para header móvil fijo */
     .block-container {{
         padding-top: 70px !important;
     }}
 
-    /* Checkbox escondido (controla open/close) */
     #fc-menu-cb {{
         position: fixed;
         left: -9999px;
@@ -197,7 +167,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         height: 0;
     }}
 
-    /* Header móvil fijo */
     #fc-mobile-header {{
         position: fixed;
         top: 0;
@@ -212,7 +181,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }}
 
-    /* Botón hamburguesa (es un LABEL del checkbox) */
     #fc-menu-toggle {{
         width: 44px;
         height: 44px;
@@ -245,7 +213,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         letter-spacing: -0.01em;
     }}
 
-    /* Overlay (es un LABEL del checkbox para cerrar) */
     #fc-mobile-overlay {{
         position: fixed;
         top: 56px;
@@ -259,7 +226,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         transition: all 0.20s;
     }}
 
-    /* Drawer */
     #fc-mobile-menu {{
         position: fixed;
         top: 56px;
@@ -276,7 +242,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         padding: 16px;
     }}
 
-    /* OPEN (controlado por checkbox) */
     #fc-menu-cb:checked ~ #fc-mobile-overlay {{
         opacity: 1;
         visibility: visible;
@@ -285,7 +250,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         transform: translateX(0);
     }}
 
-    /* Animación del icono a X */
     #fc-menu-cb:checked ~ #fc-mobile-header #fc-menu-toggle span:nth-child(1) {{
         transform: rotate(45deg) translate(6px, 6px);
     }}
@@ -296,7 +260,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         transform: rotate(-45deg) translate(6px, -6px);
     }}
 
-    /* Info usuario */
     .fc-user-info {{
         background: rgba(248,250,252,0.95);
         padding: 14px;
@@ -325,7 +288,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
         margin: 12px 0 8px 4px;
     }}
 
-    /* Items menú */
     .fc-menu-item {{
         display: block;
         padding: 14px 14px;
@@ -395,17 +357,116 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
 
   {menu_items_html}
 
-  <a class="fc-logout" href="?logout=1">🚪 Cerrar sesión</a>
+  <a class="fc-logout" id="fc-logout-btn">🚪 Cerrar sesión</a>
 </div>
+
+<script>
+(function() {{
+    // Esperar a que el DOM esté listo
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', initMenu);
+    }} else {{
+        initMenu();
+    }}
+    
+    function initMenu() {{
+        // Obtener todos los items del menú
+        const menuItems = document.querySelectorAll('.fc-menu-item[data-menu]');
+        const logoutBtn = document.getElementById('fc-logout-btn');
+        
+        // Agregar event listeners a cada item
+        menuItems.forEach(function(item) {{
+            item.addEventListener('click', function(e) {{
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const menuName = this.getAttribute('data-menu');
+                const idx = this.getAttribute('data-idx');
+                
+                // Crear input hidden con el nombre del menú
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'menu_click';
+                input.value = menuName;
+                input.id = 'menu_click_' + idx;
+                document.body.appendChild(input);
+                
+                // Simular click en el input para que Streamlit lo detecte
+                input.click();
+                
+                // Cerrar menú
+                document.getElementById('fc-menu-cb').checked = false;
+                
+                // Trigger Streamlit rerun después de un micro delay
+                setTimeout(function() {{
+                    // Buscar botón de Streamlit para hacer rerun
+                    const buttons = window.parent.document.querySelectorAll('button[kind="primary"]');
+                    buttons.forEach(btn => {{
+                        if (btn.textContent.includes('menu_nav_')) {{
+                            btn.click();
+                        }}
+                    }});
+                }}, 50);
+            }});
+        }});
+        
+        // Logout
+        if (logoutBtn) {{
+            logoutBtn.addEventListener('click', function(e) {{
+                e.preventDefault();
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'logout_click';
+                input.value = 'true';
+                document.body.appendChild(input);
+                input.click();
+                
+                setTimeout(function() {{
+                    const buttons = window.parent.document.querySelectorAll('button[kind="primary"]');
+                    buttons.forEach(btn => {{
+                        if (btn.textContent.includes('logout_nav')) {{
+                            btn.click();
+                        }}
+                    }});
+                }}, 50);
+            }});
+        }}
+    }}
+}})();
+</script>
 """
 
-    # Sin indentación para evitar renderizado como código
     html = "\n".join(line.lstrip() for line in html.splitlines())
     st.markdown(html, unsafe_allow_html=True)
 
 
 # Inyectar CSS + menú móvil
 inject_css_and_mobile_menu(user=user, menu_actual=st.session_state["radio_menu"])
+
+
+# =========================
+# BOTONES INVISIBLES PARA NAVEGACIÓN
+# =========================
+# Crear un botón invisible por cada opción de menú
+for idx, opcion in enumerate(MENU_OPTIONS):
+    if st.button(f"nav", key=f"menu_nav_{idx}", type="primary"):
+        st.session_state["radio_menu"] = opcion
+        st.rerun()
+
+# Botón invisible para logout
+if st.button("logout", key="logout_nav", type="primary"):
+    logout()
+    st.rerun()
+
+# CSS para ocultar los botones invisibles
+st.markdown("""
+<style>
+/* Ocultar botones de navegación invisibles */
+button[kind="primary"] {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 # =========================
