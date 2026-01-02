@@ -93,7 +93,7 @@ def mostrar_inicio():
         color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;
         letter-spacing:1px;margin:18px 0 10px 6px;display:flex;align-items:center;gap:8px;
       }
-      .fc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
+      .fc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;}
       .fc-card{
         border:1px solid rgba(15,23,42,0.10);
         background:rgba(255,255,255,0.72);
@@ -174,8 +174,8 @@ def mostrar_inicio():
         </div>
       </div>
 
-      <div style="height:14px;"></div>
-
+      <div style="height:22px;"></div>
+      
       <div class="fc-section-title">📋 Gestión</div>
       <div class="fc-grid">
         <div class="fc-card" onclick="go('pedidos')">
