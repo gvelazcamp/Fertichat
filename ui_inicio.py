@@ -136,22 +136,22 @@ def mostrar_inicio():
     
     with col1:
         if st.button("🛒\n\n**Compras IA**\n\nConsultas inteligentes", key="btn_compras", use_container_width=True):
-            st.session_state["menu_principal"] = "🛒 Compras IA"
+            st.session_state["navegacion_destino"] = "🛒 Compras IA"
             st.rerun()
     
     with col2:
         if st.button("🔎\n\n**Buscador IA**\n\nBuscar facturas/lotes", key="btn_buscador", use_container_width=True):
-            st.session_state["menu_principal"] = "🔎 Buscador IA"
+            st.session_state["navegacion_destino"] = "🔎 Buscador IA"
             st.rerun()
     
     with col3:
         if st.button("📦\n\n**Stock IA**\n\nConsultar inventario", key="btn_stock", use_container_width=True):
-            st.session_state["menu_principal"] = "📦 Stock IA"
+            st.session_state["navegacion_destino"] = "📦 Stock IA"
             st.rerun()
     
     with col4:
         if st.button("📊\n\n**Dashboard**\n\nVer estadísticas", key="btn_dashboard", use_container_width=True):
-            st.session_state["menu_principal"] = "📊 Dashboard"
+            st.session_state["navegacion_destino"] = "📊 Dashboard"
             st.rerun()
     
     st.markdown("<div style='height: 20px'></div>", unsafe_allow_html=True)
@@ -175,22 +175,22 @@ def mostrar_inicio():
     
     with col5:
         if st.button("📄\n\n**Pedidos Internos**\n\nGestionar pedidos", key="btn_pedidos", use_container_width=True):
-            st.session_state["menu_principal"] = "📄 Pedidos internos"
+            st.session_state["navegacion_destino"] = "📄 Pedidos internos"
             st.rerun()
     
     with col6:
         if st.button("🧾\n\n**Baja de Stock**\n\nRegistrar bajas", key="btn_baja", use_container_width=True):
-            st.session_state["menu_principal"] = "🧾 Baja de stock"
+            st.session_state["navegacion_destino"] = "🧾 Baja de stock"
             st.rerun()
     
     with col7:
         if st.button("📦\n\n**Órdenes de Compra**\n\nCrear órdenes", key="btn_ordenes", use_container_width=True):
-            st.session_state["menu_principal"] = "📦 Órdenes de compra"
+            st.session_state["navegacion_destino"] = "📦 Órdenes de compra"
             st.rerun()
     
     with col8:
         if st.button("📈\n\n**Indicadores**\n\nPower BI", key="btn_indicadores", use_container_width=True):
-            st.session_state["menu_principal"] = "📈 Indicadores (Power BI)"
+            st.session_state["navegacion_destino"] = "📈 Indicadores (Power BI)"
             st.rerun()
     
     # Estilos para los botones
