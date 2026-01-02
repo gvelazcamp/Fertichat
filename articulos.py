@@ -1,11 +1,16 @@
 # =====================================================================
-# 📚 MÓDULO ARTÍCULOS - FERTI CHAT
+# 📚 MÓDULO ARTÍCULOS (GNS) - FERTI CHAT
 # Archivo: articulos.py
+#
+# Objetivo:
+# - LISTAR artículos ya creados desde tabla Supabase: public.articulos (estructura GNS)
+# - Permite buscar, seleccionar y adjuntar imágenes/manuales (Storage)
 #
 # Requiere:
 # - supabase_client.py con objeto: supabase
-# - Tablas (Supabase/Postgres): articulos, proveedores (id,nombre), articulo_archivos (opcional)
+# - Tabla (Supabase/Postgres): articulos  (GNS)
 # - Bucket Storage (Supabase): "articulos" (para imágenes/manuales)
+# - Tabla articulo_archivos (opcional)
 # =====================================================================
 
 import streamlit as st
@@ -14,7 +19,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 import uuid
 
-from supabase_client import supabase  # <-- NO cambiar si ya lo tenés así
+from supabase_client import supabase  # <-- NO cambiar
 
 # AgGrid opcional (si no está, cae a st.dataframe)
 try:
@@ -24,77 +29,39 @@ except Exception:
 
 
 # =====================================================================
-# CONSTANTES
+# CONFIG
 # =====================================================================
 BUCKET_ARTICULOS = "articulos"
+TABLE_ARTICULOS_GNS = "articulos"  # <- TU TABLA GNS (la creaste con ese nombre)
 
-TIPOS = {
-    "Ingreso": "ingreso",
-    "Egreso": "egreso",
-    "Gastos fijos": "gasto_fijo",
+# Mapeo "posibles nombres" -> "columna normalizada"
+# (Soporta nombres con espacios, guiones, puntos, etc)
+COL_ALIASES = {
+    "id": ["id", "Id", "ID"],
+    "descripcion": ["descripcion", "Descripcion", "Descripción", "DESCRIPCION", "DESCRIPCIÓN"],
+    "familia": ["familia", "Familia", "FAMILIA"],
+    "codigo_int": ["codigo_int", "Codigo Int.", "Código Int.", "Codigo Int", "Código Int", "Código Int.", "Codigo Int."],
+    "codigo_ext": ["codigo_ext", "Codigo Ext.", "Código Ext.", "Codigo Ext", "Código Ext", "Código Ext.", "Codigo Ext."],
+    "unidad": ["unidad", "Unidad", "UNIDAD"],
+    "tipo_articulo": ["tipo_articulo", "Tipo Articulo", "Tipo Artículo", "TIPO ARTICULO", "TIPO ARTÍCULO"],
+    "tipo_impuesto": ["tipo_impuesto", "Tipo Impuesto", "TIPO IMPUESTO"],
+    "tipo_concepto": ["tipo_concepto", "Tipo Concepto", "TIPO CONCEPTO"],
+    "cuenta_compra": ["cuenta_compra", "Cuenta Compra", "CUENTA COMPRA"],
+    "cuenta_venta": ["cuenta_venta", "Cuenta Venta", "CUENTA VENTA"],
+    "cuenta_venta_exe": ["cuenta_venta_exe", "Cuenta Venta Exe.", "Cuenta Venta Exe", "CUENTA VENTA EXE", "Cuenta Venta Exe."],
+    "cuenta_costo_venta": ["cuenta_costo_venta", "Cuenta Costo Venta", "CUENTA COSTO VENTA"],
+    "proveedor": ["proveedor", "Proveedor", "PROVEEDOR"],
+    "activo": ["activo", "Activo", "ACTIVO"],
+    "mueve_stock": ["mueve_stock", "Mueve Stock", "MueveStock", "MUEVE STOCK"],
+    "ecommerce": ["ecommerce", "e-Commerce", "ecommerce", "E-Commerce", "e_commerce", "E-COMMERCE"],
+    "stock_minimo": ["stock_minimo", "Stock Minimo", "Stock Mínimo", "STOCK MINIMO", "STOCK MÍNIMO"],
+    "stock_maximo": ["stock_maximo", "Stock Maximo", "Stock Máximo", "STOCK MAXIMO", "STOCK MÁXIMO"],
+    "costo_fijo": ["costo_fijo", "Costo Fijo", "COSTO FIJO"],
 }
-
-IVA_OPS = {
-    "Exento (0%)": "exento",
-    "Mínimo (10%)": "minimo_10",
-    "Básico (22%)": "basico_22",
-}
-
-MONEDAS = ["UYU", "USD"]
-
-PRECIO_POR_OPS = {
-    "Por unidad base (stock)": "unidad_base",
-    "Por unidad de compra": "unidad_compra",
-}
-
-UNIDAD_BASE_OPS = {
-    "Unidad": "unidad",
-    "Gramos": "gramos",
-}
-
-UNIDAD_COMPRA_OPS = {
-    "Unidad": "unidad",
-    "Caja": "caja",
-    "Gramos": "gramos",
-}
-
-# Columnas exactas del maestro (lista)
-ARTICULO_COLS = [
-    "id",
-    "tipo",
-    "nombre",
-    "descripcion",
-    "codigo_interno",
-    "codigo_barra",
-    "familia",
-    "subfamilia",
-    "equipo",
-    "proveedor_id",
-    "fifo",
-    "iva",
-    "tiene_lote",
-    "requiere_vencimiento",
-    "unidad_base",
-    "unidad_compra",
-    "contenido_por_unidad_compra",
-    "stock_min",
-    "stock_max",
-    "precio_actual",
-    "moneda_actual",
-    "precio_por_actual",
-    "fecha_precio_actual",
-    "precio_anterior",
-    "moneda_anterior",
-    "precio_por_anterior",
-    "fecha_precio_anterior",
-    "activo",
-    "created_at",
-    "updated_at",
-]
 
 
 # =====================================================================
-# HELPERS SUPABASE (mínimos)
+# HELPERS SUPABASE
 # =====================================================================
 def _sb_select(
     table: str,
@@ -103,6 +70,7 @@ def _sb_select(
     order: Optional[Tuple[str, bool]] = None,
 ) -> pd.DataFrame:
     q = supabase.table(table).select(columns)
+
     if filters:
         for col, op, val in filters:
             if op == "eq":
@@ -111,21 +79,15 @@ def _sb_select(
                 q = q.ilike(col, val)
             elif op == "is":
                 q = q.is_(col, val)
+
+    # Nota: para columnas con espacios/nombres raros, evitamos order server-side.
     if order:
         col, asc = order
         q = q.order(col, desc=not asc)
+
     res = q.execute()
     data = getattr(res, "data", None) or []
     return pd.DataFrame(data)
-
-
-def _sb_upsert_articulo(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    try:
-        res = supabase.table("articulos").upsert(payload).execute()
-        data = getattr(res, "data", None) or []
-        return True, "OK", (data[0] if len(data) > 0 else None)
-    except Exception as e:
-        return False, str(e), None
 
 
 def _sb_insert_archivo(payload: Dict[str, Any]) -> Tuple[bool, str]:
@@ -149,135 +111,124 @@ def _sb_upload_storage(bucket: str, path: str, content_bytes: bytes, mime: str) 
 
 
 # =====================================================================
+# NORMALIZACIÓN (para que SIEMPRE encontremos columnas)
+# =====================================================================
+def _find_col(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+    cols = list(df.columns)
+    # match exacto primero
+    for c in candidates:
+        if c in cols:
+            return c
+    # match por lower/strip (por si hay diferencias mínimas)
+    cols_norm = {str(c).strip().lower(): c for c in cols}
+    for c in candidates:
+        key = str(c).strip().lower()
+        if key in cols_norm:
+            return cols_norm[key]
+    return None
+
+
+def _normalize_articulos_gns(df_raw: pd.DataFrame) -> pd.DataFrame:
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "descripcion",
+                "familia",
+                "codigo_int",
+                "codigo_ext",
+                "unidad",
+                "tipo_articulo",
+                "tipo_impuesto",
+                "tipo_concepto",
+                "cuenta_compra",
+                "cuenta_venta",
+                "cuenta_venta_exe",
+                "cuenta_costo_venta",
+                "proveedor",
+                "activo",
+                "mueve_stock",
+                "ecommerce",
+                "stock_minimo",
+                "stock_maximo",
+                "costo_fijo",
+            ]
+        )
+
+    out = pd.DataFrame()
+
+    for key, aliases in COL_ALIASES.items():
+        col = _find_col(df_raw, aliases)
+        if col is None:
+            out[key] = None
+        else:
+            out[key] = df_raw[col]
+
+    # Normalizar types a texto para búsqueda/visual (sin romper)
+    for c in out.columns:
+        if c in ["activo", "mueve_stock", "ecommerce"]:
+            # boolean friendly (si viene 'x', '1', 'true', etc)
+            def _to_bool(v):
+                s = str(v or "").strip().lower()
+                if s in ["true", "t", "1", "x", "si", "sí", "y", "yes"]:
+                    return True
+                if s in ["false", "f", "0", "no", "n", ""]:
+                    return False
+                # si ya es bool
+                if isinstance(v, bool):
+                    return bool(v)
+                return False
+
+            out[c] = out[c].apply(_to_bool)
+
+    # Orden local por descripción
+    if "descripcion" in out.columns:
+        out["descripcion"] = out["descripcion"].astype(str).fillna("").str.strip()
+        out = out.sort_values("descripcion", ascending=True)
+
+    # id a str para selección/archivos
+    out["id"] = out["id"].astype(str).fillna("").str.strip()
+
+    return out.reset_index(drop=True)
+
+
+# =====================================================================
 # CACHES
 # =====================================================================
 @st.cache_data(ttl=30)
-def _cache_proveedores() -> pd.DataFrame:
-    """
-    Proveedores para selector.
-    - Si NO existe la tabla public.proveedores, devuelve vacío y NO rompe el módulo.
-    """
-    try:
-        df = _sb_select("proveedores", "id,nombre", order=("nombre", True))
-    except Exception:
-        return pd.DataFrame(columns=["id", "nombre"])
-
-    if df.empty:
-        return df
-
-    df["id"] = df["id"].astype(str)
-    df["nombre"] = df["nombre"].astype(str)
-    return df
-
-
-@st.cache_data(ttl=30)
-def _cache_articulos_por_tipo(tipo: str) -> pd.DataFrame:
-    df = _sb_select("articulos", "*", filters=[("tipo", "eq", tipo)], order=("nombre", True))
-    if df.empty:
-        return df
-    for c in ARTICULO_COLS:
-        if c not in df.columns:
-            df[c] = None
-    df = df[ARTICULO_COLS].copy()
-    return df
-
-
-@st.cache_data(ttl=30)
-def _cache_articulos_all() -> pd.DataFrame:
-    """
-    Trae TODOS los artículos (sin filtrar por tipo).
-    Útil para ver artículos ya creados aunque el campo 'tipo' esté vacío o distinto.
-    """
-    df = _sb_select("articulos", "*", order=("nombre", True))
-    if df.empty:
-        return df
-    for c in ARTICULO_COLS:
-        if c not in df.columns:
-            df[c] = None
-    df = df[ARTICULO_COLS].copy()
-    return df
+def _cache_articulos_gns() -> pd.DataFrame:
+    df_raw = _sb_select(TABLE_ARTICULOS_GNS, "*")
+    return _normalize_articulos_gns(df_raw)
 
 
 def _invalidate_caches():
-    _cache_proveedores.clear()
-    _cache_articulos_por_tipo.clear()
-    _cache_articulos_all.clear()
+    _cache_articulos_gns.clear()
 
 
 # =====================================================================
-# LÓGICA PRECIO: 2 niveles (actual + anterior)
+# UI: GRID
 # =====================================================================
-def _aplicar_historial_precio_minimo(payload: Dict[str, Any], current_row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Si cambia el precio_actual (o moneda/por), mueve lo actual a 'anterior' y guarda el nuevo como actual.
-    Solo opera cuando hay edición (current_row) y detecta cambio real.
-    """
-    if not current_row:
-        if payload.get("precio_actual") is not None and payload.get("moneda_actual") and payload.get("precio_por_actual"):
-            payload["fecha_precio_actual"] = datetime.utcnow().isoformat()
-        return payload
-
-    cur_precio = current_row.get("precio_actual")
-    cur_mon = current_row.get("moneda_actual")
-    cur_por = current_row.get("precio_por_actual")
-    cur_fecha = current_row.get("fecha_precio_actual")
-
-    new_precio = payload.get("precio_actual")
-    new_mon = payload.get("moneda_actual")
-    new_por = payload.get("precio_por_actual")
-
-    def _norm_num(x):
-        try:
-            if x is None or x == "":
-                return None
-            return float(x)
-        except Exception:
-            return None
-
-    cur_precio_n = _norm_num(cur_precio)
-    new_precio_n = _norm_num(new_precio)
-
-    changed = False
-    if cur_precio_n != new_precio_n:
-        changed = True
-    if (cur_mon or "") != (new_mon or ""):
-        changed = True
-    if (cur_por or "") != (new_por or ""):
-        changed = True
-
-    if changed and (new_precio_n is not None) and new_mon and new_por:
-        payload["precio_anterior"] = cur_precio_n
-        payload["moneda_anterior"] = cur_mon
-        payload["precio_por_anterior"] = cur_por
-        payload["fecha_precio_anterior"] = cur_fecha
-        payload["fecha_precio_actual"] = datetime.utcnow().isoformat()
-
-    return payload
-
-
-# =====================================================================
-# UI
-# =====================================================================
-def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+def _grid_listado(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
     if df is None or df.empty:
-        st.info("Sin artículos para mostrar.")
+        st.info("Sin artículos para mostrar. (Si sabés que hay datos, revisá RLS/Policies de la tabla en Supabase).")
         return None
 
     view_cols = [
-        "nombre",
-        "codigo_interno",
-        "codigo_barra",
-        "familia",
-        "subfamilia",
-        "equipo",
-        "unidad_compra",
-        "unidad_base",
-        "precio_actual",
-        "moneda_actual",
-        "activo",
-        "updated_at",
         "id",
+        "descripcion",
+        "familia",
+        "codigo_int",
+        "codigo_ext",
+        "unidad",
+        "proveedor",
+        "activo",
+        "mueve_stock",
+        "ecommerce",
+        "stock_minimo",
+        "stock_maximo",
+        "costo_fijo",
     ]
+
     for c in view_cols:
         if c not in df.columns:
             df[c] = None
@@ -286,7 +237,7 @@ def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
     st.caption(f"Mostrando {len(vdf)} artículo(s).")
 
     if AgGrid is None:
-        st.dataframe(vdf.drop(columns=["id"], errors="ignore"), use_container_width=True, height=350)
+        st.dataframe(vdf, use_container_width=True, height=420)
         return None
 
     gb = GridOptionsBuilder.from_dataframe(vdf)
@@ -300,7 +251,7 @@ def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
         update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
-        height=350,
+        height=420,
     )
 
     sel = resp.get("selected_rows") or []
@@ -309,210 +260,37 @@ def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
     return sel[0]
 
 
-def _selector_proveedor(current_id: Optional[str]) -> Optional[str]:
-    dfp = _cache_proveedores()
-    if dfp.empty:
-        st.caption("Sin proveedores (tabla proveedores vacía o no existe).")
-        return current_id
-
-    options = ["(sin proveedor)"] + dfp["nombre"].tolist()
-    name_by_id = {row["id"]: row["nombre"] for _, row in dfp.iterrows()}
-    id_by_name = {row["nombre"]: row["id"] for _, row in dfp.iterrows()}
-
-    default_name = "(sin proveedor)"
-    if current_id and str(current_id) in name_by_id:
-        default_name = name_by_id[str(current_id)]
-
-    idx = options.index(default_name) if default_name in options else 0
-    choice = st.selectbox("Proveedor principal", options, index=idx, key="art_sel_prov")
-    if choice == "(sin proveedor)":
-        return None
-    return str(id_by_name.get(choice))
-
-
-def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[str]:
-    is_edit = bool(selected and selected.get("id"))
-    st.subheader("Editar artículo" if is_edit else "Nuevo artículo")
-
-    current_row = None
-    if is_edit:
-        df_all = _cache_articulos_por_tipo(tipo)
-        match = df_all[df_all["id"].astype(str) == str(selected["id"])]
-        if not match.empty:
-            current_row = match.iloc[0].to_dict()
-
-    base = current_row or {}
-
-    btn_prefix = f"art_form_{tipo}_{str((selected or {}).get('id') or 'new')}"
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        btn_save = st.button("💾 Guardar", type="primary", use_container_width=True, key=f"{btn_prefix}_save")
-    with b2:
-        btn_new = st.button("➕ Nuevo", use_container_width=True, key=f"{btn_prefix}_new")
-    with b3:
-        btn_reload = st.button("🔄 Recargar", use_container_width=True, key=f"{btn_prefix}_reload")
-
-    if btn_reload:
-        _invalidate_caches()
-        st.rerun()
-
-    if btn_new:
-        st.session_state["articulos_sel"] = None
-        st.rerun()
-
-    with st.expander("🧾 Datos generales", expanded=True):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            nombre = st.text_input("Nombre *", value=str(base.get("nombre") or ""), key="art_nombre")
-            descripcion = st.text_area("Descripción", value=str(base.get("descripcion") or ""), height=90, key="art_desc")
-
-            codigo_interno = st.text_input("Código interno", value=str(base.get("codigo_interno") or ""), key="art_codint")
-            codigo_barra = st.text_input("Código de barra", value=str(base.get("codigo_barra") or ""), key="art_codbar")
-
-            familia = st.text_input("Familia", value=str(base.get("familia") or ""), key="art_fam")
-            subfamilia = st.text_input("Subfamilia", value=str(base.get("subfamilia") or ""), key="art_subfam")
-            equipo = st.text_input("Equipo", value=str(base.get("equipo") or ""), key="art_equipo")
-
-            proveedor_id = _selector_proveedor(str(base.get("proveedor_id") or "") or None)
-
-        with col2:
-            fifo = st.checkbox("FIFO", value=bool(base.get("fifo", True)), key="art_fifo")
-            activo = st.checkbox("Activo", value=bool(base.get("activo", True)), key="art_activo")
-
-            inv_iva = {v: k for k, v in IVA_OPS.items()}
-            iva_default = inv_iva.get(base.get("iva") or "basico_22", "Básico (22%)")
-            iva_label = st.selectbox("IVA", list(IVA_OPS.keys()), index=list(IVA_OPS.keys()).index(iva_default), key="art_iva")
-            iva = IVA_OPS[iva_label]
-
-            tiene_lote = st.checkbox("Tiene lote", value=bool(base.get("tiene_lote", False)), key="art_lote")
-            requiere_vencimiento = st.checkbox("Requiere vencimiento", value=bool(base.get("requiere_vencimiento", False)), key="art_vto")
-
-    with st.expander("📦 Unidades y stock", expanded=True):
-        colU1, colU2 = st.columns(2)
-
-        with colU1:
-            inv_ub = {v: k for k, v in UNIDAD_BASE_OPS.items()}
-            ub_default = inv_ub.get(base.get("unidad_base") or "unidad", "Unidad")
-            unidad_base_label = st.selectbox(
-                "Unidad base (stock)",
-                list(UNIDAD_BASE_OPS.keys()),
-                index=list(UNIDAD_BASE_OPS.keys()).index(ub_default),
-                key="art_ub",
-            )
-            unidad_base = UNIDAD_BASE_OPS[unidad_base_label]
-
-            stock_min = st.number_input("Stock mínimo", min_value=0.0, value=float(base.get("stock_min") or 0), step=1.0, key="art_smin")
-            stock_max = st.number_input("Stock máximo", min_value=0.0, value=float(base.get("stock_max") or 0), step=1.0, key="art_smax")
-
-        with colU2:
-            inv_uc = {v: k for k, v in UNIDAD_COMPRA_OPS.items()}
-            uc_default = inv_uc.get(base.get("unidad_compra") or "unidad", "Unidad")
-            unidad_compra_label = st.selectbox(
-                "Unidad de compra",
-                list(UNIDAD_COMPRA_OPS.keys()),
-                index=list(UNIDAD_COMPRA_OPS.keys()).index(uc_default),
-                key="art_uc",
-            )
-            unidad_compra = UNIDAD_COMPRA_OPS[unidad_compra_label]
-
-            contenido_default = float(base.get("contenido_por_unidad_compra") or 1)
-            contenido_por_unidad_compra = st.number_input(
-                "Contenido por unidad de compra (ej: 1 caja = 100 unidades)",
-                min_value=1.0,
-                value=contenido_default if contenido_default >= 1 else 1.0,
-                step=1.0,
-                key="art_cont",
-            )
-
-    with st.expander("💲 Precio", expanded=True):
-        colP1, colP2 = st.columns(2)
-
-        with colP1:
-            moneda_actual = st.selectbox(
-                "Moneda (precio actual)",
-                MONEDAS,
-                index=MONEDAS.index((base.get("moneda_actual") or "UYU")),
-                key="art_mon",
-            )
-
-            precio_actual_val = base.get("precio_actual")
-            try:
-                precio_actual_val = float(precio_actual_val) if precio_actual_val is not None else 0.0
-            except Exception:
-                precio_actual_val = 0.0
-
-            precio_actual = st.number_input("Precio actual (referencia)", min_value=0.0, value=float(precio_actual_val), step=1.0, key="art_prec")
-            inv_pp = {v: k for k, v in PRECIO_POR_OPS.items()}
-            pp_default = inv_pp.get(base.get("precio_por_actual") or "unidad_compra", "Por unidad de compra")
-            precio_por_label = st.selectbox(
-                "Precio actual es por",
-                list(PRECIO_POR_OPS.keys()),
-                index=list(PRECIO_POR_OPS.keys()).index(pp_default),
-                key="art_por",
-            )
-            precio_por_actual = PRECIO_POR_OPS[precio_por_label]
-            st.caption(f"Fecha último precio: {base.get('fecha_precio_actual') or '—'}")
-
-        with colP2:
-            st.markdown("**Último precio anterior (historial mínimo)**")
-            st.write(f"Precio anterior: {base.get('precio_anterior') or '—'}")
-            st.write(f"Moneda anterior: {base.get('moneda_anterior') or '—'}")
-            st.write(f"Por anterior: {base.get('precio_por_anterior') or '—'}")
-            st.write(f"Fecha anterior: {base.get('fecha_precio_anterior') or '—'}")
-
-    if not btn_save:
-        return None
-
-    if not nombre.strip():
-        st.error("Nombre es obligatorio.")
-        return None
-
-    payload: Dict[str, Any] = {
-        "tipo": tipo,
-        "nombre": nombre.strip(),
-        "descripcion": descripcion.strip() if descripcion else None,
-        "codigo_interno": codigo_interno.strip() if codigo_interno else None,
-        "codigo_barra": codigo_barra.strip() if codigo_barra else None,
-        "familia": familia.strip() if familia else None,
-        "subfamilia": subfamilia.strip() if subfamilia else None,
-        "equipo": equipo.strip() if equipo else None,
-        "proveedor_id": proveedor_id,
-        "fifo": bool(fifo),
-        "iva": iva,
-        "tiene_lote": bool(tiene_lote),
-        "requiere_vencimiento": bool(requiere_vencimiento),
-        "unidad_base": unidad_base,
-        "unidad_compra": unidad_compra,
-        "contenido_por_unidad_compra": float(contenido_por_unidad_compra),
-        "stock_min": float(stock_min),
-        "stock_max": float(stock_max),
-        "precio_actual": float(precio_actual),
-        "moneda_actual": moneda_actual,
-        "precio_por_actual": precio_por_actual,
-        "activo": bool(activo),
+def _ui_detalle(row: Dict[str, Any]):
+    st.subheader("Detalle")
+    # Mostrar en formato “limpio”
+    show = {
+        "Id": row.get("id"),
+        "Descripción": row.get("descripcion"),
+        "Familia": row.get("familia"),
+        "Código Int.": row.get("codigo_int"),
+        "Código Ext.": row.get("codigo_ext"),
+        "Unidad": row.get("unidad"),
+        "Tipo Artículo": row.get("tipo_articulo"),
+        "Tipo Impuesto": row.get("tipo_impuesto"),
+        "Tipo Concepto": row.get("tipo_concepto"),
+        "Cuenta Compra": row.get("cuenta_compra"),
+        "Cuenta Venta": row.get("cuenta_venta"),
+        "Cuenta Venta Exe.": row.get("cuenta_venta_exe"),
+        "Cuenta Costo Venta": row.get("cuenta_costo_venta"),
+        "Proveedor": row.get("proveedor"),
+        "Activo": row.get("activo"),
+        "Mueve Stock": row.get("mueve_stock"),
+        "e-Commerce": row.get("ecommerce"),
+        "Stock Mínimo": row.get("stock_minimo"),
+        "Stock Máximo": row.get("stock_maximo"),
+        "Costo Fijo": row.get("costo_fijo"),
     }
-
-    if is_edit:
-        payload["id"] = str(selected["id"])
-
-    payload = _aplicar_historial_precio_minimo(payload, current_row)
-
-    ok, msg, row = _sb_upsert_articulo(payload)
-    if not ok:
-        st.error(f"No se pudo guardar: {msg}")
-        return None
-
-    _invalidate_caches()
-    st.success("Guardado.")
-
-    if row and row.get("id"):
-        return str(row["id"])
-    if is_edit:
-        return str(selected["id"])
-    return None
+    st.write(show)
 
 
+# =====================================================================
+# ARCHIVOS (Storage)
+# =====================================================================
 def _ui_archivos(articulo_id: str):
     st.markdown("### Archivos (imágenes / manuales)")
 
@@ -534,7 +312,7 @@ def _ui_archivos(articulo_id: str):
                     st.error(f"Error storage: {err}")
                 else:
                     payload = {
-                        "articulo_id": articulo_id,
+                        "articulo_id": str(articulo_id),
                         "tipo": "imagen",
                         "nombre_archivo": img.name,
                         "storage_bucket": BUCKET_ARTICULOS,
@@ -559,7 +337,7 @@ def _ui_archivos(articulo_id: str):
                     st.error(f"Error storage: {err}")
                 else:
                     payload = {
-                        "articulo_id": articulo_id,
+                        "articulo_id": str(articulo_id),
                         "tipo": "manual",
                         "nombre_archivo": pdf.name,
                         "storage_bucket": BUCKET_ARTICULOS,
@@ -571,10 +349,15 @@ def _ui_archivos(articulo_id: str):
                     _sb_insert_archivo(payload)
                     st.success("Manual subido.")
 
+    # Listado si existe tabla articulo_archivos
     try:
-        df = _sb_select("articulo_archivos", "*", filters=[("articulo_id", "eq", articulo_id)], order=("created_at", False))
-        if not df.empty:
-            st.dataframe(df[["tipo", "nombre_archivo", "storage_path", "created_at"]], use_container_width=True)
+        df = _sb_select("articulo_archivos", "*", filters=[("articulo_id", "eq", str(articulo_id))])
+        if df is not None and not df.empty:
+            cols_show = [c for c in ["tipo", "nombre_archivo", "storage_path", "created_at"] if c in df.columns]
+            if cols_show:
+                st.dataframe(df[cols_show], use_container_width=True)
+            else:
+                st.dataframe(df, use_container_width=True)
         else:
             st.caption("Sin registros en articulo_archivos (o tabla vacía).")
     except Exception:
@@ -582,10 +365,10 @@ def _ui_archivos(articulo_id: str):
 
 
 # =====================================================================
-# FUNCIÓN PRINCIPAL DEL MÓDULO
+# FUNCIÓN PRINCIPAL
 # =====================================================================
 def mostrar_articulos():
-    st.title("📚 Artículos")
+    st.title("📚 Artículos (GNS)")
 
     if "articulos_sel" not in st.session_state:
         st.session_state["articulos_sel"] = None
@@ -593,43 +376,34 @@ def mostrar_articulos():
     if "articulos_busqueda" not in st.session_state:
         st.session_state["articulos_busqueda"] = ""
 
-    tipo_label = st.radio("Categoría", list(TIPOS.keys()), horizontal=True)
-    tipo = TIPOS[tipo_label]
-
-    tab_listado, tab_form = st.tabs(["📋 Listado", "📝 Nuevo / Editar"])
+    tab_listado, tab_detalle = st.tabs(["📋 Listado", "🧾 Detalle / Archivos"])
 
     # -------------------------
     # TAB LISTADO
     # -------------------------
     with tab_listado:
-        top1, top2, top3 = st.columns([0.72, 0.14, 0.14])
+        c1, c2, c3 = st.columns([0.72, 0.14, 0.14])
 
-        with top1:
+        with c1:
             filtro = st.text_input(
-                "Buscar (nombre / códigos / familia / subfamilia / equipo)",
+                "Buscar (Descripción / Familia / Códigos / Proveedor)",
                 key="articulos_busqueda",
                 placeholder="Vacío = muestra todos",
             )
 
-        with top2:
-            ver_todos = st.checkbox("Ver todos los tipos", value=True, key=f"art_ver_todos_{tipo}")
-
-        with top3:
-            if st.button("🧹 Limpiar", use_container_width=True, key=f"art_list_clear_{tipo}"):
+        with c2:
+            if st.button("🧹 Limpiar", use_container_width=True, key="art_list_clear"):
                 st.session_state["articulos_busqueda"] = ""
                 st.rerun()
 
-        if st.button("🔄 Recargar listado", use_container_width=True, key=f"art_list_reload_{tipo}"):
-            _invalidate_caches()
-            st.rerun()
+        with c3:
+            if st.button("🔄 Recargar", use_container_width=True, key="art_list_reload"):
+                _invalidate_caches()
+                st.rerun()
 
-        # Traer data
-        if ver_todos:
-            df = _cache_articulos_all()
-        else:
-            df = _cache_articulos_por_tipo(tipo)
+        df = _cache_articulos_gns()
 
-        # Filtro local (literal, no regex)
+        # Filtro local literal (no regex)
         if df is not None and not df.empty and (filtro or "").strip():
             t = (filtro or "").strip().lower()
 
@@ -637,20 +411,20 @@ def mostrar_articulos():
                 return s.fillna("").astype(str).str.lower()
 
             cols_busqueda = [
-                "tipo",
-                "nombre",
-                "codigo_interno",
-                "codigo_barra",
+                "id",
+                "descripcion",
                 "familia",
-                "subfamilia",
-                "equipo",
-                "unidad_base",
-                "unidad_compra",
-                "iva",
-                "moneda_actual",
-                "precio_actual",
-                "stock_min",
-                "stock_max",
+                "codigo_int",
+                "codigo_ext",
+                "unidad",
+                "proveedor",
+                "tipo_articulo",
+                "tipo_impuesto",
+                "tipo_concepto",
+                "cuenta_compra",
+                "cuenta_venta",
+                "cuenta_venta_exe",
+                "cuenta_costo_venta",
             ]
 
             for c in cols_busqueda:
@@ -663,34 +437,44 @@ def mostrar_articulos():
 
             df = df[mask].copy()
 
-        selected_row = _grid(df)
-
+        selected_row = _grid_listado(df)
         if selected_row and selected_row.get("id"):
-            st.session_state["articulos_sel"] = {"id": selected_row["id"]}
-            st.info("Artículo seleccionado. Abrí la pestaña “Nuevo / Editar” para modificarlo.")
+            st.session_state["articulos_sel"] = {"id": str(selected_row["id"])}
+            st.info("Artículo seleccionado. Abrí la pestaña “Detalle / Archivos”.")
+
+        # Mini diagnóstico si sigue vacío
+        if df is None or df.empty:
+            with st.expander("🔎 Diagnóstico (si sabés que hay datos)", expanded=False):
+                st.write(
+                    "Si tu tabla tiene filas y acá sale vacío, casi seguro es RLS/Policies.\n\n"
+                    "En Supabase: Table Editor → articulos → RLS.\n"
+                    "Si está ENABLED, necesitás una policy SELECT para anon/authenticated."
+                )
 
     # -------------------------
-    # TAB FORM
+    # TAB DETALLE / ARCHIVOS
     # -------------------------
-    with tab_form:
-        cA, cB = st.columns(2)
-        with cA:
-            if st.button("➕ Nuevo artículo", use_container_width=True, key=f"art_form_new_{tipo}"):
-                st.session_state["articulos_sel"] = None
-                st.rerun()
-        with cB:
-            if st.button("🔄 Recargar", use_container_width=True, key=f"art_form_reload_{tipo}"):
+    with tab_detalle:
+        sel = st.session_state.get("articulos_sel")
+        if not sel or not sel.get("id"):
+            st.info("Seleccioná un artículo en la pestaña “Listado”.")
+            return
+
+        articulo_id = str(sel["id"]).strip()
+        df_all = _cache_articulos_gns()
+        row = None
+        if df_all is not None and not df_all.empty:
+            m = df_all[df_all["id"].astype(str) == articulo_id]
+            if not m.empty:
+                row = m.iloc[0].to_dict()
+
+        if not row:
+            st.warning("No se encontró el artículo seleccionado (probá Recargar).")
+            if st.button("🔄 Recargar", use_container_width=True, key="art_det_reload"):
                 _invalidate_caches()
                 st.rerun()
+            return
 
-        saved_id = _form_articulo(tipo, st.session_state.get("articulos_sel"))
-
-        if saved_id:
-            st.session_state["articulos_sel"] = {"id": saved_id}
-            st.markdown("---")
-            _ui_archivos(saved_id)
-        else:
-            sel = st.session_state.get("articulos_sel")
-            if sel and sel.get("id"):
-                st.markdown("---")
-                _ui_archivos(str(sel["id"]))
+        _ui_detalle(row)
+        st.markdown("---")
+        _ui_archivos(articulo_id)
