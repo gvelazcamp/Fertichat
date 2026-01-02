@@ -11,7 +11,7 @@ from auth import login_user, change_password, init_db
 init_db()
 
 # =====================================================================
-# 🎨 ESTILOS CSS - DISEÑO MODERNO Y LUMINOSO
+# 🎨 ESTILOS CSS - DISEÑO MODERNO Y LUMINOSO + RESPONSIVE REAL
 # =====================================================================
 
 LOGIN_CSS = """
@@ -32,6 +32,13 @@ LOGIN_CSS = """
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 1rem !important;
+    }
+
+    /* ===== Wrapper para que TODO el login quede centrado y con ancho controlado ===== */
+    .fc-login-wrap{
+        width: 100%;
+        max-width: 460px;
+        margin: 0 auto;
     }
 
     /* Tarjeta del formulario - Glassmorphism */
@@ -133,17 +140,52 @@ LOGIN_CSS = """
         border-left: 4px solid #22c55e !important;
     }
 
-    /* Responsive */
+    /* =========================
+       ✅ RESPONSIVE REAL (móvil)
+       - Mismo diseño, misma “card”, mismo centrado
+    ========================= */
     @media (max-width: 768px) {
+
+        /* Padding general más cómodo */
+        .block-container {
+            padding-left: 0.9rem !important;
+            padding-right: 0.9rem !important;
+            padding-top: 1.2rem !important;
+            padding-bottom: 1.2rem !important;
+        }
+
+        /* Wrapper del login: mantiene ancho controlado y centrado */
+        .fc-login-wrap{
+            max-width: 420px;
+        }
+
+        /* Card: mismo estilo, solo un poco más compacta */
         [data-testid="stForm"] {
             padding: 24px 20px;
             border-radius: 20px;
         }
-        
-        .block-container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+
+        /* Tabs: evita que se “rompan” */
+        button[data-baseweb="tab"] {
+            padding: 10px 14px !important;
+            font-size: 0.95rem !important;
         }
+
+        /* Inputs/botón: cómodos en móvil */
+        input {
+            padding: 12px 14px !important;
+        }
+
+        .stForm button[kind="secondaryFormSubmit"],
+        .stForm button[type="submit"] {
+            width: 100% !important;
+            padding: 14px 18px !important;
+        }
+    }
+
+    /* iOS fix: evita zoom raro al tocar inputs */
+    @media (max-width: 768px){
+        input, select, textarea { font-size: 16px !important; }
     }
 </style>
 """
@@ -216,13 +258,13 @@ def login_form():
                 Ingresá tus credenciales para continuar
             </p>
         """, unsafe_allow_html=True)
-        
+
         st.text_input("🏢 Empresa", value="Fertilab", disabled=True)
         usuario = st.text_input("👤 Usuario", placeholder="Ingresá tu usuario")
         password = st.text_input("🔒 Contraseña", type="password", placeholder="Ingresá tu contraseña")
 
         st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
-        
+
         submitted = st.form_submit_button("Ingresar", use_container_width=True)
 
         if submitted:
@@ -249,14 +291,14 @@ def change_password_form():
                 Actualizá tu contraseña de acceso
             </p>
         """, unsafe_allow_html=True)
-        
+
         usuario = st.text_input("👤 Usuario", placeholder="Tu usuario")
         old_password = st.text_input("🔑 Contraseña actual", type="password", placeholder="Contraseña actual")
         new_password = st.text_input("🔒 Nueva contraseña", type="password", placeholder="Nueva contraseña")
         new_password2 = st.text_input("🔒 Confirmar nueva", type="password", placeholder="Repetí la nueva contraseña")
 
         st.markdown("<div style='height: 10px'></div>", unsafe_allow_html=True)
-        
+
         submitted = st.form_submit_button("Cambiar contraseña", use_container_width=True)
 
         if submitted:
@@ -282,15 +324,20 @@ def show_login_page():
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
+        # ✅ Wrapper: mantiene el mismo “layout” en desktop y móvil
+        st.markdown("<div class='fc-login-wrap'>", unsafe_allow_html=True)
+
         show_logo()
-        
+
         tab1, tab2 = st.tabs(["🔐 Ingresar", "🔑 Cambiar clave"])
         with tab1:
             login_form()
         with tab2:
             change_password_form()
-        
+
         show_footer()
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================================
 # GESTIÓN DE SESIÓN
