@@ -41,6 +41,11 @@ def mostrar_inicio():
                 "baja": "🧾 Baja de stock",
                 "ordenes": "📦 Órdenes de compra",
                 "indicadores": "📈 Indicadores (Power BI)",
+                "comprobantes": "📥 Ingreso de comprobantes",
+                "ficha": "📒 Ficha de stock",
+                "articulos": "📚 Artículos",
+                "depositos": "🏬 Depósitos",
+                "familias": "🧩 Familias",
             }
             destino = mapping.get(go.strip().lower())
             if destino:
@@ -110,6 +115,10 @@ def mostrar_inicio():
         box-shadow:0 14px 34px rgba(2,6,23,0.09);
         border-color:rgba(37,99,235,0.20);
       }
+      .fc-card:active{
+        transform:translateY(0);
+        box-shadow:0 10px 26px rgba(2,6,23,0.06);
+      }
       .fc-row{display:flex;align-items:center;gap:14px;}
       .fc-tile{
         width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;
@@ -132,6 +141,11 @@ def mostrar_inicio():
       .tile-baja{background:rgba(244,63,94,0.10);border-color:rgba(244,63,94,0.18);}
       .tile-ordenes{background:rgba(100,116,139,0.10);border-color:rgba(100,116,139,0.18);}
       .tile-indicadores{background:rgba(34,197,94,0.10);border-color:rgba(34,197,94,0.18);}
+      .tile-comprobantes{background:rgba(168,85,247,0.10);border-color:rgba(168,85,247,0.18);}
+      .tile-ficha{background:rgba(251,146,60,0.10);border-color:rgba(251,146,60,0.18);}
+      .tile-articulos{background:rgba(20,184,166,0.10);border-color:rgba(20,184,166,0.18);}
+      .tile-depositos{background:rgba(99,102,241,0.10);border-color:rgba(99,102,241,0.18);}
+      .tile-familias{background:rgba(236,72,153,0.10);border-color:rgba(236,72,153,0.18);}
 
       @media (max-width: 980px){
         .fc-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -139,6 +153,9 @@ def mostrar_inicio():
       @media (max-width: 520px){
         .fc-grid{grid-template-columns:1fr;}
         .fc-tile{width:50px;height:50px;border-radius:14px;flex:0 0 50px;}
+        .fc-ico{font-size:24px;}
+        .fc-txt h3{font-size:15px;}
+        .fc-txt p{font-size:12px;}
       }
     </style>
 
@@ -206,6 +223,46 @@ def mostrar_inicio():
           </div>
         </div>
       </div>
+
+      <div style="height:22px;"></div>
+      
+      <div class="fc-section-title">⚙️ Configuración</div>
+      <div class="fc-grid">
+        <div class="fc-card" onclick="go('comprobantes')">
+          <div class="fc-row">
+            <div class="fc-tile tile-comprobantes"><div class="fc-ico">📥</div></div>
+            <div class="fc-txt"><h3>Ingreso comprobantes</h3><p>Cargar facturas</p></div>
+          </div>
+        </div>
+
+        <div class="fc-card" onclick="go('ficha')">
+          <div class="fc-row">
+            <div class="fc-tile tile-ficha"><div class="fc-ico">📒</div></div>
+            <div class="fc-txt"><h3>Ficha de stock</h3><p>Ver movimientos</p></div>
+          </div>
+        </div>
+
+        <div class="fc-card" onclick="go('articulos')">
+          <div class="fc-row">
+            <div class="fc-tile tile-articulos"><div class="fc-ico">📚</div></div>
+            <div class="fc-txt"><h3>Artículos</h3><p>Gestionar productos</p></div>
+          </div>
+        </div>
+
+        <div class="fc-card" onclick="go('depositos')">
+          <div class="fc-row">
+            <div class="fc-tile tile-depositos"><div class="fc-ico">🏬</div></div>
+            <div class="fc-txt"><h3>Depósitos</h3><p>Gestionar depósitos</p></div>
+          </div>
+        </div>
+
+        <div class="fc-card" onclick="go('familias')">
+          <div class="fc-row">
+            <div class="fc-tile tile-familias"><div class="fc-ico">🧩</div></div>
+            <div class="fc-txt"><h3>Familias</h3><p>Categorías</p></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -217,7 +274,7 @@ def mostrar_inicio():
     </script>
     """
 
-    components.html(html_cards, height=640, scrolling=True)
+    components.html(html_cards, height=820, scrolling=True)
 
     # =========================
     # TIP DEL DÍA
@@ -228,6 +285,8 @@ def mostrar_inicio():
         "💡 Probá 'comparar roche 2024 2025' para ver la evolución de compras",
         "💡 En el Buscador podés filtrar por proveedor, artículo y fechas",
         "💡 Usá 'top 10 proveedores 2025' para ver el ranking de compras",
+        "💡 El Dashboard te muestra estadísticas en tiempo real de tus operaciones",
+        "💡 Podés hacer click en las tarjetas de la pantalla de inicio para navegar rápido",
     ]
     tip = random.choice(tips)
 
