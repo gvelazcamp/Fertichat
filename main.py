@@ -42,6 +42,7 @@ from orquestador import procesar_pregunta_router
 from ui_buscador import mostrar_buscador_ia
 from ui_stock import mostrar_stock_ia, mostrar_resumen_stock_rotativo
 from ui_dashboard import mostrar_dashboard, mostrar_indicadores_ia, mostrar_resumen_compras_rotativo
+from ingreso_comprobantes import mostrar_ingreso_comprobantes
 from ui_inicio import mostrar_inicio
 from ficha_stock import mostrar_ficha_stock
 from articulos import mostrar_articulos
@@ -215,6 +216,9 @@ elif menu == "📦 Stock IA":
     mostrar_stock_ia()
 elif menu == "🔎 Buscador IA":
     mostrar_buscador_ia()
+
+elif menu == "📥 Ingreso de comprobantes":
+    mostrar_ingreso_comprobantes()
 
 elif menu == "📊 Dashboard":
     mostrar_dashboard()
