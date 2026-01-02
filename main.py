@@ -61,15 +61,15 @@ def inject_css_responsive():
         ========================= */
 
         :root{
-            --fc-bg-1: #f6f4ef;          /* beige suave */
-            --fc-bg-2: #f3f6fb;          /* celeste ultra suave */
-            --fc-surface: #ffffff;       /* tarjetas */
+            --fc-bg-1: #f6f4ef;
+            --fc-bg-2: #f3f6fb;
+            --fc-surface: #ffffff;
             --fc-border: rgba(15, 23, 42, 0.10);
             --fc-text: #0f172a;
             --fc-muted: #64748b;
-            --fc-primary: #0b3b60;       /* azul corporativo */
-            --fc-primary-2: #2563eb;     /* azul acento */
-            --fc-accent: #f59e0b;        /* naranja/acento */
+            --fc-primary: #0b3b60;
+            --fc-primary-2: #2563eb;
+            --fc-accent: #f59e0b;
             --fc-radius: 18px;
             --fc-radius-sm: 12px;
             --fc-shadow: 0 14px 40px rgba(2, 6, 23, 0.08);
@@ -81,7 +81,6 @@ def inject_css_responsive():
             color: var(--fc-text);
         }
 
-        /* Fondo general */
         [data-testid="stAppViewContainer"]{
             background:
                 radial-gradient(1200px 600px at 20% 10%, rgba(245,158,11,0.10), transparent 55%),
@@ -89,7 +88,6 @@ def inject_css_responsive():
                 linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
         }
 
-        /* “ondas” suaves (overlay) */
         [data-testid="stAppViewContainer"]::before{
             content:"";
             position: fixed;
@@ -106,14 +104,13 @@ def inject_css_responsive():
             background-position: center bottom;
         }
 
-        /* Contenedor principal */
+        /* ✅ AJUSTE: más espacio arriba para que no “corte” el header */
         .block-container{
             max-width: 1240px;
-            padding-top: 1.25rem;
+            padding-top: 3.25rem;   /* <-- antes 1.25rem */
             padding-bottom: 2.25rem;
         }
 
-        /* Sidebar */
         section[data-testid="stSidebar"]{
             border-right: 1px solid rgba(15, 23, 42, 0.08);
         }
@@ -122,12 +119,10 @@ def inject_css_responsive():
             backdrop-filter: blur(8px);
         }
 
-        /* Inputs (incluye buscador sidebar) */
         .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"]{
             border-radius: 999px !important;
         }
 
-        /* Radios del menú (sidebar) */
         div[data-testid="stSidebar"] div[role="radiogroup"] label{
             border-radius: 12px;
             padding: 8px 10px;
@@ -139,7 +134,6 @@ def inject_css_responsive():
             background: rgba(37,99,235,0.06);
             border: 1px solid rgba(37,99,235,0.10);
         }
-        /* item seleccionado */
         div[data-testid="stSidebar"] div[role="radiogroup"] label input:checked + div{
             font-weight: 700 !important;
             color: var(--fc-primary) !important;
@@ -149,21 +143,18 @@ def inject_css_responsive():
             border: 1px solid rgba(245,158,11,0.18);
         }
 
-        /* Botones */
         .stButton > button{
             border-radius: 14px !important;
             border: 1px solid rgba(15,23,42,0.10) !important;
             box-shadow: var(--fc-shadow-sm);
         }
 
-        /* Separadores */
         hr{
             border: none;
             border-top: 1px solid rgba(15,23,42,0.10);
             margin: 14px 0;
         }
 
-        /* Header (tu bloque) */
         .fc-header{
             background: rgba(255,255,255,0.70);
             border: 1px solid rgba(15,23,42,0.10);
@@ -177,18 +168,16 @@ def inject_css_responsive():
         .fc-subtitle{
             color: var(--fc-muted);
         }
-
-        /* Campanita */
         .fc-notif button{
             width: 100%;
         }
 
         /* =========================
-           RESPONSIVE (tu CSS original, intacto)
+           RESPONSIVE
         ========================= */
         @media (max-width: 768px){
             .block-container{
-                padding-top: 0.9rem !important;
+                padding-top: 2.6rem !important;  /* <-- antes 0.9rem */
                 padding-left: 0.8rem !important;
                 padding-right: 0.8rem !important;
                 padding-bottom: 4.5rem !important;
