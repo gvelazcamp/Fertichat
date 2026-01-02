@@ -96,8 +96,12 @@ ARTICULO_COLS = [
 # =====================================================================
 # HELPERS SUPABASE (mínimos)
 # =====================================================================
-def _sb_select(table: str, columns: str = "*", filters: Optional[List[Tuple[str, str, Any]]] = None,
-              order: Optional[Tuple[str, bool]] = None) -> pd.DataFrame:
+def _sb_select(
+    table: str,
+    columns: str = "*",
+    filters: Optional[List[Tuple[str, str, Any]]] = None,
+    order: Optional[Tuple[str, bool]] = None,
+) -> pd.DataFrame:
     q = supabase.table(table).select(columns)
     if filters:
         for col, op, val in filters:
@@ -177,72 +181,27 @@ def _cache_articulos_por_tipo(tipo: str) -> pd.DataFrame:
     df = df[ARTICULO_COLS].copy()
     return df
 
-@st.cache_data(ttl=60)
-def _cache_unicos_chatbot_raw() -> pd.DataFrame:
+
+@st.cache_data(ttl=30)
+def _cache_articulos_all() -> pd.DataFrame:
     """
-    Devuelve listado único desde public.chatbot_raw:
-    - Articulo (único)
-    - Familia
-    - Tipo Articulo (si existe)
+    Trae TODOS los artículos (sin filtrar por tipo).
+    Útil para ver artículos ya creados aunque el campo 'tipo' esté vacío o distinto.
     """
-    try:
-        # OJO: "Tipo Articulo" tiene espacio -> va entre comillas
-        df = _sb_select("chatbot_raw", 'Articulo,Familia,"Tipo Articulo"', order=("Articulo", True))
-    except Exception:
-        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
-
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
-
-    # Normalizar strings
-    for c in ["Articulo", "Familia", "Tipo Articulo"]:
-        if c in df.columns:
-            df[c] = df[c].astype(str).fillna("").str.strip()
-
-    # Filtrar vacíos
-    df = df[df["Articulo"].astype(str).str.strip() != ""].copy()
-    if df.empty:
-        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
-
-    # Únicos por Articulo
-    df = df.drop_duplicates(subset=["Articulo"], keep="first").reset_index(drop=True)
-
-    return df
-
-
-@st.cache_data(ttl=60)
-def _cache_sugerencias_desde_chatbot_raw() -> pd.DataFrame:
-    """
-    Sugerencias: valores únicos de chatbot_raw.Articulo
-    (y trae Familia / Tipo Articulo si existen).
-    """
-    try:
-        df = _sb_select("chatbot_raw", "Articulo,Familia,Tipo Articulo", order=("Articulo", True))
-    except Exception:
-        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
-
+    df = _sb_select("articulos", "*", order=("nombre", True))
     if df.empty:
         return df
-
-    # Normalizar
-    for c in ["Articulo", "Familia", "Tipo Articulo"]:
-        if c in df.columns:
-            df[c] = df[c].astype(str).fillna("").str.strip()
-
-    df = df[df["Articulo"].astype(str).str.strip() != ""].copy()
-    if df.empty:
-        return pd.DataFrame(columns=["Articulo", "Familia", "Tipo Articulo"])
-
-    # Unificar por Articulo (primera ocurrencia)
-    df = df.drop_duplicates(subset=["Articulo"], keep="first").reset_index(drop=True)
+    for c in ARTICULO_COLS:
+        if c not in df.columns:
+            df[c] = None
+    df = df[ARTICULO_COLS].copy()
     return df
 
 
 def _invalidate_caches():
     _cache_proveedores.clear()
     _cache_articulos_por_tipo.clear()
-    _cache_sugerencias_desde_chatbot_raw.clear()
-
+    _cache_articulos_all.clear()
 
 
 # =====================================================================
@@ -254,18 +213,15 @@ def _aplicar_historial_precio_minimo(payload: Dict[str, Any], current_row: Optio
     Solo opera cuando hay edición (current_row) y detecta cambio real.
     """
     if not current_row:
-        # Nuevo artículo: si viene precio_actual, setea fecha_precio_actual
         if payload.get("precio_actual") is not None and payload.get("moneda_actual") and payload.get("precio_por_actual"):
             payload["fecha_precio_actual"] = datetime.utcnow().isoformat()
         return payload
 
-    # Valores actuales (DB)
     cur_precio = current_row.get("precio_actual")
     cur_mon = current_row.get("moneda_actual")
     cur_por = current_row.get("precio_por_actual")
     cur_fecha = current_row.get("fecha_precio_actual")
 
-    # Nuevos (form)
     new_precio = payload.get("precio_actual")
     new_mon = payload.get("moneda_actual")
     new_por = payload.get("precio_por_actual")
@@ -290,16 +246,12 @@ def _aplicar_historial_precio_minimo(payload: Dict[str, Any], current_row: Optio
         changed = True
 
     if changed and (new_precio_n is not None) and new_mon and new_por:
-        # Mover actual -> anterior
         payload["precio_anterior"] = cur_precio_n
         payload["moneda_anterior"] = cur_mon
         payload["precio_por_anterior"] = cur_por
         payload["fecha_precio_anterior"] = cur_fecha
-
-        # Setear fecha del nuevo actual
         payload["fecha_precio_actual"] = datetime.utcnow().isoformat()
 
-    # Si NO cambió, NO toques fechas.
     return payload
 
 
@@ -311,7 +263,6 @@ def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         st.info("Sin artículos para mostrar.")
         return None
 
-    # Vista para listado (columna id solo para selección)
     view_cols = [
         "nombre",
         "codigo_interno",
@@ -332,11 +283,8 @@ def _grid(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
             df[c] = None
 
     vdf = df[view_cols].copy()
-
-    # Mostrar cantidad
     st.caption(f"Mostrando {len(vdf)} artículo(s).")
 
-    # Sin AgGrid: solo tabla (sin selección)
     if AgGrid is None:
         st.dataframe(vdf.drop(columns=["id"], errors="ignore"), use_container_width=True, height=350)
         return None
@@ -376,7 +324,7 @@ def _selector_proveedor(current_id: Optional[str]) -> Optional[str]:
         default_name = name_by_id[str(current_id)]
 
     idx = options.index(default_name) if default_name in options else 0
-    choice = st.selectbox("Proveedor principal", options, index=idx)
+    choice = st.selectbox("Proveedor principal", options, index=idx, key="art_sel_prov")
     if choice == "(sin proveedor)":
         return None
     return str(id_by_name.get(choice))
@@ -386,7 +334,6 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
     is_edit = bool(selected and selected.get("id"))
     st.subheader("Editar artículo" if is_edit else "Nuevo artículo")
 
-    # Valores actuales (si edita): traemos fila completa desde df cache para comparar precio
     current_row = None
     if is_edit:
         df_all = _cache_articulos_por_tipo(tipo)
@@ -394,21 +341,16 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
         if not match.empty:
             current_row = match.iloc[0].to_dict()
 
-    prefill = None
-    if (not is_edit) and ("articulos_prefill" in st.session_state):
-        prefill = st.session_state.get("articulos_prefill") or None
+    base = current_row or {}
 
-    base = current_row or prefill or {}
-
-    # Botones arriba (mejor UX)
+    btn_prefix = f"art_form_{tipo}_{str((selected or {}).get('id') or 'new')}"
     b1, b2, b3 = st.columns(3)
     with b1:
-        btn_save = st.button("💾 Guardar", type="primary", use_container_width=True)
+        btn_save = st.button("💾 Guardar", type="primary", use_container_width=True, key=f"{btn_prefix}_save")
     with b2:
-        btn_new = st.button("➕ Nuevo", use_container_width=True)
+        btn_new = st.button("➕ Nuevo", use_container_width=True, key=f"{btn_prefix}_new")
     with b3:
-        btn_reload = st.button("🔄 Recargar", use_container_width=True)
-
+        btn_reload = st.button("🔄 Recargar", use_container_width=True, key=f"{btn_prefix}_reload")
 
     if btn_reload:
         _invalidate_caches()
@@ -418,42 +360,34 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
         st.session_state["articulos_sel"] = None
         st.rerun()
 
-    # -------------------------
-    # General
-    # -------------------------
     with st.expander("🧾 Datos generales", expanded=True):
         col1, col2 = st.columns(2)
 
         with col1:
-            nombre = st.text_input("Nombre *", value=str(base.get("nombre") or ""))
-            descripcion = st.text_area("Descripción", value=str(base.get("descripcion") or ""), height=90)
+            nombre = st.text_input("Nombre *", value=str(base.get("nombre") or ""), key="art_nombre")
+            descripcion = st.text_area("Descripción", value=str(base.get("descripcion") or ""), height=90, key="art_desc")
 
-            codigo_interno = st.text_input("Código interno", value=str(base.get("codigo_interno") or ""))
-            codigo_barra = st.text_input("Código de barra", value=str(base.get("codigo_barra") or ""))
+            codigo_interno = st.text_input("Código interno", value=str(base.get("codigo_interno") or ""), key="art_codint")
+            codigo_barra = st.text_input("Código de barra", value=str(base.get("codigo_barra") or ""), key="art_codbar")
 
-            familia = st.text_input("Familia", value=str(base.get("familia") or ""))
-            subfamilia = st.text_input("Subfamilia", value=str(base.get("subfamilia") or ""))
-            equipo = st.text_input("Equipo", value=str(base.get("equipo") or ""))
+            familia = st.text_input("Familia", value=str(base.get("familia") or ""), key="art_fam")
+            subfamilia = st.text_input("Subfamilia", value=str(base.get("subfamilia") or ""), key="art_subfam")
+            equipo = st.text_input("Equipo", value=str(base.get("equipo") or ""), key="art_equipo")
 
-            # Proveedor: si no existe tabla, _cache_proveedores devuelve vacío y no rompe
             proveedor_id = _selector_proveedor(str(base.get("proveedor_id") or "") or None)
 
         with col2:
-            fifo = st.checkbox("FIFO", value=bool(base.get("fifo", True)))
-            activo = st.checkbox("Activo", value=bool(base.get("activo", True)))
+            fifo = st.checkbox("FIFO", value=bool(base.get("fifo", True)), key="art_fifo")
+            activo = st.checkbox("Activo", value=bool(base.get("activo", True)), key="art_activo")
 
-            # IVA
             inv_iva = {v: k for k, v in IVA_OPS.items()}
             iva_default = inv_iva.get(base.get("iva") or "basico_22", "Básico (22%)")
-            iva_label = st.selectbox("IVA", list(IVA_OPS.keys()), index=list(IVA_OPS.keys()).index(iva_default))
+            iva_label = st.selectbox("IVA", list(IVA_OPS.keys()), index=list(IVA_OPS.keys()).index(iva_default), key="art_iva")
             iva = IVA_OPS[iva_label]
 
-            tiene_lote = st.checkbox("Tiene lote", value=bool(base.get("tiene_lote", False)))
-            requiere_vencimiento = st.checkbox("Requiere vencimiento", value=bool(base.get("requiere_vencimiento", False)))
+            tiene_lote = st.checkbox("Tiene lote", value=bool(base.get("tiene_lote", False)), key="art_lote")
+            requiere_vencimiento = st.checkbox("Requiere vencimiento", value=bool(base.get("requiere_vencimiento", False)), key="art_vto")
 
-    # -------------------------
-    # Unidades / Stock
-    # -------------------------
     with st.expander("📦 Unidades y stock", expanded=True):
         colU1, colU2 = st.columns(2)
 
@@ -464,11 +398,12 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
                 "Unidad base (stock)",
                 list(UNIDAD_BASE_OPS.keys()),
                 index=list(UNIDAD_BASE_OPS.keys()).index(ub_default),
+                key="art_ub",
             )
             unidad_base = UNIDAD_BASE_OPS[unidad_base_label]
 
-            stock_min = st.number_input("Stock mínimo", min_value=0.0, value=float(base.get("stock_min") or 0), step=1.0)
-            stock_max = st.number_input("Stock máximo", min_value=0.0, value=float(base.get("stock_max") or 0), step=1.0)
+            stock_min = st.number_input("Stock mínimo", min_value=0.0, value=float(base.get("stock_min") or 0), step=1.0, key="art_smin")
+            stock_max = st.number_input("Stock máximo", min_value=0.0, value=float(base.get("stock_max") or 0), step=1.0, key="art_smax")
 
         with colU2:
             inv_uc = {v: k for k, v in UNIDAD_COMPRA_OPS.items()}
@@ -477,6 +412,7 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
                 "Unidad de compra",
                 list(UNIDAD_COMPRA_OPS.keys()),
                 index=list(UNIDAD_COMPRA_OPS.keys()).index(uc_default),
+                key="art_uc",
             )
             unidad_compra = UNIDAD_COMPRA_OPS[unidad_compra_label]
 
@@ -486,11 +422,9 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
                 min_value=1.0,
                 value=contenido_default if contenido_default >= 1 else 1.0,
                 step=1.0,
+                key="art_cont",
             )
 
-    # -------------------------
-    # Precio
-    # -------------------------
     with st.expander("💲 Precio", expanded=True):
         colP1, colP2 = st.columns(2)
 
@@ -499,6 +433,7 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
                 "Moneda (precio actual)",
                 MONEDAS,
                 index=MONEDAS.index((base.get("moneda_actual") or "UYU")),
+                key="art_mon",
             )
 
             precio_actual_val = base.get("precio_actual")
@@ -507,17 +442,16 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
             except Exception:
                 precio_actual_val = 0.0
 
-            precio_actual = st.number_input("Precio actual (referencia)", min_value=0.0, value=float(precio_actual_val), step=1.0)
-
+            precio_actual = st.number_input("Precio actual (referencia)", min_value=0.0, value=float(precio_actual_val), step=1.0, key="art_prec")
             inv_pp = {v: k for k, v in PRECIO_POR_OPS.items()}
             pp_default = inv_pp.get(base.get("precio_por_actual") or "unidad_compra", "Por unidad de compra")
             precio_por_label = st.selectbox(
                 "Precio actual es por",
                 list(PRECIO_POR_OPS.keys()),
                 index=list(PRECIO_POR_OPS.keys()).index(pp_default),
+                key="art_por",
             )
             precio_por_actual = PRECIO_POR_OPS[precio_por_label]
-
             st.caption(f"Fecha último precio: {base.get('fecha_precio_actual') or '—'}")
 
         with colP2:
@@ -527,9 +461,6 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
             st.write(f"Por anterior: {base.get('precio_por_anterior') or '—'}")
             st.write(f"Fecha anterior: {base.get('fecha_precio_anterior') or '—'}")
 
-    # -------------------------
-    # Guardar
-    # -------------------------
     if not btn_save:
         return None
 
@@ -547,30 +478,24 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
         "subfamilia": subfamilia.strip() if subfamilia else None,
         "equipo": equipo.strip() if equipo else None,
         "proveedor_id": proveedor_id,
-
         "fifo": bool(fifo),
         "iva": iva,
         "tiene_lote": bool(tiene_lote),
         "requiere_vencimiento": bool(requiere_vencimiento),
-
         "unidad_base": unidad_base,
         "unidad_compra": unidad_compra,
         "contenido_por_unidad_compra": float(contenido_por_unidad_compra),
-
         "stock_min": float(stock_min),
         "stock_max": float(stock_max),
-
         "precio_actual": float(precio_actual),
         "moneda_actual": moneda_actual,
         "precio_por_actual": precio_por_actual,
-
         "activo": bool(activo),
     }
 
     if is_edit:
         payload["id"] = str(selected["id"])
 
-    # Aplicar historial mínimo de precio (actual -> anterior) SOLO si cambia
     payload = _aplicar_historial_precio_minimo(payload, current_row)
 
     ok, msg, row = _sb_upsert_articulo(payload)
@@ -580,9 +505,7 @@ def _form_articulo(tipo: str, selected: Optional[Dict[str, Any]]) -> Optional[st
 
     _invalidate_caches()
     st.success("Guardado.")
-    st.session_state["articulos_prefill"] = None
 
-    # Devolver ID guardado
     if row and row.get("id"):
         return str(row["id"])
     if is_edit:
@@ -610,7 +533,6 @@ def _ui_archivos(articulo_id: str):
                 if not ok:
                     st.error(f"Error storage: {err}")
                 else:
-                    # Registrar si existe tabla articulo_archivos (opcional)
                     payload = {
                         "articulo_id": articulo_id,
                         "tipo": "imagen",
@@ -649,7 +571,6 @@ def _ui_archivos(articulo_id: str):
                     _sb_insert_archivo(payload)
                     st.success("Manual subido.")
 
-    # Listado si existe tabla articulo_archivos
     try:
         df = _sb_select("articulo_archivos", "*", filters=[("articulo_id", "eq", articulo_id)], order=("created_at", False))
         if not df.empty:
@@ -672,25 +593,28 @@ def mostrar_articulos():
     if "articulos_busqueda" not in st.session_state:
         st.session_state["articulos_busqueda"] = ""
 
-    # Selector de tipo (submenú)
     tipo_label = st.radio("Categoría", list(TIPOS.keys()), horizontal=True)
     tipo = TIPOS[tipo_label]
 
-    # Tabs para que no quede “desparramado”
     tab_listado, tab_form = st.tabs(["📋 Listado", "📝 Nuevo / Editar"])
 
     # -------------------------
     # TAB LISTADO
     # -------------------------
     with tab_listado:
-        c1, c2 = st.columns([0.86, 0.14])
-        with c1:
+        top1, top2, top3 = st.columns([0.72, 0.14, 0.14])
+
+        with top1:
             filtro = st.text_input(
                 "Buscar (nombre / códigos / familia / subfamilia / equipo)",
                 key="articulos_busqueda",
                 placeholder="Vacío = muestra todos",
             )
-        with c2:
+
+        with top2:
+            ver_todos = st.checkbox("Ver todos los tipos", value=True, key=f"art_ver_todos_{tipo}")
+
+        with top3:
             if st.button("🧹 Limpiar", use_container_width=True, key=f"art_list_clear_{tipo}"):
                 st.session_state["articulos_busqueda"] = ""
                 st.rerun()
@@ -699,17 +623,21 @@ def mostrar_articulos():
             _invalidate_caches()
             st.rerun()
 
-        df = _cache_articulos_por_tipo(tipo)
+        # Traer data
+        if ver_todos:
+            df = _cache_articulos_all()
+        else:
+            df = _cache_articulos_por_tipo(tipo)
 
-        # Filtro local robusto (literal, no regex)
+        # Filtro local (literal, no regex)
         if df is not None and not df.empty and (filtro or "").strip():
             t = (filtro or "").strip().lower()
 
             def _col_as_str(s: pd.Series) -> pd.Series:
                 return s.fillna("").astype(str).str.lower()
 
-            # Columnas donde buscar (incluye campos numéricos pasados a str)
             cols_busqueda = [
+                "tipo",
                 "nombre",
                 "codigo_interno",
                 "codigo_barra",
@@ -766,9 +694,3 @@ def mostrar_articulos():
             if sel and sel.get("id"):
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
-
-
-
-
-
-
