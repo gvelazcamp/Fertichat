@@ -215,7 +215,7 @@ if "radio_menu" not in st.session_state:
 # =========================
 st.markdown("""
 <div id="mobile-menu-toggle">
-    <button onclick="toggleMobileMenu()">
+    <button id="hamburger-btn">
         <span></span>
         <span></span>
         <span></span>
@@ -223,40 +223,115 @@ st.markdown("""
     <div class="logo">🦋 FertiChat</div>
 </div>
 
-<div id="sidebar-overlay" onclick="closeMobileMenu()"></div>
+<div id="sidebar-overlay"></div>
 
 <script>
-function toggleMobileMenu() {
-    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
-    const overlay = document.getElementById('sidebar-overlay');
+(function() {
+    let sidebarOpen = false;
     
-    if (sidebar && overlay) {
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('open');
+    function findSidebar() {
+        // Buscar en el documento principal y en todos los iframes
+        let sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (!sidebar && window.parent && window.parent.document) {
+            sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+        }
+        return sidebar;
     }
-}
-
-function closeMobileMenu() {
-    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
-    const overlay = document.getElementById('sidebar-overlay');
     
-    if (sidebar && overlay) {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('open');
-    }
-}
-
-// Cerrar sidebar al hacer click en una opción
-window.addEventListener('load', function() {
-    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
-    if (sidebar) {
-        sidebar.addEventListener('click', function(e) {
-            if (e.target.closest('input[type="radio"]')) {
-                setTimeout(closeMobileMenu, 300);
+    function toggleSidebar() {
+        const sidebar = findSidebar();
+        const overlay = document.getElementById('sidebar-overlay') || 
+                        (window.parent && window.parent.document.getElementById('sidebar-overlay'));
+        
+        console.log('Sidebar encontrado:', sidebar);
+        console.log('Overlay encontrado:', overlay);
+        
+        if (sidebar) {
+            sidebarOpen = !sidebarOpen;
+            
+            if (sidebarOpen) {
+                sidebar.classList.add('open');
+                sidebar.style.transform = 'translateX(0)';
+                if (overlay) {
+                    overlay.classList.add('open');
+                    overlay.style.opacity = '1';
+                    overlay.style.visibility = 'visible';
+                }
+            } else {
+                sidebar.classList.remove('open');
+                sidebar.style.transform = 'translateX(-100%)';
+                if (overlay) {
+                    overlay.classList.remove('open');
+                    overlay.style.opacity = '0';
+                    overlay.style.visibility = 'hidden';
+                }
             }
-        });
+        } else {
+            console.error('No se encontró el sidebar');
+        }
     }
-});
+    
+    function closeSidebar() {
+        const sidebar = findSidebar();
+        const overlay = document.getElementById('sidebar-overlay') || 
+                        (window.parent && window.parent.document.getElementById('sidebar-overlay'));
+        
+        if (sidebar) {
+            sidebarOpen = false;
+            sidebar.classList.remove('open');
+            sidebar.style.transform = 'translateX(-100%)';
+            if (overlay) {
+                overlay.classList.remove('open');
+                overlay.style.opacity = '0';
+                overlay.style.visibility = 'hidden';
+            }
+        }
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('hamburger-btn');
+        const overlay = document.getElementById('sidebar-overlay');
+        
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Click en hamburguesa');
+                toggleSidebar();
+            });
+        }
+        
+        if (overlay) {
+            overlay.addEventListener('click', closeSidebar);
+        }
+        
+        // Cerrar al seleccionar opción
+        setTimeout(function() {
+            const sidebar = findSidebar();
+            if (sidebar) {
+                const radioButtons = sidebar.querySelectorAll('input[type="radio"]');
+                radioButtons.forEach(function(radio) {
+                    radio.addEventListener('change', function() {
+                        setTimeout(closeSidebar, 200);
+                    });
+                });
+            }
+        }, 1000);
+    });
+    
+    // Si ya está cargado
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        const btn = document.getElementById('hamburger-btn');
+        if (btn) {
+            btn.onclick = function(e) {
+                e.preventDefault();
+                console.log('Click directo en hamburguesa');
+                toggleSidebar();
+            };
+        }
+    }
+})();
 </script>
 """, unsafe_allow_html=True)
 
