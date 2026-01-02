@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - MENÚ HAMBURGUESA ARRIBA (ESTILO GNS+)
+# MAIN.PY - MENÚ PC (SIDEBAR) + MENÚ PROPIO MÓVIL (HAMBURGUESA)
 # =========================
 
 import streamlit as st
@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
     layout="wide",
-    initial_sidebar_state="expanded"  # Solo para PC
+    initial_sidebar_state="expanded"  # PC
 )
 
 # =========================
@@ -34,104 +34,329 @@ from familias import mostrar_familias
 
 
 # =========================
-# CSS (IGUAL AL ORIGINAL, SIN OCULTAR SIDEBAR EN MÓVIL)
+# CSS + MENÚ MÓVIL (PROPIO)
+# - PC: sidebar normal (tu st.sidebar)
+# - Móvil: ocultamos sidebar nativo y usamos drawer propio
 # =========================
-def inject_css():
-    st.markdown(
+def inject_css_and_mobile_menu(user: dict, menu_actual: str):
+    # Generar items del menú (mismo texto que tu MENU_OPTIONS)
+    menu_items_html = ""
+    for opcion in MENU_OPTIONS:
+        active_class = "fc-active" if opcion == menu_actual else ""
+        # Nota: usamos query param menu=... para setear st.session_state["radio_menu"]
+        menu_items_html += f"""
+            <a class="fc-menu-item {active_class}" href="?menu={opcion}">{opcion}</a>
         """
+
+    st.markdown(
+        f"""
         <style>
-        /* Ocultar elementos de Streamlit */
+        /* =========================
+           OCULTAR UI DE STREAMLIT (solo lo que molesta)
+        ========================= */
         div.stAppToolbar,
         div[data-testid="stToolbar"],
         div[data-testid="stToolbarActions"],
         div[data-testid="stDecoration"],
         #MainMenu,
-        footer{
+        footer {{
           display: none !important;
-        }
+        }}
 
-        header[data-testid="stHeader"]{
+        /* Header nativo: lo ocultamos (usamos header propio en móvil) */
+        header[data-testid="stHeader"] {{
           height: 0 !important;
           background: transparent !important;
-        }
+        }}
 
-        /* Theme */
-        :root{
+        /* =========================
+           THEME GENERAL
+        ========================= */
+        :root {{
             --fc-bg-1: #f6f4ef;
             --fc-bg-2: #f3f6fb;
             --fc-primary: #0b3b60;
             --fc-accent: #f59e0b;
-        }
+        }}
 
-        html, body{
+        html, body {{
             font-family: Inter, system-ui, sans-serif;
             color: #0f172a;
-        }
+        }}
 
-        [data-testid="stAppViewContainer"]{
+        [data-testid="stAppViewContainer"] {{
             background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
-        }
+        }}
 
-        .block-container{
+        .block-container {{
             max-width: 1240px;
             padding-top: 1.25rem;
             padding-bottom: 2.25rem;
-        }
+        }}
 
-        /* Sidebar PC y MÓVIL (ya no se oculta en móvil) */
-        section[data-testid="stSidebar"]{
+        /* =========================
+           SIDEBAR PC (se mantiene tu estilo)
+        ========================= */
+        section[data-testid="stSidebar"] {{
             border-right: 1px solid rgba(15, 23, 42, 0.08);
-        }
-        section[data-testid="stSidebar"] > div{
+        }}
+        section[data-testid="stSidebar"] > div {{
             background: rgba(255,255,255,0.70);
             backdrop-filter: blur(8px);
-        }
+        }}
 
-        div[data-testid="stSidebar"] div[role="radiogroup"] label{
+        div[data-testid="stSidebar"] div[role="radiogroup"] label {{
             border-radius: 12px;
             padding: 8px 10px;
             margin: 3px 0;
             border: 1px solid transparent;
-        }
-        div[data-testid="stSidebar"] div[role="radiogroup"] label:hover{
+        }}
+        div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
             background: rgba(37,99,235,0.06);
-        }
-        div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+        }}
+        div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
             background: rgba(245,158,11,0.10);
             border: 1px solid rgba(245,158,11,0.18);
-        }
+        }}
 
         /* =========================
-   HEADER / SIDEBAR FIX MOBILE
-   ========================= */
+           PC: ocultar menú móvil
+        ========================= */
+        @media (min-width: 769px) {{
+            #fc-mobile-header,
+            #fc-mobile-menu,
+            #fc-mobile-overlay {{
+                display: none !important;
+            }}
+        }}
 
-/* PC: ocultar header */
-@media (min-width: 769px){
-  header[data-testid="stHeader"],
-  div[data-testid="stToolbar"],
-  div.stAppToolbar{
-    display: none !important;
-  }
-}
+        /* =========================
+           MÓVIL: menú propio + ocultar sidebar nativo
+        ========================= */
+        @media (max-width: 768px) {{
 
-/* CELULAR: header VISIBLE (CLAVE) */
-@media (max-width: 768px){
-  header[data-testid="stHeader"]{
-    display: block !important;
-    height: auto !important;
-    background: transparent !important;
-  }
+            /* Ocultar sidebar nativo SOLO en móvil */
+            section[data-testid="stSidebar"] {{
+                display: none !important;
+            }}
 
-  /* Botón hamburguesa */
-  button[data-testid="stExpandSidebarButton"]{
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 999999 !important;
-  }
-}
+            /* Dejar espacio para header móvil fijo */
+            .block-container {{
+                padding-top: 70px !important;
+            }}
 
+            /* Header móvil fijo */
+            #fc-mobile-header {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 56px;
+                background: #0b3b60;
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                padding: 0 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }}
+
+            /* Botón hamburguesa */
+            #fc-menu-toggle {{
+                width: 44px;
+                height: 44px;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 5px;
+                padding: 0;
+                -webkit-tap-highlight-color: transparent;
+            }}
+
+            #fc-menu-toggle span {{
+                width: 24px;
+                height: 3px;
+                background: white;
+                border-radius: 2px;
+                transition: all 0.25s;
+                display: block;
+            }}
+
+            #fc-menu-toggle.open span:nth-child(1) {{
+                transform: rotate(45deg) translate(6px, 6px);
+            }}
+            #fc-menu-toggle.open span:nth-child(2) {{
+                opacity: 0;
+            }}
+            #fc-menu-toggle.open span:nth-child(3) {{
+                transform: rotate(-45deg) translate(6px, -6px);
+            }}
+
+            #fc-mobile-logo {{
+                color: white;
+                font-size: 18px;
+                font-weight: 800;
+                margin-left: 12px;
+                letter-spacing: -0.01em;
+            }}
+
+            /* Overlay */
+            #fc-mobile-overlay {{
+                position: fixed;
+                top: 56px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999998;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.25s;
+            }}
+
+            #fc-mobile-overlay.open {{
+                opacity: 1;
+                visibility: visible;
+            }}
+
+            /* Drawer */
+            #fc-mobile-menu {{
+                position: fixed;
+                top: 56px;
+                left: 0;
+                width: 290px;
+                height: calc(100vh - 56px);
+                height: calc(100dvh - 56px);
+                background: rgba(255,255,255,0.98);
+                box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+                z-index: 999999;
+                overflow-y: auto;
+                padding: 16px;
+            }}
+
+            #fc-mobile-menu.open {{
+                transform: translateX(0);
+            }}
+
+            /* Info usuario */
+            .fc-user-info {{
+                background: rgba(248,250,252,0.95);
+                padding: 14px;
+                border-radius: 12px;
+                margin-bottom: 14px;
+                border: 1px solid rgba(15,23,42,0.10);
+            }}
+
+            .fc-user-line {{
+                color: #0f172a;
+                font-size: 14px;
+                margin: 4px 0;
+                line-height: 1.2;
+            }}
+
+            .fc-user-sub {{
+                color: #64748b;
+                font-size: 12px;
+            }}
+
+            .fc-section-label {{
+                color: #64748b;
+                font-size: 11px;
+                font-weight: 800;
+                text-transform: uppercase;
+                margin: 12px 0 8px 4px;
+            }}
+
+            /* Items del menú */
+            .fc-menu-item {{
+                display: block;
+                padding: 14px 14px;
+                margin: 6px 0;
+                border-radius: 10px;
+                background: rgba(248,250,252,0.92);
+                border: 1px solid rgba(15,23,42,0.10);
+                cursor: pointer;
+                color: #0f172a !important;
+                font-size: 15px;
+                font-weight: 500;
+                text-decoration: none !important;
+                -webkit-tap-highlight-color: transparent;
+            }}
+
+            .fc-menu-item:active {{
+                background: rgba(245,158,11,0.10);
+                border-color: rgba(245,158,11,0.20);
+            }}
+
+            .fc-menu-item.fc-active {{
+                background: rgba(245,158,11,0.15);
+                border-color: rgba(245,158,11,0.30);
+                font-weight: 800;
+                color: #0b3b60 !important;
+            }}
+
+            .fc-logout {{
+                display: block;
+                padding: 14px 14px;
+                margin: 14px 0 6px 0;
+                border-radius: 10px;
+                background: rgba(244,63,94,0.08);
+                border: 1px solid rgba(244,63,94,0.20);
+                cursor: pointer;
+                color: #dc2626 !important;
+                font-size: 15px;
+                font-weight: 700;
+                text-decoration: none !important;
+            }}
+
+            .fc-logout:active {{
+                background: rgba(244,63,94,0.15);
+            }}
+        }}
         </style>
+
+        <!-- HEADER MÓVIL -->
+        <div id="fc-mobile-header">
+            <button id="fc-menu-toggle" onclick="fcToggleMenu()">
+                <span></span><span></span><span></span>
+            </button>
+            <div id="fc-mobile-logo">🦋 FertiChat</div>
+        </div>
+
+        <!-- OVERLAY -->
+        <div id="fc-mobile-overlay" onclick="fcToggleMenu()"></div>
+
+        <!-- MENÚ LATERAL MÓVIL -->
+        <div id="fc-mobile-menu">
+            <div class="fc-user-info">
+                <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
+                <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
+                <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
+            </div>
+
+            <div class="fc-section-label">Menú</div>
+
+            {menu_items_html}
+
+            <a class="fc-logout" href="?logout=1">🚪 Cerrar sesión</a>
+        </div>
+
+        <script>
+            function fcToggleMenu() {{
+                var btn = document.getElementById('fc-menu-toggle');
+                var menu = document.getElementById('fc-mobile-menu');
+                var ov  = document.getElementById('fc-mobile-overlay');
+                if (!btn || !menu || !ov) return;
+                btn.classList.toggle('open');
+                menu.classList.toggle('open');
+                ov.classList.toggle('open');
+            }}
+        </script>
         """,
         unsafe_allow_html=True
     )
@@ -140,7 +365,6 @@ def inject_css():
 # =========================
 # INICIALIZACIÓN
 # =========================
-inject_css()
 init_db()
 require_auth()
 
@@ -150,23 +374,29 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
-# Manejar navegación desde tarjetas de inicio (query params)
+# =========================
+# NAVEGACIÓN POR QUERY PARAMS (MENÚ MÓVIL)
+# =========================
 try:
     menu_param = st.query_params.get("menu")
     if menu_param and menu_param in MENU_OPTIONS:
         st.session_state["radio_menu"] = menu_param
         st.query_params.clear()
         st.rerun()
-    
+
     if st.query_params.get("logout") == "1":
         logout()
         st.query_params.clear()
         st.rerun()
-except:
+except Exception:
     pass
 
+# Inyectar CSS + menú móvil (usa radio_menu actual para resaltar)
+inject_css_and_mobile_menu(user=user, menu_actual=st.session_state["radio_menu"])
+
+
 # =========================
-# TÍTULO Y CAMPANITA
+# TÍTULO Y CAMPANITA (TU HEADER NORMAL)
 # =========================
 usuario_actual = user.get("usuario", user.get("email", ""))
 cant_pendientes = 0
@@ -201,7 +431,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # =========================
-# SIDEBAR (PC Y MÓVIL - AHORA FUNCIONA EN AMBOS)
+# SIDEBAR (SOLO PC VISUALMENTE; EN MÓVIL SE OCULTA POR CSS)
 # =========================
 with st.sidebar:
     st.markdown(f"""
@@ -225,7 +455,7 @@ with st.sidebar:
     st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
     if user.get('empresa'):
         st.markdown(f"🏢 {user.get('empresa')}")
-    st.markdown(f"📧 _{user.get('Usuario', '')}_")
+    st.markdown(f"📧 _{user.get('Usuario', user.get('usuario', ''))}_")
 
     st.markdown("---")
 
@@ -240,7 +470,7 @@ with st.sidebar:
 
 
 # =========================
-# ROUTER
+# ROUTER (IGUAL AL TUYO)
 # =========================
 menu_actual = st.session_state["radio_menu"]
 
