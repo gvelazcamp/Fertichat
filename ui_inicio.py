@@ -85,7 +85,7 @@ def mostrar_inicio():
     )
 
     # =========================
-    # Cards HTML ORIGINALES (LAS HERMOSAS)
+    # Cards HTML ORIGINALES (LAS HERMOSAS) - ARREGLADO
     # =========================
     html_cards = """
     <style>
@@ -153,87 +153,79 @@ def mostrar_inicio():
     <div class="fc-home-wrap">
       <div class="fc-section-title">📌 Módulos principales</div>
       <div class="fc-grid">
-        <a href="?go=compras" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-compras"><div class="fc-ico">🛒</div></div>
-              <div class="fc-txt"><h3>Compras IA</h3><p>Consultas inteligentes</p></div>
-            </div>
+        <div class="fc-card" onclick="go('compras')">
+          <div class="fc-row">
+            <div class="fc-tile tile-compras"><div class="fc-ico">🛒</div></div>
+            <div class="fc-txt"><h3>Compras IA</h3><p>Consultas inteligentes</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=buscador" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-buscador"><div class="fc-ico">🔎</div></div>
-              <div class="fc-txt"><h3>Buscador IA</h3><p>Buscar facturas / lotes</p></div>
-            </div>
+        <div class="fc-card" onclick="go('buscador')">
+          <div class="fc-row">
+            <div class="fc-tile tile-buscador"><div class="fc-ico">🔎</div></div>
+            <div class="fc-txt"><h3>Buscador IA</h3><p>Buscar facturas / lotes</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=stock" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-stock"><div class="fc-ico">📦</div></div>
-              <div class="fc-txt"><h3>Stock IA</h3><p>Consultar inventario</p></div>
-            </div>
+        <div class="fc-card" onclick="go('stock')">
+          <div class="fc-row">
+            <div class="fc-tile tile-stock"><div class="fc-ico">📦</div></div>
+            <div class="fc-txt"><h3>Stock IA</h3><p>Consultar inventario</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=dashboard" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-dashboard"><div class="fc-ico">📊</div></div>
-              <div class="fc-txt"><h3>Dashboard</h3><p>Ver estadísticas</p></div>
-            </div>
+        <div class="fc-card" onclick="go('dashboard')">
+          <div class="fc-row">
+            <div class="fc-tile tile-dashboard"><div class="fc-ico">📊</div></div>
+            <div class="fc-txt"><h3>Dashboard</h3><p>Ver estadísticas</p></div>
           </div>
-        </a>
+        </div>
       </div>
 
       <div style="height:22px;"></div>
       
       <div class="fc-section-title">📋 Gestión</div>
       <div class="fc-grid">
-        <a href="?go=pedidos" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-pedidos"><div class="fc-ico">📄</div></div>
-              <div class="fc-txt"><h3>Pedidos internos</h3><p>Gestionar pedidos</p></div>
-            </div>
+        <div class="fc-card" onclick="go('pedidos')">
+          <div class="fc-row">
+            <div class="fc-tile tile-pedidos"><div class="fc-ico">📄</div></div>
+            <div class="fc-txt"><h3>Pedidos internos</h3><p>Gestionar pedidos</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=baja" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-baja"><div class="fc-ico">🧾</div></div>
-              <div class="fc-txt"><h3>Baja de stock</h3><p>Registrar bajas</p></div>
-            </div>
+        <div class="fc-card" onclick="go('baja')">
+          <div class="fc-row">
+            <div class="fc-tile tile-baja"><div class="fc-ico">🧾</div></div>
+            <div class="fc-txt"><h3>Baja de stock</h3><p>Registrar bajas</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=ordenes" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-ordenes"><div class="fc-ico">📦</div></div>
-              <div class="fc-txt"><h3>Órdenes de compra</h3><p>Crear órdenes</p></div>
-            </div>
+        <div class="fc-card" onclick="go('ordenes')">
+          <div class="fc-row">
+            <div class="fc-tile tile-ordenes"><div class="fc-ico">📦</div></div>
+            <div class="fc-txt"><h3>Órdenes de compra</h3><p>Crear órdenes</p></div>
           </div>
-        </a>
+        </div>
 
-        <a href="?go=indicadores" style="text-decoration:none;">
-          <div class="fc-card">
-            <div class="fc-row">
-              <div class="fc-tile tile-indicadores"><div class="fc-ico">📈</div></div>
-              <div class="fc-txt"><h3>Indicadores</h3><p>Power BI</p></div>
-            </div>
+        <div class="fc-card" onclick="go('indicadores')">
+          <div class="fc-row">
+            <div class="fc-tile tile-indicadores"><div class="fc-ico">📈</div></div>
+            <div class="fc-txt"><h3>Indicadores</h3><p>Power BI</p></div>
           </div>
-        </a>
+        </div>
       </div>
     </div>
+
+    <script>
+      function go(dest){
+        const url = new URL(window.location.href);
+        url.searchParams.set('go', dest);
+        window.location.href = url.toString();
+      }
+    </script>
     """
 
-    st.markdown(html_cards, unsafe_allow_html=True)
+    components.html(html_cards, height=640, scrolling=True)
 
     # =========================
     # TIP DEL DÍA
