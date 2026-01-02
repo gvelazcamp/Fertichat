@@ -159,66 +159,73 @@ Usa frases como:
 
 def obtener_sugerencia_ejecutable(pregunta: str) -> dict:
     """
-    Usa OpenAI para entender qué quiso decir el usuario
-    y devolver UNA sugerencia que el sistema puede ejecutar.
-    SISTEMA HÍBRIDO: Interpreta lenguaje humano → Sugiere formato estándar
+    ✅ VERSIÓN MEJORADA: Interpreta TODAS las variaciones de lenguaje natural
     """
-    system_prompt = """Eres un intérprete para un chatbot de compras de laboratorio.
-Tu tarea es entender lo que el usuario quiere y traducirlo a un formato que el sistema entiende.
+    system_prompt = """Eres un intérprete experto para un chatbot de compras de laboratorio.
+Tu tarea es entender CUALQUIER forma en que el usuario pregunte y traducirla al formato exacto que el sistema entiende.
 
-IMPORTANTE: Debes responder SOLO en JSON válido, sin markdown ni explicaciones.
+IMPORTANTE: Responde SOLO en JSON válido, sin markdown.
 
-FORMATOS QUE EL SISTEMA ENTIENDE (usa estos exactamente):
+FORMATOS QUE EL SISTEMA ENTIENDE:
 
-COMPRAS:
-- "compras {proveedor} {año}" → compras roche 2025
-- "compras {proveedor} {mes} {año}" → compras roche noviembre 2025
-- "detalle compras {proveedor} {año}" → detalle compras roche 2025
-- "total compras {mes} {año}" → total compras noviembre 2025
+COMPRAS (todas estas variaciones son válidas):
+✅ "compras {proveedor} {año}" → compras roche 2025
+✅ "compras {proveedor} {mes} {año}" → compras roche noviembre 2025
+✅ "detalle compras {proveedor} {año}" → detalle compras roche 2025
+✅ "total compras {mes} {año}" → total compras noviembre 2025
+
+VARIACIONES QUE DEBES ENTENDER Y TRADUCIR:
+- "cuales fueron las compras a roche en noviembre 2025" → "compras roche noviembre 2025"
+- "cuanto le compramos a roche en noviembre 2025" → "compras roche noviembre 2025"
+- "mostrame las compras de roche noviembre 2025" → "compras roche noviembre 2025"
+- "dame las compras a roche de noviembre 2025" → "compras roche noviembre 2025"
+- "compras realizadas a roche en noviembre 2025" → "compras roche noviembre 2025"
+- "que compramos a roche en noviembre 2025" → "compras roche noviembre 2025"
+- "cuanto gastamos en roche noviembre 2025" → "compras roche noviembre 2025"
+
+PALABRAS CLAVE QUE INDICAN "COMPRAS":
+- "compras", "compré", "compramos", "comprado", "comprando"
+- "cuanto le compramos", "cuanto compramos", "cuanto gastamos"
+- "qué compramos", "que compras hicimos"
+- "cuales fueron las compras"
+- "mostrame las compras", "dame las compras"
+- "compras realizadas a", "compras hechas a"
+
+PREPOSICIONES QUE DEBES IGNORAR:
+- "a", "de", "en", "del", "al", "para", "con"
 
 COMPARACIONES:
-- "comparar {proveedor} {año1} {año2}" → comparar roche 2023 2024
-- "comparar {proveedor} {mes} {año1} vs {mes} {año2}" → comparar roche noviembre 2023 vs noviembre 2024
-- "comparar gastos familias {año1} {año2}" → comparar gastos familias 2023 2024
-- "comparar gastos familias {mes1} {mes2}" → comparar gastos familias junio julio
+✅ "comparar {proveedor} {año1} {año2}" → comparar roche 2023 2024
+✅ "comparar {proveedor} {mes} {año1} vs {mes} {año2}" → comparar roche noviembre 2023 vs noviembre 2024
+✅ "comparar gastos familias {año1} {año2}" → comparar gastos familias 2023 2024
 
 FACTURAS:
-- "última factura {proveedor/artículo}" → última factura vitek
-- "detalle factura {número}" → detalle factura 275217
-- "factura completa {artículo}" → factura completa vitek
+✅ "última factura {proveedor/artículo}" → última factura vitek
+✅ "detalle factura {número}" → detalle factura 275217
 
-GASTOS/FAMILIAS:
-- "gastos familias {mes} {año}" → gastos familias noviembre 2025
-- "gastos secciones {lista} {mes} {año}" → gastos secciones G,FB noviembre 2025
-- "top proveedores {mes} {año}" → top proveedores noviembre 2025
-- "top 10 proveedores {año}" → top 10 proveedores 2025
+GASTOS:
+✅ "gastos familias {mes} {año}" → gastos familias noviembre 2025
+✅ "top proveedores {mes} {año}" → top proveedores noviembre 2025
 
-STOCK:
-- "stock total"
-- "stock {artículo}" → stock vitek
-- "stock familia {sección}" → stock familia ID
-- "lotes por vencer"
-- "lotes vencidos"
-
-EJEMPLOS DE TRADUCCIÓN:
-- "cuanto le compramos a roche en 2024" → "compras roche 2024"
-- "que compramos de biodiagnostico en noviembre" → "compras biodiagnostico noviembre 2025"
-- "comparame roche del año pasado con este" → "comparar roche 2024 2025"
-- "Comparame compras Roche Novimbr 2023 2024" → "comparar roche noviembre 2023 vs noviembre 2024"
-- "cuanto gastamos en familias en junio y julio" → "comparar gastos familias junio julio"
-- "cuando fue la ultima vez que vino vitek" → "última factura vitek"
-- "cuanto hay en stock de reactivos" → "stock total"
-- "quienes son los proveedores que mas compramos" → "top 10 proveedores 2025"
-
-ERRORES COMUNES QUE DEBES ENTENDER:
+ERRORES COMUNES QUE DEBES CORREGIR:
 - "novimbre", "novienbre", "novimbr" → noviembre
 - "setiembre", "septirmbre" → septiembre
 - "oct", "nov", "dic" → octubre, noviembre, diciembre
-- Sin tildes: "ultima", "cuanto", "deposito"
-- "comparame", "comparar", "compara" → comparar
+- "ultima" → última
+- "cuanto" → cuánto
 
-RESPONDE SOLO JSON (sin ```json ni nada más):
-{"entendido": "Querés ver...", "sugerencia": "comando exacto", "alternativas": ["opción 1", "opción 2"]}
+EJEMPLOS REALES:
+Usuario: "cuales fueron las compras a roche en noviembre 2025"
+Respuesta: {"entendido": "Querés ver las compras realizadas al proveedor ROCHE en noviembre 2025", "sugerencia": "compras roche noviembre 2025", "alternativas": ["detalle compras roche noviembre 2025", "total compras roche noviembre 2025"]}
+
+Usuario: "cuanto le compramos a biodiagnostico este mes"
+Respuesta: {"entendido": "Querés ver las compras a BIODIAGNOSTICO del mes actual", "sugerencia": "compras biodiagnostico noviembre 2025", "alternativas": ["total compras biodiagnostico noviembre 2025"]}
+
+Usuario: "compras roche 2025"
+Respuesta: {"entendido": "Querés ver todas las compras a ROCHE en 2025", "sugerencia": "compras roche 2025", "alternativas": ["detalle compras roche 2025", "comparar roche 2024 2025"]}
+
+RESPONDE SOLO JSON (sin ```json):
+{"entendido": "descripción clara", "sugerencia": "comando exacto", "alternativas": ["opción 1", "opción 2"]}
 """
 
     try:
@@ -229,7 +236,7 @@ RESPONDE SOLO JSON (sin ```json ni nada más):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": pregunta}
             ],
-            temperature=0.2,
+            temperature=0.1,  # ✅ Reducido para mayor consistencia
             max_tokens=250,
             timeout=15
         )
@@ -304,7 +311,9 @@ def _sql_es_seguro(sql: str) -> bool:
     return True
 
 def fallback_openai_sql(pregunta: str, motivo: str) -> Tuple[Optional[str], Optional[pd.DataFrame], Optional[str]]:
-    """FALLBACK: Genera SQL con OpenAI cuando las reglas no funcionan"""
+    """
+    ✅ FALLBACK MEJORADO: Genera SQL SIN LIMIT para traer datos completos
+    """
     hoy = datetime.now()
     mes_actual = hoy.strftime('%Y-%m')
 
@@ -327,7 +336,7 @@ REGLAS:
 1. SIEMPRE filtrar: (tipo_comprobante = 'Compra Contado' OR tipo_comprobante LIKE 'Compra%')
 2. Para Total numérico: CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(Total), '.', ''), ',', '.'), '(', '-'), ')', ''), '$', '') AS DECIMAL(15,2))
 3. Para Mes: TRIM(Mes) = 'YYYY-MM'
-4. LIMIT 100 si es detalle
+4. ✅ NO USES LIMIT - Trae TODOS los registros (el sistema limitará en UI si es necesario)
 5. SOLO SELECT
 """
 
@@ -336,6 +345,8 @@ REGLAS:
 {schema_info}
 
 Fecha actual: {hoy.strftime('%Y-%m-%d')}, Mes actual: {mes_actual}
+
+✅ IMPORTANTE: NO agregues LIMIT a las queries. El sistema necesita todos los datos para cálculos correctos.
 
 Responde SOLO con JSON:
 {{"sql": "SELECT ...", "titulo": "descripción corta", "respuesta": "explicación breve de qué hace"}}
@@ -362,11 +373,15 @@ Responde SOLO con JSON:
         titulo = str(obj.get("titulo", "Resultado")).strip()
         respuesta = str(obj.get("respuesta", "")).strip()
 
+        # ✅ Remover LIMIT si OpenAI lo agregó
+        sql = re.sub(r'\s+LIMIT\s+\d+\s*$', '', sql, flags=re.IGNORECASE)
+
         if not _sql_es_seguro(sql):
             return None, None, None
 
         df = ejecutar_consulta(sql)
         return titulo, df, respuesta
 
-    except Exception:
+    except Exception as e:
+        print(f"❌ Error en fallback_openai_sql: {e}")
         return None, None, None
