@@ -77,7 +77,6 @@ def inject_css_responsive():
         /* =========================
            THEME (look & feel tipo mockup)
         ========================= */
-
         :root{
             --fc-bg-1: #f6f4ef;
             --fc-bg-2: #f3f6fb;
@@ -173,6 +172,7 @@ def inject_css_responsive():
             margin: 14px 0;
         }
 
+        /* (queda por compatibilidad si algún módulo usa fc-header) */
         .fc-header{
             background: rgba(255,255,255,0.70);
             border: 1px solid rgba(15,23,42,0.10);
@@ -190,24 +190,52 @@ def inject_css_responsive():
             width: 100%;
         }
 
-/* ✅ Más negro el texto default (por ejemplo "Fertilab") y placeholders en móvil */
-.stApp input,
-.stApp input:disabled{
-    color: #0f172a !important;          /* texto más negro */
-    -webkit-text-fill-color: #0f172a !important;  /* iOS/Android/Chrome mobile */
-    opacity: 1 !important;
-}
+        /* =========================
+           ✅ HEADER REAL (sin div vacío)
+           Estiliza el bloque de columnas que viene después del ancla
+        ========================= */
+        #fc_header_anchor{
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
 
-.stApp input::placeholder{
-    color: #64748b !important;          /* placeholder más visible */
-    -webkit-text-fill-color: #64748b !important;
-    opacity: 1 !important;
-}
+        #fc_header_anchor + div[data-testid="stHorizontalBlock"]{
+            background: rgba(255,255,255,0.70) !important;
+            border: 1px solid rgba(15,23,42,0.10) !important;
+            box-shadow: var(--fc-shadow) !important;
+            border-radius: var(--fc-radius) !important;
+            padding: 16px 18px !important;
+        }
 
-/* Si querés que el label también sea más oscuro */
-.stApp label{
-    color: #0f172a !important;
-}
+        /* Por si quedó algún fc-header vacío viejo, lo mata */
+        div.fc-header:empty{
+            display: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            height: 0 !important;
+        }
+
+        /* ✅ Más negro el texto default (por ejemplo "Fertilab") y placeholders en móvil */
+        .stApp input,
+        .stApp input:disabled{
+            color: #0f172a !important;
+            -webkit-text-fill-color: #0f172a !important;
+            opacity: 1 !important;
+        }
+
+        .stApp input::placeholder{
+            color: #64748b !important;
+            -webkit-text-fill-color: #64748b !important;
+            opacity: 1 !important;
+        }
+
+        /* Labels más oscuros */
+        .stApp label{
+            color: #0f172a !important;
+        }
 
         /* =========================
            RESPONSIVE
@@ -282,8 +310,8 @@ cant_pendientes = 0
 if usuario_actual:
     cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
-# Header con campanita integrada (SIN mariposa arriba)
-st.markdown("<div class='fc-header'>", unsafe_allow_html=True)
+# ✅ Ancla: estiliza el bloque de columnas (evita <div class="fc-header"></div> vacío)
+st.markdown("<div id='fc_header_anchor'></div>", unsafe_allow_html=True)
 
 col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
@@ -311,7 +339,6 @@ with col_notif:
         st.markdown("<div style='text-align:right; font-size:26px; padding-top:6px;'>🔔</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # =========================
