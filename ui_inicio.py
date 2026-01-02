@@ -1,6 +1,6 @@
 # =========================
 # UI_INICIO.PY - PANTALLA DE INICIO CON ACCESOS RÁPIDOS (CORPORATIVO)
-# LAS TARJETAS HERMOSAS ORIGINALES - SOLO ARREGLANDO NAVEGACIÓN
+# ARREGLADO PARA MÓVIL - USA window.parent.location
 # =========================
 
 import streamlit as st
@@ -85,11 +85,14 @@ def mostrar_inicio():
     )
 
     # =========================
-    # Cards HTML ORIGINALES (LAS HERMOSAS) - ARREGLADO
+    # Cards HTML - ARREGLADO CON window.parent.location
     # =========================
     html_cards = """
     <style>
-      .fc-home-wrap{max-width:1100px;margin:0 auto;}
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 0; }
+      
+      .fc-home-wrap{max-width:1100px;margin:0 auto;padding:0 8px;}
       .fc-section-title{
         color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase;
         letter-spacing:1px;margin:18px 0 10px 6px;display:flex;align-items:center;gap:8px;
@@ -105,6 +108,7 @@ def mostrar_inicio():
         transition:transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
         user-select:none;
         height:100%;
+        -webkit-tap-highlight-color: transparent;
       }
       .fc-card:hover{
         transform:translateY(-2px);
@@ -112,8 +116,8 @@ def mostrar_inicio():
         border-color:rgba(37,99,235,0.20);
       }
       .fc-card:active{
-        transform:translateY(0);
-        box-shadow:0 10px 26px rgba(2,6,23,0.06);
+        transform:scale(0.98);
+        box-shadow:0 6px 16px rgba(2,6,23,0.08);
       }
       .fc-row{display:flex;align-items:center;gap:14px;}
       .fc-tile{
@@ -139,10 +143,11 @@ def mostrar_inicio():
       .tile-indicadores{background:rgba(34,197,94,0.10);border-color:rgba(34,197,94,0.18);}
 
       @media (max-width: 980px){
-        .fc-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+        .fc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
       }
       @media (max-width: 520px){
-        .fc-grid{grid-template-columns:1fr;}
+        .fc-grid{grid-template-columns:1fr;gap:12px;}
+        .fc-card{padding:14px;}
         .fc-tile{width:50px;height:50px;border-radius:14px;flex:0 0 50px;}
         .fc-ico{font-size:24px;}
         .fc-txt h3{font-size:15px;}
@@ -153,28 +158,28 @@ def mostrar_inicio():
     <div class="fc-home-wrap">
       <div class="fc-section-title">📌 Módulos principales</div>
       <div class="fc-grid">
-        <div class="fc-card" onclick="go('compras')">
+        <div class="fc-card" onclick="navegarA('compras')">
           <div class="fc-row">
             <div class="fc-tile tile-compras"><div class="fc-ico">🛒</div></div>
             <div class="fc-txt"><h3>Compras IA</h3><p>Consultas inteligentes</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('buscador')">
+        <div class="fc-card" onclick="navegarA('buscador')">
           <div class="fc-row">
             <div class="fc-tile tile-buscador"><div class="fc-ico">🔎</div></div>
             <div class="fc-txt"><h3>Buscador IA</h3><p>Buscar facturas / lotes</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('stock')">
+        <div class="fc-card" onclick="navegarA('stock')">
           <div class="fc-row">
             <div class="fc-tile tile-stock"><div class="fc-ico">📦</div></div>
             <div class="fc-txt"><h3>Stock IA</h3><p>Consultar inventario</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('dashboard')">
+        <div class="fc-card" onclick="navegarA('dashboard')">
           <div class="fc-row">
             <div class="fc-tile tile-dashboard"><div class="fc-ico">📊</div></div>
             <div class="fc-txt"><h3>Dashboard</h3><p>Ver estadísticas</p></div>
@@ -186,28 +191,28 @@ def mostrar_inicio():
       
       <div class="fc-section-title">📋 Gestión</div>
       <div class="fc-grid">
-        <div class="fc-card" onclick="go('pedidos')">
+        <div class="fc-card" onclick="navegarA('pedidos')">
           <div class="fc-row">
             <div class="fc-tile tile-pedidos"><div class="fc-ico">📄</div></div>
             <div class="fc-txt"><h3>Pedidos internos</h3><p>Gestionar pedidos</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('baja')">
+        <div class="fc-card" onclick="navegarA('baja')">
           <div class="fc-row">
             <div class="fc-tile tile-baja"><div class="fc-ico">🧾</div></div>
             <div class="fc-txt"><h3>Baja de stock</h3><p>Registrar bajas</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('ordenes')">
+        <div class="fc-card" onclick="navegarA('ordenes')">
           <div class="fc-row">
             <div class="fc-tile tile-ordenes"><div class="fc-ico">📦</div></div>
             <div class="fc-txt"><h3>Órdenes de compra</h3><p>Crear órdenes</p></div>
           </div>
         </div>
 
-        <div class="fc-card" onclick="go('indicadores')">
+        <div class="fc-card" onclick="navegarA('indicadores')">
           <div class="fc-row">
             <div class="fc-tile tile-indicadores"><div class="fc-ico">📈</div></div>
             <div class="fc-txt"><h3>Indicadores</h3><p>Power BI</p></div>
@@ -217,15 +222,23 @@ def mostrar_inicio():
     </div>
 
     <script>
-      function go(dest){
-        const url = new URL(window.location.href);
-        url.searchParams.set('go', dest);
-        window.location.href = url.toString();
+      // *** CLAVE: usar window.parent para salir del iframe ***
+      function navegarA(destino) {
+        try {
+          // Obtener URL del padre (Streamlit), no del iframe
+          var parentUrl = window.parent.location.href;
+          var url = new URL(parentUrl);
+          url.searchParams.set('go', destino);
+          window.parent.location.href = url.toString();
+        } catch(e) {
+          // Fallback si hay error de cross-origin
+          window.parent.location.href = '/?go=' + destino;
+        }
       }
     </script>
     """
 
-    components.html(html_cards, height=640, scrolling=True)
+    components.html(html_cards, height=580, scrolling=False)
 
     # =========================
     # TIP DEL DÍA
