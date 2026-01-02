@@ -348,6 +348,56 @@ def inject_css_responsive():
                 flex: 1 1 280px !important;
             }
         }
+
+        /* =========================
+   FIX: Sidebar móvil visible (igual que PC)
+   - Fondo blanco / blur
+   - Texto negro (menú y labels)
+   ========================= */
+@media (max-width: 768px){
+
+  /* Fondo del drawer */
+  section[data-testid="stSidebar"],
+  section[data-testid="stSidebar"] > div,
+  div[data-testid="stSidebarContent"]{
+      background: rgba(255,255,255,0.90) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+  }
+
+  /* Bordes/sombra como PC */
+  section[data-testid="stSidebar"]{
+      border-right: 1px solid rgba(15, 23, 42, 0.10) !important;
+      box-shadow: 12px 0 28px rgba(2, 6, 23, 0.12) !important;
+  }
+
+  /* Texto visible (solo sidebar) */
+  section[data-testid="stSidebar"] .stMarkdown,
+  section[data-testid="stSidebar"] .stMarkdown * ,
+  section[data-testid="stSidebar"] label,
+  section[data-testid="stSidebar"] label * ,
+  section[data-testid="stSidebar"] p,
+  section[data-testid="stSidebar"] span{
+      color: #0f172a !important;
+  }
+
+  /* Radio: texto visible + mantiene tu estilo de seleccionado */
+  section[data-testid="stSidebar"] div[role="radiogroup"] label > div{
+      color: #0f172a !important;
+  }
+  section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) > div{
+      color: var(--fc-primary) !important;
+      font-weight: 700 !important;
+  }
+
+  /* (por las dudas) sigue sin el punto/radio gigante */
+  section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
+      display: none !important;
+  }
+}
+
         </style>
         """,
         unsafe_allow_html=True
