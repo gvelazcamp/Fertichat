@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # CERRADO al inicio
 )
 
 # =========================
@@ -103,95 +103,88 @@ def inject_css():
         }
 
         /* ========================================
-           MÓVIL - SELECTBOX FLOTANTE
+           RESPONSIVE MÓVIL - SIDEBAR NATIVO FORZADO
         ======================================== */
         @media (max-width: 768px){
             
-            /* Ocultar sidebar en móvil */
+            /* NO ocultar sidebar - dejarlo funcionar nativo */
             section[data-testid="stSidebar"]{
-                display: none !important;
+                display: block !important;
+                visibility: visible !important;
             }
 
-            /* Padding arriba para el selectbox */
-            .block-container{
-                padding-top: 85px !important;
-                padding-left: 0.8rem !important;
-                padding-right: 0.8rem !important;
+            /* Sidebar cuando está abierto */
+            section[data-testid="stSidebar"][aria-expanded="true"]{
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                background: rgba(255,255,255,0.98) !important;
+                backdrop-filter: blur(12px) !important;
             }
 
-            /* Container del selectbox móvil flotante */
-            div[data-testid="stSelectbox"]:first-of-type{
-                position: fixed !important;
-                top: 8px !important;
-                left: 8px !important;
-                right: 8px !important;
-                z-index: 9999 !important;
-                background: white !important;
-                padding: 8px 10px !important;
-                border-radius: 12px !important;
-                box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
-                border: 2px solid #0b3b60 !important;
-            }
-
-            /* Ocultar label */
-            div[data-testid="stSelectbox"]:first-of-type label{
-                display: none !important;
-            }
-
-            /* Estilo del select */
-            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"] > div{
-                background: white !important;
+            /* Textos del sidebar NEGROS */
+            section[data-testid="stSidebar"] *{
                 color: #0f172a !important;
-                font-size: 16px !important;
-                font-weight: 700 !important;
-                border: none !important;
-                padding: 6px 10px !important;
             }
 
-            /* Ícono hamburguesa */
-            div[data-testid="stSelectbox"]:first-of-type div[data-baseweb="select"]::before{
-                content: "☰";
-                font-size: 20px;
-                margin-right: 8px;
-                color: #0b3b60;
-                font-weight: 400;
-            }
-
-            /* Flecha */
-            div[data-testid="stSelectbox"]:first-of-type svg{
-                color: #0b3b60 !important;
-                width: 20px !important;
-                height: 20px !important;
-            }
-
-            /* Dropdown abierto */
-            div[data-baseweb="popover"] ul{
-                background: white !important;
-                border: 2px solid #0b3b60 !important;
+            /* Items del menú radio */
+            section[data-testid="stSidebar"] div[role="radiogroup"] label{
+                background: rgba(248,250,252,0.8) !important;
+                border: 1px solid rgba(15,23,42,0.1) !important;
                 border-radius: 10px !important;
-                box-shadow: 0 10px 28px rgba(0,0,0,0.25) !important;
-                max-height: 65vh !important;
+                padding: 10px 12px !important;
+                margin: 4px 0 !important;
             }
 
-            div[data-baseweb="popover"] li{
-                color: #0f172a !important;
-                font-size: 15px !important;
-                padding: 11px 14px !important;
-                border-bottom: 1px solid #e5e7eb !important;
-            }
-
-            div[data-baseweb="popover"] li:hover,
-            div[data-baseweb="popover"] li[aria-selected="true"]{
-                background: rgba(245,158,11,0.12) !important;
-                color: #0b3b60 !important;
+            section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+                background: rgba(245,158,11,0.15) !important;
+                border-color: rgba(245,158,11,0.3) !important;
                 font-weight: 700 !important;
             }
-        }
 
-        /* PC - selectbox oculto */
-        @media (min-width: 769px){
-            div[data-testid="stSelectbox"]:first-of-type{
+            /* Ocultar círculo del radio */
+            section[data-testid="stSidebar"] div[role="radiogroup"] div[data-baseweb="radio"]{
                 display: none !important;
+            }
+
+            /* BOTÓN HAMBURGUESA - SÚPER VISIBLE */
+            button[data-testid="stExpandSidebarButton"],
+            button[data-testid="stSidebarCollapsedControl"],
+            button[data-testid="stSidebarCollapseButton"],
+            button[data-testid="baseButton-header"],
+            button[kind="header"],
+            button[kind="headerNoPadding"]{
+                display: flex !important;
+                position: fixed !important;
+                top: 12px !important;
+                left: 12px !important;
+                z-index: 999999 !important;
+                width: 52px !important;
+                height: 52px !important;
+                background: #ffffff !important;
+                border: 2px solid #0b3b60 !important;
+                border-radius: 14px !important;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            button[data-testid="stExpandSidebarButton"] svg,
+            button[data-testid="stSidebarCollapsedControl"] svg,
+            button[data-testid="stSidebarCollapseButton"] svg,
+            button[data-testid="baseButton-header"] svg,
+            button[kind="header"] svg{
+                color: #0b3b60 !important;
+                fill: #0b3b60 !important;
+                width: 26px !important;
+                height: 26px !important;
+            }
+
+            /* Padding para el contenido */
+            .block-container{
+                padding-top: 1.5rem !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
             }
         }
         </style>
@@ -208,37 +201,6 @@ init_db()
 require_auth()
 
 user = get_current_user() or {}
-
-# =========================
-# MENÚ MÓVIL (SELECTBOX FLOTANTE)
-# =========================
-if "radio_menu" not in st.session_state:
-    st.session_state["radio_menu"] = "🏠 Inicio"
-
-# Detectar ancho de pantalla (aproximado)
-import streamlit.components.v1 as components
-screen_width = components.html(
-    """
-    <script>
-    window.parent.postMessage({width: window.innerWidth}, "*");
-    </script>
-    """,
-    height=0
-)
-
-# Mostrar selectbox SIEMPRE (CSS lo oculta en PC)
-menu_mobile = st.selectbox(
-    "Menú",
-    MENU_OPTIONS,
-    index=MENU_OPTIONS.index(st.session_state["radio_menu"]),
-    key="mobile_menu_select",
-    label_visibility="collapsed"
-)
-
-# Si cambió el selectbox móvil, actualizar
-if menu_mobile != st.session_state["radio_menu"]:
-    st.session_state["radio_menu"] = menu_mobile
-    st.rerun()
 
 # =========================
 # TÍTULO Y CAMPANITA
