@@ -41,14 +41,10 @@ def mostrar_inicio():
                 "baja": "🧾 Baja de stock",
                 "ordenes": "📦 Órdenes de compra",
                 "indicadores": "📈 Indicadores (Power BI)",
-                "comprobantes": "📥 Ingreso de comprobantes",
-                "ficha": "📒 Ficha de stock",
-                "articulos": "📚 Artículos",
-                "depositos": "🏬 Depósitos",
             }
             destino = mapping.get(go.strip().lower())
             if destino:
-                st.session_state["navegacion_destino"] = destino
+                st.session_state["radio_menu"] = destino
                 _clear_query_params_safe()
                 st.rerun()
             else:
@@ -88,7 +84,7 @@ def mostrar_inicio():
     )
 
     # =========================
-    # Cards HTML (clickeables)
+    # Cards HTML (clickeables) - SOLO LAS 8 ORIGINALES
     # =========================
     html_cards = """
     <style>
@@ -140,10 +136,7 @@ def mostrar_inicio():
       .tile-baja{background:rgba(244,63,94,0.10);border-color:rgba(244,63,94,0.18);}
       .tile-ordenes{background:rgba(100,116,139,0.10);border-color:rgba(100,116,139,0.18);}
       .tile-indicadores{background:rgba(34,197,94,0.10);border-color:rgba(34,197,94,0.18);}
-      .tile-comprobantes{background:rgba(168,85,247,0.10);border-color:rgba(168,85,247,0.18);}
-      .tile-ficha{background:rgba(251,146,60,0.10);border-color:rgba(251,146,60,0.18);}
-      .tile-articulos{background:rgba(20,184,166,0.10);border-color:rgba(20,184,166,0.18);}
-      .tile-depositos{background:rgba(99,102,241,0.10);border-color:rgba(99,102,241,0.18);}
+
       @media (max-width: 980px){
         .fc-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
       }
@@ -220,46 +213,6 @@ def mostrar_inicio():
           </div>
         </div>
       </div>
-
-      <div style="height:22px;"></div>
-      
-      <div class="fc-section-title">⚙️ Configuración</div>
-      <div class="fc-grid">
-        <div class="fc-card" onclick="go('comprobantes')">
-          <div class="fc-row">
-            <div class="fc-tile tile-comprobantes"><div class="fc-ico">📥</div></div>
-            <div class="fc-txt"><h3>Ingreso comprobantes</h3><p>Cargar facturas</p></div>
-          </div>
-        </div>
-
-        <div class="fc-card" onclick="go('ficha')">
-          <div class="fc-row">
-            <div class="fc-tile tile-ficha"><div class="fc-ico">📒</div></div>
-            <div class="fc-txt"><h3>Ficha de stock</h3><p>Ver movimientos</p></div>
-          </div>
-        </div>
-
-        <div class="fc-card" onclick="go('articulos')">
-          <div class="fc-row">
-            <div class="fc-tile tile-articulos"><div class="fc-ico">📚</div></div>
-            <div class="fc-txt"><h3>Artículos</h3><p>Gestionar productos</p></div>
-          </div>
-        </div>
-
-        <div class="fc-card" onclick="go('depositos')">
-          <div class="fc-row">
-            <div class="fc-tile tile-depositos"><div class="fc-ico">🏬</div></div>
-            <div class="fc-txt"><h3>Depósitos</h3><p>Gestionar depósitos</p></div>
-          </div>
-        </div>
-
-        <div class="fc-card" onclick="go('familias')">
-          <div class="fc-row">
-            <div class="fc-tile tile-familias"><div class="fc-ico">🧩</div></div>
-            <div class="fc-txt"><h3>Familias</h3><p>Categorías</p></div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <script>
@@ -271,7 +224,7 @@ def mostrar_inicio():
     </script>
     """
 
-    components.html(html_cards, height=820, scrolling=True)
+    components.html(html_cards, height=640, scrolling=True)
 
     # =========================
     # TIP DEL DÍA
@@ -282,8 +235,6 @@ def mostrar_inicio():
         "💡 Probá 'comparar roche 2024 2025' para ver la evolución de compras",
         "💡 En el Buscador podés filtrar por proveedor, artículo y fechas",
         "💡 Usá 'top 10 proveedores 2025' para ver el ranking de compras",
-        "💡 El Dashboard te muestra estadísticas en tiempo real de tus operaciones",
-        "💡 Podés hacer click en las tarjetas de la pantalla de inicio para navegar rápido",
     ]
     tip = random.choice(tips)
 
