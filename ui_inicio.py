@@ -45,7 +45,6 @@ def mostrar_inicio():
                 "ficha": "📒 Ficha de stock",
                 "articulos": "📚 Artículos",
                 "depositos": "🏬 Depósitos",
-                "familias": "🧩 Familias",
             }
             destino = mapping.get(go.strip().lower())
             if destino:
