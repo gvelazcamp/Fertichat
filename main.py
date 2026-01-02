@@ -100,13 +100,6 @@ def inject_css():
             background: rgba(245,158,11,0.10);
             border: 1px solid rgba(245,158,11,0.18);
         }
-
-        /* PC - Normal */
-        @media (min-width: 769px){
-            .block-container{
-                padding-top: 1.25rem !important;
-            }
-        }
         </style>
         """,
         unsafe_allow_html=True
