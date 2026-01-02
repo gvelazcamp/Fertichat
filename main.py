@@ -50,12 +50,142 @@ from depositos import mostrar_depositos
 from familias import mostrar_familias
 
 # =========================
-# CSS RESPONSIVE
+# CSS RESPONSIVE + TEMA CORPORATIVO
 # =========================
 def inject_css_responsive():
     st.markdown(
         """
         <style>
+        /* =========================
+           THEME (look & feel tipo mockup)
+        ========================= */
+
+        :root{
+            --fc-bg-1: #f6f4ef;          /* beige suave */
+            --fc-bg-2: #f3f6fb;          /* celeste ultra suave */
+            --fc-surface: #ffffff;       /* tarjetas */
+            --fc-border: rgba(15, 23, 42, 0.10);
+            --fc-text: #0f172a;
+            --fc-muted: #64748b;
+            --fc-primary: #0b3b60;       /* azul corporativo */
+            --fc-primary-2: #2563eb;     /* azul acento */
+            --fc-accent: #f59e0b;        /* naranja/acento */
+            --fc-radius: 18px;
+            --fc-radius-sm: 12px;
+            --fc-shadow: 0 14px 40px rgba(2, 6, 23, 0.08);
+            --fc-shadow-sm: 0 8px 22px rgba(2, 6, 23, 0.06);
+        }
+
+        html, body, [class*="css"]{
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+            color: var(--fc-text);
+        }
+
+        /* Fondo general */
+        [data-testid="stAppViewContainer"]{
+            background:
+                radial-gradient(1200px 600px at 20% 10%, rgba(245,158,11,0.10), transparent 55%),
+                radial-gradient(900px 520px at 90% 20%, rgba(37,99,235,0.10), transparent 55%),
+                linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
+        }
+
+        /* “ondas” suaves (overlay) */
+        [data-testid="stAppViewContainer"]::before{
+            content:"";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.20;
+            background-image: url("data:image/svg+xml;utf8,<?xml version='1.0' encoding='UTF-8'?>\
+<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'>\
+<path d='M0,680 C260,610 420,740 720,670 C1020,600 1200,740 1600,640 L1600,900 L0,900 Z' fill='%230b3b60' fill-opacity='0.06'/>\
+<path d='M0,720 C260,650 440,800 760,720 C1080,640 1220,760 1600,690 L1600,900 L0,900 Z' fill='%232563eb' fill-opacity='0.05'/>\
+</svg>");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+        }
+
+        /* Contenedor principal */
+        .block-container{
+            max-width: 1240px;
+            padding-top: 1.25rem;
+            padding-bottom: 2.25rem;
+        }
+
+        /* Sidebar */
+        section[data-testid="stSidebar"]{
+            border-right: 1px solid rgba(15, 23, 42, 0.08);
+        }
+        section[data-testid="stSidebar"] > div{
+            background: rgba(255,255,255,0.70);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Inputs (incluye buscador sidebar) */
+        .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"]{
+            border-radius: 999px !important;
+        }
+
+        /* Radios del menú (sidebar) */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label{
+            border-radius: 12px;
+            padding: 8px 10px;
+            margin: 3px 0;
+            border: 1px solid transparent;
+            transition: all 120ms ease;
+        }
+        div[data-testid="stSidebar"] div[role="radiogroup"] label:hover{
+            background: rgba(37,99,235,0.06);
+            border: 1px solid rgba(37,99,235,0.10);
+        }
+        /* item seleccionado */
+        div[data-testid="stSidebar"] div[role="radiogroup"] label input:checked + div{
+            font-weight: 700 !important;
+            color: var(--fc-primary) !important;
+        }
+        div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+            background: rgba(245,158,11,0.10);
+            border: 1px solid rgba(245,158,11,0.18);
+        }
+
+        /* Botones */
+        .stButton > button{
+            border-radius: 14px !important;
+            border: 1px solid rgba(15,23,42,0.10) !important;
+            box-shadow: var(--fc-shadow-sm);
+        }
+
+        /* Separadores */
+        hr{
+            border: none;
+            border-top: 1px solid rgba(15,23,42,0.10);
+            margin: 14px 0;
+        }
+
+        /* Header (tu bloque) */
+        .fc-header{
+            background: rgba(255,255,255,0.70);
+            border: 1px solid rgba(15,23,42,0.10);
+            box-shadow: var(--fc-shadow);
+            border-radius: var(--fc-radius);
+            padding: 16px 18px;
+        }
+        .fc-brand h1{
+            letter-spacing: -0.02em;
+        }
+        .fc-subtitle{
+            color: var(--fc-muted);
+        }
+
+        /* Campanita */
+        .fc-notif button{
+            width: 100%;
+        }
+
+        /* =========================
+           RESPONSIVE (tu CSS original, intacto)
+        ========================= */
         @media (max-width: 768px){
             .block-container{
                 padding-top: 0.9rem !important;
@@ -127,28 +257,33 @@ if usuario_actual:
     cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
 # Header con campanita integrada
+st.markdown("<div class='fc-header'>", unsafe_allow_html=True)
 col_logo, col_spacer, col_notif = st.columns([6, 3, 1])
 
 with col_logo:
     st.markdown("""
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="fc-brand" style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 42px;">🦋</span>
             <div>
-                <h1 style="margin: 0; font-size: 32px; font-weight: 700; color: #1e293b;">FertiChat</h1>
-                <p style="margin: 0; font-size: 14px; color: #64748b;">Sistema de Gestión de Compras</p>
+                <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">FertiChat</h1>
+                <p class="fc-subtitle" style="margin: 0; font-size: 14px;">Sistema de Gestión de Compras</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 with col_notif:
+    st.markdown("<div class='fc-notif'>", unsafe_allow_html=True)
     if cant_pendientes > 0:
         if st.button(f"🔔 {cant_pendientes}", key="campanita_global", help="Tenés pedidos internos pendientes"):
             st.session_state["ir_a_pedidos"] = True
             st.rerun()
     else:
         st.markdown("<div style='text-align: right; font-size: 24px; padding-top: 10px;'>🔔</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<hr>", unsafe_allow_html=True)
 
 # =========================
 # SIDEBAR
@@ -156,17 +291,25 @@ st.markdown("<hr style='margin: 15px 0; border: none; border-top: 1px solid #e2e
 with st.sidebar:
     st.markdown(f"""
         <div style='
-            background: linear-gradient(135deg, #1e3a5f, #3d7ab5);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            color: white;
+            background: rgba(255,255,255,0.85);
+            padding: 16px;
+            border-radius: 18px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
         '>
-            <div style='font-size: 24px; text-align: center; margin-bottom: 5px;'>🦋</div>
-            <div style='font-size: 18px; font-weight: bold; text-align: center;'>Ferti Chat</div>
-            <div style='font-size: 12px; text-align: center; opacity: 0.8;'>Sistema de Gestión</div>
+            <div style='display:flex; align-items:center; gap:10px; justify-content:center;'>
+                <div style='font-size: 26px;'>🦋</div>
+                <div style='font-size: 20px; font-weight: 800; color:#0f172a;'>FertiChat</div>
+            </div>
+            <div style='font-size: 12px; text-align:center; color:#64748b; margin-top:2px;'>
+                Sistema de Gestión
+            </div>
         </div>
     """, unsafe_allow_html=True)
+
+    # Buscador visual (no afecta la lógica del menú)
+    st.text_input("Buscar...", value="", key="sidebar_search", label_visibility="collapsed", placeholder="Buscar...")
 
     st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
     if user.get('empresa'):
@@ -190,14 +333,14 @@ with st.sidebar:
     if st.session_state.get("navegacion_destino"):
         st.session_state["radio_menu"] = st.session_state["navegacion_destino"]
         del st.session_state["navegacion_destino"]
-    
+
     # Si no hay valor previo, usar Inicio
     if "radio_menu" not in st.session_state:
         st.session_state["radio_menu"] = "🏠 Inicio"
 
     menu = st.radio(
-        "Ir a:", 
-        MENU_OPTIONS, 
+        "Ir a:",
+        MENU_OPTIONS,
         key="radio_menu"
     )
 
@@ -214,6 +357,7 @@ elif menu == "🛒 Compras IA":
 elif menu == "📦 Stock IA":
     mostrar_resumen_stock_rotativo()
     mostrar_stock_ia()
+
 elif menu == "🔎 Buscador IA":
     mostrar_buscador_ia()
 
@@ -246,4 +390,3 @@ elif menu == "🏬 Depósitos":
 
 elif menu == "🧩 Familias":
     mostrar_familias()
-
