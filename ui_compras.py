@@ -141,10 +141,10 @@ def mostrar_detalle_df(
     titulo="Detalle",
     key="detalle",
     contexto_respuesta=None,
-    max_rows=1000, 
+    max_rows=1000,
     enable_chart=True,
     enable_explain=True,
-):
+    
     # ---------------------------------
     # Validaciones básicas
     # ---------------------------------
