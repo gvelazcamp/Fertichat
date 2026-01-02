@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - SOLUCIÓN DEFINITIVA CON BOTONES NATIVOS
+# MAIN.PY - SOLO SIDEBAR (SIN MENÚ MÓVIL)
 # =========================
 
 import streamlit as st
@@ -34,7 +34,7 @@ from familias import mostrar_familias
 
 
 # =========================
-# CSS GLOBAL
+# CSS SIMPLE
 # =========================
 st.markdown("""
 <style>
@@ -76,10 +76,11 @@ html, body {
     padding-bottom: 2.25rem;
 }
 
-/* Sidebar PC */
+/* Sidebar */
 section[data-testid="stSidebar"] {
     border-right: 1px solid rgba(15, 23, 42, 0.08);
 }
+
 section[data-testid="stSidebar"] > div {
     background: rgba(255,255,255,0.70);
     backdrop-filter: blur(8px);
@@ -91,187 +92,20 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label {
     margin: 3px 0;
     border: 1px solid transparent;
 }
+
 div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
     background: rgba(37,99,235,0.06);
 }
+
 div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background: rgba(245,158,11,0.10);
     border: 1px solid rgba(245,158,11,0.18);
 }
 
-/* PC: ocultar menú móvil */
-@media (min-width: 769px) {
-    #fc-mobile-header,
-    #fc-mobile-menu-container,
-    #fc-overlay {
-        display: none !important;
-    }
-}
-
-    /* MÓVIL: menú propio */
+/* Móvil: sidebar se puede abrir */
 @media (max-width: 768px) {
-    section[data-testid="stSidebar"] {
-        display: none !important;
-    }
-
     .block-container {
-        padding-top: 70px !important;
-    }
-
-    #fc-mobile-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 56px;
-        background: #0b3b60;
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        padding: 0 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-
-    #fc-mobile-logo {
-        color: white;
-        font-size: 18px;
-        font-weight: 800;
-        margin-left: 12px;
-        letter-spacing: -0.01em;
-    }
-
-    /* Ocultar el contenedor del menú móvil por defecto */
-    #fc-mobile-menu-container {
-        position: fixed;
-        top: 56px;
-        left: 0;
-        width: 290px;
-        height: calc(100vh - 56px);
-        background: rgba(255,255,255,0.98);
-        box-shadow: 4px 0 12px rgba(0,0,0,0.15);
-        z-index: 999998;
-        overflow-y: auto;
-        padding: 16px;
-        transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        visibility: hidden;
-        opacity: 0;
-    }
-
-    #fc-mobile-menu-container.open {
-        transform: translateX(0);
-        visibility: visible;
-        opacity: 1;
-    }
-
-    .fc-user-info {
-        background: rgba(248,250,252,0.95);
-        padding: 14px;
-        border-radius: 12px;
-        margin-bottom: 14px;
-        border: 1px solid rgba(15,23,42,0.10);
-    }
-
-    .fc-user-line {
-        color: #0f172a;
-        font-size: 14px;
-        margin: 4px 0;
-        line-height: 1.2;
-    }
-
-    .fc-user-sub {
-        color: #64748b;
-        font-size: 12px;
-    }
-
-    .fc-section-label {
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 800;
-        text-transform: uppercase;
-        margin: 12px 0 8px 4px;
-    }
-
-    /* Estilizar botones de Streamlit como tu menú */
-    #fc-mobile-menu-container button[kind="secondary"] {
-        display: block !important;
-        width: 100%;
-        padding: 14px 14px;
-        margin: 6px 0;
-        border-radius: 10px;
-        background: rgba(248,250,252,0.92) !important;
-        border: 1px solid rgba(15,23,42,0.10) !important;
-        cursor: pointer;
-        color: #0f172a !important;
-        font-size: 15px;
-        font-weight: 500;
-        text-decoration: none;
-        text-align: left;
-    }
-
-    #fc-mobile-menu-container button[kind="secondary"]:hover {
-        background: rgba(245,158,11,0.10) !important;
-        border-color: rgba(245,158,11,0.20) !important;
-    }
-
-    #fc-mobile-menu-container button[kind="primary"] {
-        display: block !important;
-        width: 100%;
-        padding: 14px 14px;
-        margin: 14px 0 6px 0;
-        border-radius: 10px;
-        background: rgba(244,63,94,0.08) !important;
-        border: 1px solid rgba(244,63,94,0.20) !important;
-        cursor: pointer;
-        color: #dc2626 !important;
-        font-size: 15px;
-        font-weight: 700;
-    }
-
-    .fc-menu-toggle {
-        width: 44px;
-        height: 44px;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        gap: 5px;
-        padding: 0;
-    }
-
-    .fc-menu-toggle span {
-        width: 24px;
-        height: 3px;
-        background: white;
-        border-radius: 2px;
-        transition: all 0.20s;
-        display: block;
-    }
-
-    #fc-overlay {
-        position: fixed;
-        top: 56px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 999997;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.25s;
-    }
-
-    #fc-overlay.open {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    /* CRÍTICO: Ocultar botones en PC y cuando menú está cerrado */
-    #fc-mobile-menu-container:not(.open) button {
-        pointer-events: none;
+        padding-top: 1.25rem;
     }
 }
 </style>
@@ -288,29 +122,6 @@ user = get_current_user() or {}
 
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
-
-if "menu_open" not in st.session_state:
-    st.session_state["menu_open"] = False
-
-
-# =========================
-# HEADER MÓVIL (SIEMPRE VISIBLE)
-# =========================
-st.markdown(f"""
-<div id="fc-mobile-header">
-  <div class="fc-menu-toggle" onclick="window.parent.document.querySelector('#fc-mobile-menu-container').classList.toggle('open'); window.parent.document.querySelector('#fc-overlay').classList.toggle('open');">
-    <span></span><span></span><span></span>
-  </div>
-  <div id="fc-mobile-logo">🦋 FertiChat</div>
-</div>
-<div id="fc-overlay" onclick="this.classList.remove('open'); window.parent.document.querySelector('#fc-mobile-menu-container').classList.remove('open');"></div>
-""", unsafe_allow_html=True)
-
-
-# =========================
-# PLACEHOLDER PARA MENÚ MÓVIL (se crea después del contenido principal)
-# =========================
-menu_placeholder = st.empty()
 
 
 # =========================
@@ -349,7 +160,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # =========================
-# SIDEBAR (PC)
+# SIDEBAR (PC Y MÓVIL)
 # =========================
 with st.sidebar:
     st.markdown(f"""
@@ -384,6 +195,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## 📌 Menú")
 
+    # ESTE ES EL ÚNICO MENÚ - Funciona en PC y móvil
     menu = st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
 
@@ -435,34 +247,3 @@ elif menu_actual == "🏬 Depósitos":
 
 elif menu_actual == "🧩 Familias":
     mostrar_familias()
-
-
-# =========================
-# MENÚ MÓVIL AL FINAL (PARA QUE NO INTERFIERA CON EL CONTENIDO)
-# =========================
-with menu_placeholder.container():
-    st.markdown('<div id="fc-mobile-menu-container">', unsafe_allow_html=True)
-    
-    # Info usuario
-    st.markdown(f"""
-    <div class="fc-user-info">
-        <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
-        <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
-        <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
-    </div>
-    <div class="fc-section-label">Menú</div>
-    """, unsafe_allow_html=True)
-    
-    # Botones del menú
-    for opcion in MENU_OPTIONS:
-        if st.button(opcion, key=f"mobile_menu_{opcion}", type="secondary", use_container_width=True):
-            st.session_state["radio_menu"] = opcion
-            st.session_state["menu_open"] = False
-            st.rerun()
-    
-    # Botón logout
-    if st.button("🚪 Cerrar sesión", key="mobile_logout", type="primary", use_container_width=True):
-        logout()
-        st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
