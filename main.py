@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - SIDEBAR NATIVO (PC) + FLECHITA NATIVA (MÓVIL)
+# MAIN.PY - SIDEBAR NATIVO (PC) + FLECHITA/☰ NATIVO (MÓVIL)
 # =========================
 
 import streamlit as st
@@ -46,24 +46,25 @@ if "radio_menu" not in st.session_state:
 
 
 # =========================
-# CSS (IMPORTANTE: NO ROMPER CONTROLES NATIVOS EN MÓVIL)
+# CSS (CLAVE: NO OCULTAR TOOLBAR/HEADER NATIVO EN MÓVIL)
 # =========================
 st.markdown(r"""
 <style>
-/* Ocultar UI de Streamlit */
-div.stAppToolbar, div[data-testid="stToolbar"], div[data-testid="stToolbarActions"],
+/* Ocultar UI de Streamlit (SIN ocultar stToolbar completo) */
 div[data-testid="stDecoration"], #MainMenu, footer {
   display: none !important;
 }
 
-/* ✅ NO poner height:0 global al header: en móvil hace desaparecer controles nativos */
-header[data-testid="stHeader"] {
-  background: transparent !important;
+/* Ocultar acciones del toolbar (pero NO el toolbar entero, porque ahí vive el control del sidebar) */
+div[data-testid="stToolbarActions"] {
+  display: none !important;
 }
 
-header, header[data-testid="stHeader"] {
+/* Header: mantenerlo visible (si lo ocultás, desaparece el control del sidebar en móvil) */
+header[data-testid="stHeader"] {
   visibility: visible !important;
   height: auto !important;
+  background: transparent !important;
 }
 
 /* Theme general */
@@ -95,20 +96,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 #mobile-header { display: none; }
 
 /* =========================
-   PC: sidebar tradicional siempre visible
-   - oculto el botón nativo de colapsar/expandir (arriba a la izquierda)
-   - también puedo colapsar el header para que no deje espacio
-========================= */
-@media (min-width: 768px) {
-  header[data-testid="stHeader"] { height: 0 !important; }
-  div[data-testid="collapsedControl"] { display: none !important; }
-}
-
-/* =========================
-   MÓVIL:
-   - mostramos header visual
-   - forzamos que el control nativo (flechita/☰) se vea y quede arriba
-   - NO ocultamos la flechita gris del sidebar (baseButton-header): la querés para cerrar
+   MÓVIL: mostrar header visual + asegurar que el control nativo se vea/clickee
 ========================= */
 @media (max-width: 767px) {
   .block-container { padding-top: 70px !important; }
@@ -132,18 +120,22 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     font-weight: 800;
   }
 
-  /* ✅ Control nativo (arriba a la izquierda). Esto es lo que te muestra la flecha/☰ */
-  div[data-testid="collapsedControl"] {
-    display: flex !important;
+  /* ✅ Control nativo “abrir sidebar” (en algunos streamlit es collapsedControl, en otros stSidebarExpandButton) */
+  div[data-testid="collapsedControl"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Open sidebar"] {
+    display: inline-flex !important;
     position: fixed !important;
     top: 12px !important;
     left: 12px !important;
     z-index: 1000000 !important;
   }
 
-  /* ✅ Asegurar que la flechita gris dentro del sidebar (Cerrar menú) NO se oculte */
-  [data-testid="baseButton-header"] {
-    display: flex !important;
+  /* ✅ Flecha gris “Cerrar menú” dentro del sidebar (varía según versión) */
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[title="Close sidebar"] {
+    display: inline-flex !important;
   }
 }
 </style>
