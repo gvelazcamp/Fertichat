@@ -308,35 +308,9 @@ st.markdown(f"""
 
 
 # =========================
-# MENÚ MÓVIL CON BOTONES NATIVOS DE STREAMLIT
+# PLACEHOLDER PARA MENÚ MÓVIL (se crea después del contenido principal)
 # =========================
-menu_container = st.container()
-with menu_container:
-    st.markdown('<div id="fc-mobile-menu-container">', unsafe_allow_html=True)
-    
-    # Info usuario
-    st.markdown(f"""
-    <div class="fc-user-info">
-        <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
-        <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
-        <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
-    </div>
-    <div class="fc-section-label">Menú</div>
-    """, unsafe_allow_html=True)
-    
-    # Botones del menú (usando st.button que NO recarga la página)
-    for opcion in MENU_OPTIONS:
-        if st.button(opcion, key=f"mobile_menu_{opcion}", type="secondary", use_container_width=True):
-            st.session_state["radio_menu"] = opcion
-            st.session_state["menu_open"] = False
-            st.rerun()
-    
-    # Botón logout
-    if st.button("🚪 Cerrar sesión", key="mobile_logout", type="primary", use_container_width=True):
-        logout()
-        st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+menu_placeholder = st.empty()
 
 
 # =========================
@@ -461,3 +435,34 @@ elif menu_actual == "🏬 Depósitos":
 
 elif menu_actual == "🧩 Familias":
     mostrar_familias()
+
+
+# =========================
+# MENÚ MÓVIL AL FINAL (PARA QUE NO INTERFIERA CON EL CONTENIDO)
+# =========================
+with menu_placeholder.container():
+    st.markdown('<div id="fc-mobile-menu-container">', unsafe_allow_html=True)
+    
+    # Info usuario
+    st.markdown(f"""
+    <div class="fc-user-info">
+        <div class="fc-user-line" style="font-weight:800;">👤 {user.get('nombre', 'Usuario')}</div>
+        <div class="fc-user-line fc-user-sub">🏢 {user.get('empresa', 'Empresa')}</div>
+        <div class="fc-user-line fc-user-sub">📧 {user.get('Usuario', user.get('usuario', ''))}</div>
+    </div>
+    <div class="fc-section-label">Menú</div>
+    """, unsafe_allow_html=True)
+    
+    # Botones del menú
+    for opcion in MENU_OPTIONS:
+        if st.button(opcion, key=f"mobile_menu_{opcion}", type="secondary", use_container_width=True):
+            st.session_state["radio_menu"] = opcion
+            st.session_state["menu_open"] = False
+            st.rerun()
+    
+    # Botón logout
+    if st.button("🚪 Cerrar sesión", key="mobile_logout", type="primary", use_container_width=True):
+        logout()
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
