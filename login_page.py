@@ -11,7 +11,7 @@ from auth import login_user, change_password, init_db
 init_db()
 
 # =====================================================================
-# 🎨 ESTILOS CSS - DISEÑO MODERNO Y LUMINOSO + RESPONSIVE REAL
+# 🎨 ESTILOS CSS - DISEÑO MODERNO Y LUMINOSO
 # =====================================================================
 
 LOGIN_CSS = """
@@ -34,13 +34,6 @@ LOGIN_CSS = """
         padding-bottom: 1rem !important;
     }
 
-    /* ===== Wrapper para que TODO el login quede centrado y con ancho controlado ===== */
-    .fc-login-wrap{
-        width: 100%;
-        max-width: 460px;
-        margin: 0 auto;
-    }
-
     /* Tarjeta del formulario - Glassmorphism */
     [data-testid="stForm"] {
         background: rgba(255, 255, 255, 0.95);
@@ -51,25 +44,65 @@ LOGIN_CSS = """
         backdrop-filter: blur(10px);
     }
 
-    /* Inputs */
-    input {
-        background-color: #f8fafc !important;
-        color: #1e293b !important;
+    /* =========================================================
+       FIX MOBILE: INPUTS + BOTÓN OJO (evitar zona negra)
+       Streamlit usa BaseWeb wrappers; en móvil se nota más.
+    ========================================================= */
+
+    /* Wrapper de BaseWeb (incluye el botón del ojo) */
+    div[data-baseweb="base-input"],
+    div[data-baseweb="input"]{
+        background: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
         border-radius: 12px !important;
-        padding: 12px 16px !important;
-        font-size: 16px !important;
-        transition: all 0.3s ease !important;
+        box-shadow: none !important;
+        overflow: hidden !important; /* evita “bloques” raros */
     }
 
-    input:focus {
+    /* Estado focus del wrapper */
+    div[data-baseweb="base-input"]:focus-within,
+    div[data-baseweb="input"]:focus-within{
         border-color: #667eea !important;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2) !important;
     }
 
-    input:disabled {
-        background-color: #f1f5f9 !important;
+    /* Input real: sin borde (el borde lo maneja el wrapper) */
+    div[data-baseweb="base-input"] input,
+    div[data-baseweb="input"] input{
+        border: none !important;
+        outline: none !important;
+        background: transparent !important;
+        color: #1e293b !important;
+        -webkit-text-fill-color: #1e293b !important;
+        padding: 12px 16px !important;
+        font-size: 16px !important;
+    }
+
+    /* Botón del ojo (no negro) */
+    div[data-baseweb="base-input"] button,
+    div[data-baseweb="input"] button{
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #475569 !important;
+        padding-right: 10px !important;
+    }
+
+    /* Disabled: “Fertilab” bien oscuro también en cel */
+    div[data-baseweb="base-input"] input:disabled,
+    div[data-baseweb="input"] input:disabled{
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
+        opacity: 1 !important;
+        background: transparent !important;
+    }
+
+    /* Placeholder visible */
+    div[data-baseweb="base-input"] input::placeholder,
+    div[data-baseweb="input"] input::placeholder{
         color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
+        opacity: 1 !important;
     }
 
     /* Labels */
@@ -140,52 +173,25 @@ LOGIN_CSS = """
         border-left: 4px solid #22c55e !important;
     }
 
-    /* =========================
-       ✅ RESPONSIVE REAL (móvil)
-       - Mismo diseño, misma “card”, mismo centrado
-    ========================= */
+    /* Responsive */
     @media (max-width: 768px) {
-
-        /* Padding general más cómodo */
-        .block-container {
-            padding-left: 0.9rem !important;
-            padding-right: 0.9rem !important;
-            padding-top: 1.2rem !important;
-            padding-bottom: 1.2rem !important;
-        }
-
-        /* Wrapper del login: mantiene ancho controlado y centrado */
-        .fc-login-wrap{
-            max-width: 420px;
-        }
-
-        /* Card: mismo estilo, solo un poco más compacta */
         [data-testid="stForm"] {
             padding: 24px 20px;
             border-radius: 20px;
         }
 
-        /* Tabs: evita que se “rompan” */
-        button[data-baseweb="tab"] {
-            padding: 10px 14px !important;
-            font-size: 0.95rem !important;
-        }
-
-        /* Inputs/botón: cómodos en móvil */
-        input {
-            padding: 12px 14px !important;
-        }
-
-        .stForm button[kind="secondaryFormSubmit"],
-        .stForm button[type="submit"] {
-            width: 100% !important;
-            padding: 14px 18px !important;
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 4rem !important; /* más scroll con teclado */
         }
     }
 
-    /* iOS fix: evita zoom raro al tocar inputs */
-    @media (max-width: 768px){
-        input, select, textarea { font-size: 16px !important; }
+    @media (max-width: 480px) {
+        /* un poco más compacto aún */
+        [data-testid="stForm"] {
+            padding: 22px 18px !important;
+        }
     }
 </style>
 """
@@ -324,9 +330,6 @@ def show_login_page():
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        # ✅ Wrapper: mantiene el mismo “layout” en desktop y móvil
-        st.markdown("<div class='fc-login-wrap'>", unsafe_allow_html=True)
-
         show_logo()
 
         tab1, tab2 = st.tabs(["🔐 Ingresar", "🔑 Cambiar clave"])
@@ -336,8 +339,6 @@ def show_login_page():
             change_password_form()
 
         show_footer()
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================================
 # GESTIÓN DE SESIÓN
