@@ -144,7 +144,7 @@ def mostrar_detalle_df(
     max_rows=1000,
     enable_chart=True,
     enable_explain=True,
-    
+ ):   
     # ---------------------------------
     # Validaciones básicas
     # ---------------------------------
