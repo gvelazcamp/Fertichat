@@ -207,61 +207,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   [data-testid="stCaption"] * {
     color: #0f172a !important;
   }
-
-  /* =========================================================
-   FIX PARA INPUTS/TEXTAREA EN MÓVIL - AGREGAR AL FINAL DEL CSS EN MAIN.PY
-   (dentro del @media (max-width: 768px) existente)
-========================================================= */
-
-/* Ajustar tamaño de inputs y textareas en contenido principal */
-.block-container input[type="text"],
-.block-container textarea,
-[data-baseweb="input"] input,
-[data-baseweb="textarea"] textarea {
-  font-size: 14px !important;
-  padding: 10px 12px !important;
-  min-height: 42px !important;
-  height: auto !important;
-  line-height: 1.4 !important;
-}
-
-/* Contenedor del input */
-[data-baseweb="input"],
-[data-baseweb="textarea"],
-[data-baseweb="input"] > div,
-[data-baseweb="textarea"] > div {
-  min-height: auto !important;
-  height: auto !important;
-}
-
-/* Placeholder text más pequeño */
-.block-container input::placeholder,
-.block-container textarea::placeholder {
-  font-size: 14px !important;
-  opacity: 0.6;
-}
-
-/* Text inputs específicos */
-.block-container [data-testid="stTextInput"] input {
-  font-size: 14px !important;
-  padding: 10px 12px !important;
-  height: 42px !important;
-}
-
-/* Text area específico */
-.block-container [data-testid="stTextArea"] textarea {
-  font-size: 14px !important;
-  padding: 10px 12px !important;
-  min-height: 80px !important;
-  line-height: 1.4 !important;
-}
-
-/* Botón de envío del input también proporcional */
-.block-container button {
-  font-size: 14px !important;
-  padding: 10px 16px !important;
-  min-height: 42px !important;
-}
+  
   /* TARJETAS/CARDS - fondo beige */
   .block-container div[style*="background"],
   .block-container div[style*="border-radius"],
@@ -446,10 +392,98 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   section[data-testid="stSidebar"] button span {
     color: #0f172a !important;
   }
-}
-</style>
-""", unsafe_allow_html=True)
 
+  /* =========================================================
+     FIX INPUTS/TEXTAREA - TAMAÑO Y FONDO BEIGE
+     ======================================================== */
+  
+  /* Ajustar tamaño de inputs y textareas en contenido principal */
+  .block-container input[type="text"],
+  .block-container textarea,
+  [data-baseweb="input"] input,
+  [data-baseweb="textarea"] textarea {
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    min-height: 42px !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Contenedor del input */
+  [data-baseweb="input"],
+  [data-baseweb="textarea"],
+  [data-baseweb="input"] > div,
+  [data-baseweb="textarea"] > div {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* Placeholder text más pequeño */
+  .block-container input::placeholder,
+  .block-container textarea::placeholder {
+    font-size: 14px !important;
+    opacity: 0.6;
+    color: #64748b !important;
+  }
+
+  /* Text inputs específicos */
+  .block-container [data-testid="stTextInput"] input,
+  .block-container [data-testid="stTextInput"] > div,
+  .block-container [data-testid="stTextInput"] [data-baseweb="input"] {
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    height: 42px !important;
+  }
+
+  /* Text area específico */
+  .block-container [data-testid="stTextArea"] textarea,
+  .block-container [data-testid="stTextArea"] > div,
+  .block-container [data-testid="stTextArea"] [data-baseweb="textarea"] {
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    min-height: 80px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* FORZAR fondo claro en TODOS los contenedores de input */
+  .block-container [data-testid="stTextInput"],
+  .block-container [data-testid="stTextArea"],
+  .block-container [data-testid="stChatInput"] {
+    background: transparent !important;
+  }
+
+  .block-container [data-testid="stTextInput"] > div,
+  .block-container [data-testid="stTextArea"] > div,
+  .block-container [data-testid="stChatInput"] > div {
+    background: #f8fafc !important;
+    border-radius: 8px;
+  }
+
+  /* Chat input específico (el de "Compras IA") */
+  .block-container [data-testid="stChatInput"] input,
+  .block-container [data-testid="stChatInput"] textarea,
+  .block-container [data-testid="stChatInput"] [data-baseweb="input"],
+  .block-container [data-testid="stChatInput"] [data-baseweb="textarea"],
+  .block-container [data-testid="stChatInput"] [data-baseweb="base-input"] {
+    background: #f8fafc !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    font-size: 14px !important;
+  }
+
+  /* Botón de envío del input también proporcional */
+  .block-container button {
+    font-size: 14px !important;
+    padding: 10px 16px !important;
+    min-height: 42px !important;
+  }
+
+  /* Botón de envío en chat input (flecha) */
+  .block-container [data-testid="stChatInput"] button {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+}
 
 # =========================
 # OBTENER NOTIFICACIONES (antes del header móvil)
