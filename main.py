@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
     layout="wide",
-    initial_sidebar_state="auto"  # ✅ PC abierto / móvil auto (nativo)
+    initial_sidebar_state="auto"
 )
 
 # =========================
@@ -47,16 +47,13 @@ if "radio_menu" not in st.session_state:
 
 
 # =========================
-# CSS (CLAVE: NO OCULTAR stToolbar EN MÓVIL)
+# CSS COMPLETO
 # =========================
 st.markdown(r"""
 <style>
-/* Ocultar elementos (sin romper el control nativo del sidebar) */
+/* Ocultar elementos */
 #MainMenu, footer { display: none !important; }
 div[data-testid="stDecoration"] { display: none !important; }
-
-/* ✅ NO ocultar stToolbar ni stHeader globalmente */
-/* Si ocultás stToolbar, en Z Flip 5 desaparece el botón ☰/flecha */
 
 /* Theme general */
 :root {
@@ -82,22 +79,13 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18);
 }
 
-/* Header móvil visual (solo estética) */
+/* Header móvil visual */
 #mobile-header { display: none; }
-
-/* Campana mobile oculta por defecto */
 #campana-mobile { display: none; }
 
-/* =========================================================
-   DESKTOP REAL (mouse/trackpad):
-   - sidebar siempre visible
-   - oculto controles de colapsar/expandir para que no lo puedan cerrar en PC
-   - puedo ocultar toolbar actions sin romper nada
-========================================================= */
+/* DESKTOP (mouse/trackpad) */
 @media (hover: hover) and (pointer: fine) {
   div[data-testid="stToolbarActions"] { display: none !important; }
-
-  /* No permitir colapsar sidebar en PC */
   div[data-testid="collapsedControl"] { display: none !important; }
   [data-testid="baseButton-header"],
   button[data-testid="stSidebarCollapseButton"],
@@ -108,11 +96,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   }
 }
 
-/* =========================================================
-   MÓVIL REAL (touch):
-   - mostrar SI o SI el control nativo (☰ / flecha)
-   - mantener visible el botón de cerrar del sidebar
-========================================================= */
+/* MÓVIL (touch) */
 @media (hover: none) and (pointer: coarse) {
   .block-container { padding-top: 70px !important; }
 
@@ -135,7 +119,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     font-weight: 800;
   }
 
-  /* Campana al lado de la flechita del sidebar */
   #campana-mobile {
     display: flex !important;
     position: fixed !important;
@@ -167,7 +150,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     padding: 0 3px;
   }
 
-  /* ✅ Abrir sidebar (nativo) */
   div[data-testid="collapsedControl"],
   button[data-testid="stSidebarExpandButton"],
   button[title="Open sidebar"] {
@@ -178,7 +160,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     z-index: 1000000 !important;
   }
 
-  /* ✅ Cerrar sidebar (nativo) */
   [data-testid="baseButton-header"],
   button[data-testid="stSidebarCollapseButton"],
   button[title="Close sidebar"] {
@@ -186,11 +167,8 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   }
 }
 
-/* =========================================================
-   CAMBIOS VISUALES MÓVIL (max-width para asegurar)
-========================================================= */
+/* ESTILOS MÓVIL */
 @media (max-width: 768px) {
-  /* CONTENIDO PRINCIPAL - LETRAS NEGRAS */
   .block-container h1,
   .block-container h2,
   .block-container h3,
@@ -208,7 +186,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* TARJETAS/CARDS - fondo beige */
   .block-container div[style*="background"],
   .block-container div[style*="border-radius"],
   [data-testid="stMetric"],
@@ -220,7 +197,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* SELECTBOX/DROPDOWN - fondo claro */
   [data-baseweb="select"],
   [data-baseweb="select"] > div,
   [data-baseweb="select"] > div > div,
@@ -238,14 +214,12 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     border-color: #e2e8f0 !important;
   }
   
-  /* Selectbox texto */
   [data-baseweb="select"] span,
   [data-baseweb="select"] div,
   [data-baseweb="select"] p {
     color: #0f172a !important;
   }
   
-  /* Inputs con fondo claro y texto negro */
   .block-container input,
   .block-container textarea,
   .block-container select,
@@ -257,9 +231,11 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background-color: #f8fafc !important;
     color: #0f172a !important;
     border-color: #e2e8f0 !important;
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    min-height: 42px !important;
   }
   
-  /* Textarea */
   [data-baseweb="textarea"],
   [data-baseweb="textarea"] > div,
   [data-baseweb="textarea"] textarea {
@@ -267,20 +243,17 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* Radio buttons con fondo claro */
   .block-container [role="radiogroup"] label {
     background: #f8fafc !important;
     color: #0f172a !important;
   }
   
-  /* Date input */
   [data-baseweb="datepicker"],
   [data-baseweb="datepicker"] > div {
     background: #f8fafc !important;
     color: #0f172a !important;
   }
   
-  /* BOTONES - fondo claro */
   .block-container button,
   .block-container [data-testid="stButton"] button,
   .block-container [data-testid="stFormSubmitButton"] button,
@@ -293,16 +266,17 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background-color: #f8fafc !important;
     color: #0f172a !important;
     border: 1px solid #e2e8f0 !important;
+    font-size: 14px !important;
+    padding: 10px 16px !important;
+    min-height: 42px !important;
   }
   
-  /* Botones con icono */
   .block-container button span,
   .block-container button p,
   .block-container button div {
     color: #0f172a !important;
   }
   
-  /* TABLAS/DATAFRAMES - fondo claro */
   [data-testid="stDataFrame"],
   [data-testid="stDataFrame"] > div,
   [data-testid="stTable"],
@@ -314,7 +288,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background-color: #f8fafc !important;
   }
   
-  /* Celdas de tabla */
   [data-testid="stDataFrame"] td,
   [data-testid="stDataFrame"] th,
   [data-testid="stTable"] td,
@@ -323,7 +296,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* Tabs */
   [data-baseweb="tab-list"],
   [data-baseweb="tab-panel"],
   button[data-baseweb="tab"] {
@@ -331,14 +303,12 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* Expander */
   [data-testid="stExpander"],
   [data-testid="stExpander"] > div {
     background: #f8fafc !important;
     color: #0f172a !important;
   }
   
-  /* Alertas/Info boxes mantener sus colores pero texto negro */
   [data-testid="stAlert"] p,
   [data-testid="stAlert"] span,
   .stAlert p,
@@ -346,7 +316,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
 
-  /* SIDEBAR - FONDO BLANCO */
   section[data-testid="stSidebar"],
   section[data-testid="stSidebar"] > div,
   section[data-testid="stSidebar"] > div > div,
@@ -355,7 +324,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background-color: #ffffff !important;
   }
   
-  /* SIDEBAR - LETRAS NEGRAS */
   section[data-testid="stSidebar"] p,
   section[data-testid="stSidebar"] span,
   section[data-testid="stSidebar"] label,
@@ -368,7 +336,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* Radio buttons */
   section[data-testid="stSidebar"] div[role="radiogroup"] label {
     background: #f8fafc !important;
   }
@@ -377,13 +344,11 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
-  /* Input buscar */
   section[data-testid="stSidebar"] input {
     background: #f8fafc !important;
     color: #0f172a !important;
   }
   
-  /* Botón cerrar sesión */
   section[data-testid="stSidebar"] button {
     background: #f1f5f9 !important;
     color: #0f172a !important;
@@ -392,16 +357,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   section[data-testid="stSidebar"] button span {
     color: #0f172a !important;
   }
-  
-  /* FIX INPUTS/TEXTAREA - TAMAÑO Y FONDO BEIGE */
-  .block-container input[type="text"],
-  .block-container textarea,
-  [data-baseweb="input"] input,
-  [data-baseweb="textarea"] textarea {
-    font-size: 14px !important;
-    padding: 10px 12px !important;
-    min-height: 42px !important;
-  }
 
   .block-container input::placeholder,
   .block-container textarea::placeholder {
@@ -430,100 +385,12 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     border: 1px solid #e2e8f0 !important;
   }
 }
-  /* =========================================================
-     FIX INPUTS/TEXTAREA - TAMAÑO Y FONDO BEIGE
-     ======================================================== */
-  
-  /* Ajustar tamaño de inputs y textareas en contenido principal */
-  .block-container input[type="text"],
-  .block-container textarea,
-  [data-baseweb="input"] input,
-  [data-baseweb="textarea"] textarea {
-    font-size: 14px !important;
-    padding: 10px 12px !important;
-    min-height: 42px !important;
-    height: auto !important;
-    line-height: 1.4 !important;
-  }
+</style>
+""", unsafe_allow_html=True)
 
-  /* Contenedor del input */
-  [data-baseweb="input"],
-  [data-baseweb="textarea"],
-  [data-baseweb="input"] > div,
-  [data-baseweb="textarea"] > div {
-    min-height: auto !important;
-    height: auto !important;
-  }
-
-  /* Placeholder text más pequeño */
-  .block-container input::placeholder,
-  .block-container textarea::placeholder {
-    font-size: 14px !important;
-    opacity: 0.6;
-    color: #64748b !important;
-  }
-
-  /* Text inputs específicos */
-  .block-container [data-testid="stTextInput"] input,
-  .block-container [data-testid="stTextInput"] > div,
-  .block-container [data-testid="stTextInput"] [data-baseweb="input"] {
-    font-size: 14px !important;
-    padding: 10px 12px !important;
-    height: 42px !important;
-  }
-
-  /* Text area específico */
-  .block-container [data-testid="stTextArea"] textarea,
-  .block-container [data-testid="stTextArea"] > div,
-  .block-container [data-testid="stTextArea"] [data-baseweb="textarea"] {
-    font-size: 14px !important;
-    padding: 10px 12px !important;
-    min-height: 80px !important;
-    line-height: 1.4 !important;
-  }
-
-  /* FORZAR fondo claro en TODOS los contenedores de input */
-  .block-container [data-testid="stTextInput"],
-  .block-container [data-testid="stTextArea"],
-  .block-container [data-testid="stChatInput"] {
-    background: transparent !important;
-  }
-
-  .block-container [data-testid="stTextInput"] > div,
-  .block-container [data-testid="stTextArea"] > div,
-  .block-container [data-testid="stChatInput"] > div {
-    background: #f8fafc !important;
-    border-radius: 8px;
-  }
-
-  /* Chat input específico (el de "Compras IA") */
-  .block-container [data-testid="stChatInput"] input,
-  .block-container [data-testid="stChatInput"] textarea,
-  .block-container [data-testid="stChatInput"] [data-baseweb="input"],
-  .block-container [data-testid="stChatInput"] [data-baseweb="textarea"],
-  .block-container [data-testid="stChatInput"] [data-baseweb="base-input"] {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
-    font-size: 14px !important;
-  }
-
-  /* Botón de envío del input también proporcional */
-  .block-container button {
-    font-size: 14px !important;
-    padding: 10px 16px !important;
-    min-height: 42px !important;
-  }
-
-  /* Botón de envío en chat input (flecha) */
-  .block-container [data-testid="stChatInput"] button {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-  }
-}
 
 # =========================
-# OBTENER NOTIFICACIONES (antes del header móvil)
+# OBTENER NOTIFICACIONES
 # =========================
 usuario_actual = user.get("usuario", user.get("email", ""))
 cant_pendientes = 0
@@ -532,7 +399,7 @@ if usuario_actual:
 
 
 # =========================
-# HEADER MÓVIL (visual) CON CAMPANA AL LADO DE LA FLECHITA
+# HEADER MÓVIL
 # =========================
 badge_html = ""
 if cant_pendientes > 0:
@@ -540,16 +407,17 @@ if cant_pendientes > 0:
 
 st.markdown(f"""
 <div id="mobile-header">
-    <div class="logo">&#129419; FertiChat</div>
+    <div class="logo">🦋 FertiChat</div>
 </div>
 <a id="campana-mobile" href="?ir_notif=1">
-    &#128276;
+    🔔
     {badge_html}
 </a>
 """, unsafe_allow_html=True)
 
+
 # =========================
-# MANEJAR CLICK EN CAMPANA MÓVIL
+# MANEJAR CLICK CAMPANA
 # =========================
 try:
     if st.query_params.get("ir_notif") == "1":
@@ -561,25 +429,19 @@ except:
 
 
 # =========================
-# TÍTULO Y CAMPANITA (SOLO PC - todo en HTML para poder ocultar)
+# TÍTULO PC
 # =========================
-campana_html = '<span style="font-size:26px;">&#128276;</span>'
+campana_html = f'<span style="font-size:26px;">🔔</span>'
 if cant_pendientes > 0:
-    campana_html = '<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">&#128276; ' + str(cant_pendientes) + '</a>'
+    campana_html = f'<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">🔔 {cant_pendientes}</a>'
 
-st.markdown(
-    r'''
-    <style>
-    @media (max-width: 768px) {
-        .header-desktop-wrapper {
-            display: none !important;
-        }
-    }
-    </style>
-    ''',
-    unsafe_allow_html=True
-)
-
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+  .header-desktop-wrapper { display: none !important; }
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="header-desktop-wrapper">
@@ -593,6 +455,7 @@ st.markdown(f"""
     <hr style="margin-top:16px; border:none; border-top:1px solid #e2e8f0;">
 </div>
 """, unsafe_allow_html=True)
+
 
 # =========================
 # SIDEBAR
@@ -670,4 +533,3 @@ elif menu_actual == "🧩 Familias":
     mostrar_familias()
 elif menu_actual == "📑 Comprobantes":
    mostrar_menu_comprobantes()
-
