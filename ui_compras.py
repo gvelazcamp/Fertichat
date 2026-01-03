@@ -337,3 +337,60 @@ def Compras_IA():
                 enable_chart=True,
                 enable_explain=True
             )
+def Compras_IA():
+    """
+    ✅ Chat mejorado con estado persistente del detalle
+    """
+    st.subheader("🛒 Compras IA")
+    st.markdown("*Integrado con OpenAI*")
+
+    # Inicializar historial
+    if "chat_historial" not in st.session_state:
+        st.session_state.chat_historial = []
+
+    # Mostrar historial (últimos 15 mensajes)
+    for msg in st.session_state.chat_historial[-15:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Input del usuario (compatible móvil)
+    prompt = st.text_input(
+        "Escribí tu consulta de compras:",
+        placeholder="Ej: compras roche noviembre 2025",
+        key="input_compras_ia",
+        label_visibility="collapsed"
+    )
+    
+    # Botón para enviar
+    enviar = st.button("🔍 Consultar", key="btn_consultar_compras", use_container_width=True)
+
+    if prompt and enviar:
+        # Agregar mensaje del usuario
+        st.session_state.chat_historial.append({"role": "user", "content": prompt})
+
+        with st.chat_message("assistant"):
+            with st.spinner("🔎 Procesando..."):
+                resp, df = procesar_pregunta_router(prompt)
+                
+                # ✅ Guardar respuesta en session_state ANTES de renderizar
+                st.session_state["ultima_respuesta"] = resp
+                st.session_state["ultimo_df"] = df
+                st.session_state["ultima_pregunta"] = prompt
+                
+                # Render especial (tabs/sugerencias/etc)
+                render_orquestador_output(prompt, resp, df)
+
+        # Guardar en historial
+        st.session_state.chat_historial.append({"role": "assistant", "content": resp})
+
+    # ✅ MOSTRAR DETALLE PERSISTENTE (si existe)
+    if "ultimo_df" in st.session_state and st.session_state["ultimo_df"] is not None:
+        if not st.session_state["ultimo_df"].empty:
+            mostrar_detalle_df(
+                df=st.session_state["ultimo_df"],
+                titulo=st.session_state.get("ultima_respuesta", "Detalle"),
+                key="compras_detalle_principal",
+                max_rows=None,  # Sin límite
+                enable_chart=True,
+                enable_explain=True
+            )
