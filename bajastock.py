@@ -1,195 +1,328 @@
-# =====================================================================
-# 📉 MÓDULO BAJA DE STOCK - USO OPERATIVO
-# Archivo: bajastock.py
-# =====================================================================
+# =========================
+# MAIN.PY - SIDEBAR NATIVO (PC OK) + CONTROL NATIVO EN MÓVIL (Z FLIP 5)
+# =========================
 
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 
-from sql_queries import ejecutar_consulta, get_db_connection
+st.set_page_config(
+    page_title="FertiChat",
+    page_icon="🦋",
+    layout="wide",
+    initial_sidebar_state="auto"  # ✅ PC abierto / móvil auto (nativo)
+)
 
-# =====================================================================
-# CONFIG
-# =====================================================================
-
-CANTIDAD_FIJA = 1
-
-# =====================================================================
-# DB HELPERS
-# =====================================================================
-
-def buscar_articulo(texto: str) -> pd.DataFrame:
-    """
-    Busca por código exacto o por nombre parcial
-    """
-    query = """
-        SELECT
-            "CODIGO"   AS codigo,
-            "ARTICULO" AS articulo,
-            "FAMILIA"  AS familia,
-            "STOCK"    AS stock
-        FROM stock
-        WHERE
-            "CODIGO" = %s
-            OR UPPER("ARTICULO") LIKE %s
-        LIMIT 5
-    """
-    return ejecutar_consulta(
-        query,
-        (texto.strip(), f"%{texto.upper().strip()}%")
-    )
+# =========================
+# IMPORTS
+# =========================
+from config import MENU_OPTIONS, DEBUG_MODE
+from auth import init_db
+from login_page import require_auth, get_current_user, logout
+from pedidos import mostrar_pedidos_internos, contar_notificaciones_no_leidas
+from bajastock import mostrar_baja_stock
+from ordenes_compra import mostrar_ordenes_compra
+from ui_compras import Compras_IA
+from ui_buscador import mostrar_buscador_ia
+from ui_stock import mostrar_stock_ia, mostrar_resumen_stock_rotativo
+from ui_dashboard import mostrar_dashboard, mostrar_indicadores_ia, mostrar_resumen_compras_rotativo
+from ingreso_comprobantes import mostrar_ingreso_comprobantes
+from ui_inicio import mostrar_inicio
+from ficha_stock import mostrar_ficha_stock
+from articulos import mostrar_articulos
+from depositos import mostrar_depositos
+from familias import mostrar_familias
 
 
-def bajar_stock(codigo: str, usuario: str) -> tuple[bool, str]:
-    """
-    Resta 1 unidad de stock (aunque STOCK sea texto con coma)
-    y registra movimiento
-    """
-    conn = get_db_connection()
-    if not conn:
-        return False, "Error de conexión"
+# =========================
+# INICIALIZACIÓN
+# =========================
+init_db()
+require_auth()
 
-    try:
-        cursor = conn.cursor()
+user = get_current_user() or {}
 
-        # 🔒 Bloquear fila + convertir STOCK a número real
-        cursor.execute("""
-            SELECT 
-                CAST(
-                    REPLACE(
-                        REPLACE(TRIM("STOCK"), '.', ''),
-                        ',', '.'
-                    ) AS NUMERIC
-                ) AS stock_num,
-                "ARTICULO"
-            FROM stock
-            WHERE "CODIGO" = %s
-            FOR UPDATE
-        """, (codigo,))
-
-        row = cursor.fetchone()
-
-        if not row:
-            conn.close()
-            return False, "Artículo no encontrado"
-
-        stock_actual, articulo = row
-
-        if stock_actual is None or stock_actual <= 0:
-            conn.close()
-            return False, "Stock en cero"
-
-        # ✅ ACTUALIZACIÓN CORRECTA (SIN RESTAR TEXTO)
-        cursor.execute("""
-            UPDATE stock
-            SET "STOCK" = CAST(
-                (
-                    CAST(
-                        REPLACE(
-                            REPLACE(TRIM("STOCK"), '.', ''),
-                            ',', '.'
-                        ) AS NUMERIC
-                    ) - 1
-                ) AS TEXT
-            )
-            WHERE "CODIGO" = %s
-        """, (codigo,))
-
-        # Registrar historial
-        cursor.execute("""
-            INSERT INTO stock_movimientos
-            (codigo, articulo, usuario, cantidad, fecha)
-            VALUES (%s, %s, %s, %s, NOW())
-        """, (codigo, articulo, usuario, -1))
-
-        conn.commit()
-        conn.close()
-
-        return True, f"✔️ Bajado: {articulo}"
-
-    except Exception as e:
-        try:
-            conn.rollback()
-            conn.close()
-        except:
-            pass
-        return False, str(e)
+if "radio_menu" not in st.session_state:
+    st.session_state["radio_menu"] = "🏠 Inicio"
 
 
-def obtener_historial(limit: int = 50) -> pd.DataFrame:
-    """
-    Últimos movimientos de stock
-    """
-    query = """
-        SELECT
-            fecha        AS "Fecha",
-            usuario      AS "Usuario",
-            codigo       AS "Código",
-            articulo     AS "Artículo",
-            cantidad     AS "Cantidad"
-        FROM stock_movimientos
-        ORDER BY fecha DESC
-        LIMIT %s
-    """
-    return ejecutar_consulta(query, (limit,))
+# =========================
+# CSS (CLAVE: NO OCULTAR stToolbar EN MÓVIL)
+# =========================
+st.markdown(r"""
+<style>
+/* Ocultar elementos (sin romper el control nativo del sidebar) */
+#MainMenu, footer { display: none !important; }
+div[data-testid="stDecoration"] { display: none !important; }
+
+/* ✅ NO ocultar stToolbar ni stHeader globalmente */
+/* Si ocultás stToolbar, en Z Flip 5 desaparece el botón ☰/flecha */
+
+/* Theme general */
+:root {
+    --fc-bg-1: #f6f4ef; --fc-bg-2: #f3f6fb;
+    --fc-primary: #0b3b60; --fc-accent: #f59e0b;
+}
+
+html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
+[data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
+.block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
+
+/* Sidebar look */
+section[data-testid="stSidebar"] { border-right: 1px solid rgba(15, 23, 42, 0.08); }
+section[data-testid="stSidebar"] > div {
+    background: rgba(255,255,255,0.70);
+    backdrop-filter: blur(8px);
+}
+div[data-testid="stSidebar"] div[role="radiogroup"] label {
+    border-radius: 12px; padding: 8px 10px; margin: 3px 0; border: 1px solid transparent;
+}
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: rgba(37,99,235,0.06); }
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+    background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18);
+}
+
+/* Header móvil visual (solo estética) */
+#mobile-header { display: none; }
+
+/* =========================================================
+   DESKTOP REAL (mouse/trackpad):
+   - sidebar siempre visible
+   - oculto controles de colapsar/expandir para que no lo puedan cerrar en PC
+   - puedo ocultar toolbar actions sin romper nada
+========================================================= */
+@media (hover: hover) and (pointer: fine) {
+  div[data-testid="stToolbarActions"] { display: none !important; }
+
+  /* No permitir colapsar sidebar en PC */
+  div[data-testid="collapsedControl"] { display: none !important; }
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Close sidebar"],
+  button[title="Open sidebar"] {
+    display: none !important;
+  }
+}
+
+/* =========================================================
+   MÓVIL REAL (touch):
+   - mostrar SI o SI el control nativo (☰ / flecha)
+   - mantener visible el botón de cerrar del sidebar
+========================================================= */
+@media (hover: none) and (pointer: coarse) {
+  .block-container { padding-top: 70px !important; }
+
+  #mobile-header {
+    display: flex !important;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: #0b3b60;
+    z-index: 999996;           /* debajo del control nativo */
+    align-items: center;
+    padding: 0 16px 0 56px;    /* deja lugar al control nativo */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    pointer-events: none;      /* no bloquea clicks */
+  }
+
+  #mobile-header .logo {
+    color: white;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  /* ✅ Abrir sidebar (nativo) */
+  div[data-testid="collapsedControl"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Open sidebar"] {
+    display: inline-flex !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 1000000 !important;
+  }
+
+  /* ✅ Cerrar sidebar (nativo) */
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[title="Close sidebar"] {
+    display: inline-flex !important;
+  }
+
+  /* Ocultar título FertiChat y Sistema de Gestión en móvil */
+  [data-testid="stMarkdownContainer"]:has(h1#ferti-chat) {
+    display: none !important;
+  }
+
+  /* =========================================================
+     SIDEBAR MÓVIL - FONDO BLANCO Y LETRAS NEGRAS
+  ========================================================= */
+  section[data-testid="stSidebar"] {
+    background: #ffffff !important;
+  }
+  
+  section[data-testid="stSidebar"] > div {
+    background: #ffffff !important;
+  }
+  
+  section[data-testid="stSidebar"] > div > div {
+    background: #ffffff !important;
+  }
+  
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+    background: #ffffff !important;
+  }
+  
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background: #ffffff !important;
+  }
+  
+  /* Letras negras en todo el sidebar */
+  section[data-testid="stSidebar"] * {
+    color: #0f172a !important;
+  }
+  
+  section[data-testid="stSidebar"] p,
+  section[data-testid="stSidebar"] span,
+  section[data-testid="stSidebar"] label,
+  section[data-testid="stSidebar"] h1,
+  section[data-testid="stSidebar"] h2,
+  section[data-testid="stSidebar"] h3 {
+    color: #0f172a !important;
+  }
+  
+  /* Input buscar */
+  section[data-testid="stSidebar"] input {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  
+  /* Botón cerrar sesión */
+  section[data-testid="stSidebar"] button {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+  }
+}
+</style>
+""", unsafe_allow_html=True)
 
 
-# =====================================================================
-# UI STREAMLIT
-# =====================================================================
+# =========================
+# HEADER MÓVIL (visual)
+# =========================
+st.markdown("""
+<div id="mobile-header">
+    <div class="logo">🦋 FertiChat</div>
+</div>
+""", unsafe_allow_html=True)
 
-def mostrar_baja_stock():
-    st.title("📉 Baja de Stock")
 
-    user = st.session_state.get("user", {})
-    usuario = user.get("usuario", user.get("email", "anonimo"))
+# =========================
+# TÍTULO Y CAMPANITA
+# =========================
+usuario_actual = user.get("usuario", user.get("email", ""))
+cant_pendientes = 0
+if usuario_actual:
+    cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
-    st.markdown("### 🔎 Escaneá o escribí el artículo")
-    st.caption("Cantidad fija = 1 · Uso rápido · Baja automática (ENTER)")
+col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
-    texto = st.text_input(
-        "Código de barras o nombre",
-        key="input_baja_stock",
-        placeholder="Escanear código y presionar Enter"
-    )
+with col_logo:
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div>
+                <h1 style="margin: 0; font-size: 38px; font-weight: 900; color: #0f172a;">
+                    FertiChat
+                </h1>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #64748b;">
+                    Sistema de Gestión de Compras
+                </p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    if texto:
-        df = buscar_articulo(texto)
+with col_notif:
+    if cant_pendientes > 0:
+        if st.button(f"🔔 {cant_pendientes}", key="campanita_global"):
+            st.session_state["radio_menu"] = "📄 Pedidos internos"
+            st.rerun()
+    else:
+        st.markdown("<div style='text-align:right; font-size:26px;'>🔔</div>", unsafe_allow_html=True)
 
-        if df is None or df.empty:
-            st.warning("No se encontró el artículo")
-        else:
-            # 🔥 TOMAMOS SOLO EL PRIMERO (uso operativo)
-            row = df.iloc[0]
+st.markdown("<hr>", unsafe_allow_html=True)
 
-            st.markdown(f"**{row['articulo']}**")
-            st.caption(f"Código: {row['codigo']}")
-            st.markdown(f"Familia: `{row['familia']}`")
-            st.markdown(f"Stock actual: **{row['stock']}**")
 
-            # ⬇️ BAJA AUTOMÁTICA
-            ok, msg = bajar_stock(row["codigo"], usuario)
+# =========================
+# SIDEBAR
+# =========================
+with st.sidebar:
+    st.markdown(f"""
+        <div style='
+            background: rgba(255,255,255,0.85);
+            padding: 16px;
+            border-radius: 18px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
+        '>
+            <div style='display:flex; align-items:center; gap:10px; justify-content:center;'>
+                <div style='font-size: 26px;'>🦋</div>
+                <div style='font-size: 20px; font-weight: 800; color:#0f172a;'>FertiChat</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-            if ok:
-                st.success(msg)
-                st.info("Movimiento registrado. Ver historial ↓")
-                return
-            else:
-                st.error(msg)
-                return
+    st.text_input("Buscar...", key="sidebar_search", label_visibility="collapsed", placeholder="Buscar...")
+
+    st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
+    if user.get('empresa'):
+        st.markdown(f"🏢 {user.get('empresa')}")
+    st.markdown(f"📧 _{user.get('Usuario', user.get('usuario', ''))}_")
 
     st.markdown("---")
 
-    st.subheader("🧾 Historial de bajas")
+    if st.button("🚪 Cerrar sesión", key="btn_logout_sidebar", use_container_width=True):
+        logout()
+        st.rerun()
 
-    df_hist = obtener_historial()
+    st.markdown("---")
+    st.markdown("## 📌 Menú")
 
-    if df_hist is not None and not df_hist.empty:
-        st.dataframe(
-            df_hist,
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("Todavía no hay movimientos registrados")
+    st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
+
+
+# =========================
+# ROUTER
+# =========================
+menu_actual = st.session_state["radio_menu"]
+
+if menu_actual == "🏠 Inicio":
+    mostrar_inicio()
+elif menu_actual == "🛒 Compras IA":
+    mostrar_resumen_compras_rotativo()
+    Compras_IA()
+elif menu_actual == "📦 Stock IA":
+    mostrar_resumen_stock_rotativo()
+    mostrar_stock_ia()
+elif menu_actual == "🔎 Buscador IA":
+    mostrar_buscador_ia()
+elif menu_actual == "📥 Ingreso de comprobantes":
+    mostrar_ingreso_comprobantes()
+elif menu_actual == "📊 Dashboard":
+    mostrar_dashboard()
+elif menu_actual == "📄 Pedidos internos":
+    mostrar_pedidos_internos()
+elif menu_actual == "🧾 Baja de stock":
+    mostrar_baja_stock()
+elif menu_actual == "📈 Indicadores (Power BI)":
+    mostrar_indicadores_ia()
+elif menu_actual == "📦 Órdenes de compra":
+    mostrar_ordenes_compra()
+elif menu_actual == "📒 Ficha de stock":
+    mostrar_ficha_stock()
+elif menu_actual == "📚 Artículos":
+    mostrar_articulos()
+elif menu_actual == "🏬 Depósitos":
+    mostrar_depositos()
+elif menu_actual == "🧩 Familias":
+    mostrar_familias()
