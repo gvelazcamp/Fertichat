@@ -12,11 +12,15 @@ import io
 
 from supabase import create_client
 
-# PDF (ReportLab)
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
+# PDF (ReportLab) - opcional (no rompe si no está instalado)
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    REPORTLAB_OK = True
+except Exception:
+    REPORTLAB_OK = False
 
 # =====================================================================
 # CONFIGURACIÓN SUPABASE
@@ -76,7 +80,6 @@ def _map_iva_tipo_from_articulo_row(row: dict) -> str:
 
     candidates = [
         "Tipo Impuesto", "tipo impuesto", "tipo_impuesto",
-        "tipo_impuesto_text", "TipoImpuesto",
         "iva_tipo", "IVA", "iva", "tasa_iva", "Tasa IVA"
     ]
 
@@ -89,7 +92,6 @@ def _map_iva_tipo_from_articulo_row(row: dict) -> str:
     if val is None:
         return "22%"
 
-    # Numérico (0 / 0.1 / 0.22)
     if isinstance(val, (int, float)):
         f = _safe_float(val, 0.0)
         if abs(f - 0.0) < 1e-9:
@@ -101,22 +103,17 @@ def _map_iva_tipo_from_articulo_row(row: dict) -> str:
     v_raw = str(val).strip()
     v = v_raw.lower()
 
-    # Caso típico Supabase: "1- Exento 0%"
-    # Capturamos si dice exento
     if "exent" in v or "exento" in v:
         return "Exento"
 
-    # Buscar porcentajes explícitos
-    if re.search(r"\b10\b", v) or "10%" in v:
+    if "10%" in v or re.search(r"\b10\b", v):
         return "10%"
-    if re.search(r"\b22\b", v) or "22%" in v:
+    if "22%" in v or re.search(r"\b22\b", v) or "20" in v:
         return "22%"
 
-    # Si aparece 0% lo tratamos como Exento
     if "0%" in v or re.search(r"\b0\b", v):
         return "Exento"
 
-    # Fallback: si arranca con "1-" suele ser exento
     if re.match(r"^\s*1\s*[-]", v):
         return "Exento"
 
@@ -142,9 +139,6 @@ def _map_precio_sin_iva_from_articulo_row(row: dict) -> float:
     return 0.0
 
 def _articulo_desc_from_row(row: dict) -> str:
-    """
-    Descripción usable del artículo.
-    """
     if not row:
         return ""
     candidates = ["descripción", "Descripción", "descripcion", "nombre", "articulo", "Artículo", "detalle", "Detalle"]
@@ -156,9 +150,6 @@ def _articulo_desc_from_row(row: dict) -> str:
     return ""
 
 def _articulo_label(row: dict) -> str:
-    """
-    Label visible en el selectbox (incluye id corto para evitar duplicados).
-    """
     desc = _articulo_desc_from_row(row) or ""
     rid = str(row.get("id", "") or "")
     rid8 = rid[:8] if rid else ""
@@ -192,7 +183,7 @@ def _fmt_money(v: float, moneda: str) -> str:
     return f"{moneda} {s}"
 
 # =====================================================================
-# CACHE SUPABASE (LISTAS)
+# CACHE SUPABASE
 # =====================================================================
 
 @st.cache_data(ttl=600)
@@ -331,114 +322,7 @@ def _insert_detalle_con_fallback(detalle_full: dict) -> None:
     supabase.table(TABLA_DETALLE).insert(detalle_min).execute()
 
 # =====================================================================
-# PDF
-# =====================================================================
-
-def _generar_pdf_comprobante(cabecera: dict, items: list, moneda: str) -> bytes:
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=28,
-        rightMargin=28,
-        topMargin=28,
-        bottomMargin=28
-    )
-
-    styles = getSampleStyleSheet()
-    story = []
-
-    story.append(Paragraph("Comprobante de compra", styles["Title"]))
-    story.append(Spacer(1, 10))
-
-    # Cabecera
-    proveedor = cabecera.get("proveedor", "")
-    nro = cabecera.get("nro_comprobante", "")
-    tipo = cabecera.get("tipo_comprobante", "")
-    fecha = cabecera.get("fecha", "")
-    condicion = cabecera.get("condicion_pago", "")
-
-    story.append(Paragraph(f"<b>Proveedor:</b> {proveedor}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Nº Comprobante:</b> {nro}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Tipo:</b> {tipo}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Fecha:</b> {fecha}", styles["Normal"]))
-    if condicion:
-        story.append(Paragraph(f"<b>Condición:</b> {condicion}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Moneda:</b> {moneda}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-
-    # Tabla items
-    data = [["Artículo", "Cant.", "P.Unit s/IVA", "IVA", "Desc.%", "Subtotal", "Impuestos", "Total"]]
-    subtotal = 0.0
-    iva_total = 0.0
-    desc_total = 0.0
-    total = 0.0
-
-    for it in items:
-        art = it.get("articulo", "")
-        cant = it.get("cantidad", 0)
-        pu = _safe_float(it.get("precio_unit_sin_iva", 0.0), 0.0)
-        iva_tipo = it.get("iva_tipo", "22%")
-        desc = _safe_float(it.get("descuento_pct", 0.0), 0.0)
-        sub = _safe_float(it.get("subtotal_sin_iva", 0.0), 0.0)
-        imp = _safe_float(it.get("iva_monto", 0.0), 0.0)
-        tot = _safe_float(it.get("total_con_iva", 0.0), 0.0)
-        descm = _safe_float(it.get("descuento_monto", 0.0), 0.0)
-
-        subtotal += sub
-        iva_total += imp
-        total += tot
-        desc_total += descm
-
-        data.append([
-            str(art),
-            str(cant),
-            f"{pu:,.2f}",
-            str(iva_tipo),
-            f"{desc:,.2f}",
-            f"{sub:,.2f}",
-            f"{imp:,.2f}",
-            f"{tot:,.2f}",
-        ])
-
-    tbl = Table(data, repeatRows=1)
-    tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-    ]))
-
-    story.append(tbl)
-    story.append(Spacer(1, 12))
-
-    # Totales
-    tot_tbl = Table([
-        ["SUB TOTAL", f"{moneda} {subtotal:,.2f}"],
-        ["DESC./REC.", f"{moneda} {desc_total:,.2f}"],
-        ["IMPUESTOS", f"{moneda} {iva_total:,.2f}"],
-        ["TOTAL", f"{moneda} {total:,.2f}"],
-    ], colWidths=[100, 140])
-
-    tot_tbl.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-    ]))
-
-    story.append(tot_tbl)
-
-    doc.build(story)
-    pdf = buffer.getvalue()
-    buffer.close()
-    return pdf
-
-# =====================================================================
-# FUNCIÓN PRINCIPAL DEL MÓDULO
+# FUNCIÓN PRINCIPAL
 # =====================================================================
 
 def mostrar_ingreso_comprobantes():
@@ -453,6 +337,7 @@ def mostrar_ingreso_comprobantes():
         st.warning("Supabase no configurado.")
         st.stop()
 
+    # Estado
     if "comp_items" not in st.session_state:
         st.session_state.comp_items = []
 
@@ -462,242 +347,312 @@ def mostrar_ingreso_comprobantes():
     if "comp_condicion_pago" not in st.session_state:
         st.session_state.comp_condicion_pago = "Contado"
 
-    menu = st.radio(
-        "Modo:",
-        ["🧾 Ingreso manual", "📄 Carga por archivo (CSV/PDF)"],
-        horizontal=True
-    )
+    if "comp_next_rid" not in st.session_state:
+        st.session_state.comp_next_rid = 1
 
-    # =========================
-    # INGRESO MANUAL
-    # =========================
-    if menu == "🧾 Ingreso manual":
+    # Inputs (keys para reset automático)
+    if "comp_fecha" not in st.session_state:
+        st.session_state.comp_fecha = date.today()
 
-        proveedores_options, prov_name_to_id = _get_proveedor_options()
-        articulos_options, art_label_to_row = _get_articulo_options()
+    if "comp_proveedor_sel" not in st.session_state:
+        st.session_state.comp_proveedor_sel = ""
 
-        with st.form("form_comprobante"):
+    if "comp_nro" not in st.session_state:
+        st.session_state.comp_nro = ""
 
-            # Cabecera: N° Comprobante al lado de Proveedor
-            col1, col2, col3 = st.columns(3)
+    if "comp_tipo" not in st.session_state:
+        st.session_state.comp_tipo = "Factura"
 
-            with col1:
-                fecha = st.date_input("Fecha", value=date.today())
+    if "comp_articulo_sel" not in st.session_state:
+        st.session_state.comp_articulo_sel = ""
 
-                cprov, cnro = st.columns([2, 1])
-                with cprov:
-                    proveedor_sel = st.selectbox(
-                        "Proveedor",
-                        proveedores_options,
-                        index=0,
-                        key="comp_proveedor_sel"
-                    )
-                with cnro:
-                    nro_comprobante = st.text_input("Nº Comprobante")
+    if "comp_articulo_prev" not in st.session_state:
+        st.session_state.comp_articulo_prev = ""
 
-            with col2:
-                tipo_comprobante = st.selectbox(
-                    "Tipo",
-                    ["Factura", "Remito", "Nota de Crédito"]
-                )
-                condicion_pago = st.selectbox(
-                    "Condición",
-                    ["Contado", "Crédito"],
-                    index=0 if st.session_state.comp_condicion_pago == "Contado" else 1,
-                    key="comp_condicion_pago"
-                )
+    if "comp_cantidad" not in st.session_state:
+        st.session_state.comp_cantidad = 1
 
-            with col3:
-                moneda = st.selectbox(
-                    "Moneda",
-                    ["UYU", "USD"],
-                    index=0 if st.session_state.comp_moneda == "UYU" else 1,
-                    key="comp_moneda"
-                )
+    if "comp_precio" not in st.session_state:
+        st.session_state.comp_precio = 0.0
 
-            st.markdown("### 📦 Artículos")
+    if "comp_desc" not in st.session_state:
+        st.session_state.comp_desc = 0.0
 
-            c1, c2, c3, c4, c5, c6, c7 = st.columns([2.6, 1, 1.2, 1.1, 1.1, 1.2, 1.4])
-            with c1:
-                articulo_sel = st.selectbox(
-                    "Artículo",
-                    articulos_options,
-                    index=0,
-                    key="comp_articulo_sel"
-                )
-            with c2:
-                cantidad = st.number_input("Cantidad", min_value=1, step=1)
-            with c3:
-                precio_unit_sin_iva = st.number_input("Precio unit. s/IVA", min_value=0.0, step=0.01)
-            with c4:
-                # Se muestra, pero al agregar se pisará por el IVA del artículo
-                iva_tipo = st.selectbox("IVA", ["Exento", "10%", "22%"], index=2)
-            with c5:
-                descuento_pct = st.number_input("Desc. %", min_value=0.0, max_value=100.0, step=0.5)
-            with c6:
-                lote = st.text_input("Lote")
-            with c7:
-                vencimiento = st.date_input("Vencimiento")
+    if "comp_lote" not in st.session_state:
+        st.session_state.comp_lote = ""
 
-            btn_add = st.form_submit_button("➕ Agregar artículo")
-            guardar = st.form_submit_button("💾 Guardar comprobante")
+    if "comp_venc" not in st.session_state:
+        st.session_state.comp_venc = date.today()
 
-        # ----------------------------------
-        # Agregar artículo (IVA y precio salen del artículo)
-        # ----------------------------------
-        if btn_add:
-            if not proveedor_sel:
-                st.error("Seleccioná un proveedor.")
-            elif not articulo_sel:
-                st.error("Seleccioná un artículo.")
-            else:
-                art_row = art_label_to_row.get(articulo_sel, {})
-                art_desc = _articulo_desc_from_row(art_row) or articulo_sel
-                art_id = art_row.get("id")
+    # -------------------------
+    # Cabecera
+    # -------------------------
+    proveedores_options, prov_name_to_id = _get_proveedor_options()
+    articulos_options, art_label_to_row = _get_articulo_options()
 
-                # IVA desde artículo (fuerte)
-                iva_tipo_final = _map_iva_tipo_from_articulo_row(art_row)
-                iva_rate = _iva_rate_from_tipo(iva_tipo_final)
+    c1, c2, c3 = st.columns(3)
 
-                # Precio desde artículo SOLO si el usuario dejó 0
-                if _safe_float(precio_unit_sin_iva, 0.0) <= 0.0:
-                    precio_db = _map_precio_sin_iva_from_articulo_row(art_row)
-                    if precio_db > 0:
-                        precio_unit_sin_iva = float(precio_db)
+    with c1:
+        st.session_state.comp_fecha = st.date_input("Fecha", value=st.session_state.comp_fecha, key="comp_fecha")
 
-                calc = _calc_linea(int(cantidad), float(precio_unit_sin_iva), float(iva_rate), float(descuento_pct))
-
-                st.session_state.comp_items.append({
-                    "articulo": art_desc,
-                    "articulo_id": art_id,
-                    "cantidad": int(cantidad),
-                    "precio_unit_sin_iva": float(precio_unit_sin_iva),
-                    "iva_tipo": iva_tipo_final,
-                    "iva_rate": float(iva_rate),
-                    "descuento_pct": float(descuento_pct),
-                    "descuento_monto": float(calc["descuento_monto"]),
-                    "subtotal_sin_iva": float(calc["subtotal_sin_iva"]),
-                    "iva_monto": float(calc["iva_monto"]),
-                    "total_con_iva": float(calc["total_con_iva"]),
-                    "lote": (lote or "").strip(),
-                    "vencimiento": str(vencimiento),
-                    "moneda": st.session_state.comp_moneda,
-                })
-
-        # ----------------------------------
-        # Vista items (más compacta)
-        # ----------------------------------
-        if st.session_state.comp_items:
-            df_items = pd.DataFrame(st.session_state.comp_items)
-
-            df_show = df_items.copy()
-            rename_map = {
-                "articulo": "articulo",
-                "cantidad": "cantidad",
-                "precio_unit_sin_iva": "precio_unit_sin_iva",
-                "iva_tipo": "iva_tipo",
-                "descuento_pct": "descuento_pct",
-                "subtotal_sin_iva": "subtotal_sin_iva",
-                "iva_monto": "iva_monto",
-                "total_con_iva": "total_con_iva",
-                "lote": "lote",
-                "vencimiento": "vencimiento",
-            }
-            df_show = df_show[list(rename_map.keys())].rename(columns=rename_map)
-
-            st.dataframe(df_show, use_container_width=True, hide_index=True, height=180)
-
-            moneda_actual = st.session_state.comp_moneda
-            subtotal = float(df_items["subtotal_sin_iva"].sum())
-            iva_total = float(df_items["iva_monto"].sum())
-            total_calculado = float(df_items["total_con_iva"].sum())
-            desc_total = float(df_items["descuento_monto"].sum()) if "descuento_monto" in df_items.columns else 0.0
-
-            # Barra inferior compacta (tipo POS)
-            st.markdown("")
-
-            b1, b2, b3, b4 = st.columns([2.2, 2.2, 2.2, 2.4])
-
-            with b1:
-                st.caption("SUB TOTAL")
-                st.text_input(
-                    label="",
-                    value=_fmt_money(subtotal, moneda_actual),
-                    disabled=True,
-                    label_visibility="collapsed",
-                    key="sum_subtotal"
-                )
-
-            with b2:
-                st.caption("DESC./REC.")
-                st.text_input(
-                    label="",
-                    value=_fmt_money(desc_total, moneda_actual),
-                    disabled=True,
-                    label_visibility="collapsed",
-                    key="sum_desc"
-                )
-
-            with b3:
-                st.caption("IMPUESTOS")
-                st.text_input(
-                    label="",
-                    value=_fmt_money(iva_total, moneda_actual),
-                    disabled=True,
-                    label_visibility="collapsed",
-                    key="sum_iva"
-                )
-
-            with b4:
-                st.caption("TOTAL")
-                st.text_input(
-                    label="",
-                    value=_fmt_money(total_calculado, moneda_actual),
-                    disabled=True,
-                    label_visibility="collapsed",
-                    key="sum_total"
-                )
-
-        # ----------------------------------
-        # Guardar comprobante + generar PDF
-        # ----------------------------------
-        if guardar:
-            if not proveedor_sel or not nro_comprobante or not st.session_state.comp_items:
-                st.error("Faltan datos obligatorios.")
-                st.stop()
-
-            proveedor_nombre = str(proveedor_sel).strip()
-            proveedor_id = prov_name_to_id.get(proveedor_nombre)
-            nro_norm = str(nro_comprobante).strip()
-
-            existe = (
-                supabase.table(TABLA_COMPROBANTES)
-                .select("id")
-                .eq("proveedor", proveedor_nombre)
-                .eq("nro_comprobante", nro_norm)
-                .execute()
+        cprov, cnro = st.columns([2, 1])
+        with cprov:
+            st.session_state.comp_proveedor_sel = st.selectbox(
+                "Proveedor",
+                proveedores_options,
+                index=proveedores_options.index(st.session_state.comp_proveedor_sel) if st.session_state.comp_proveedor_sel in proveedores_options else 0,
+                key="comp_proveedor_sel"
             )
-            if existe.data:
-                st.warning("Comprobante duplicado.")
-                st.stop()
+        with cnro:
+            st.session_state.comp_nro = st.text_input("Nº Comprobante", value=st.session_state.comp_nro, key="comp_nro")
+
+    with c2:
+        st.session_state.comp_tipo = st.selectbox(
+            "Tipo",
+            ["Factura", "Remito", "Nota de Crédito"],
+            index=["Factura", "Remito", "Nota de Crédito"].index(st.session_state.comp_tipo) if st.session_state.comp_tipo in ["Factura", "Remito", "Nota de Crédito"] else 0,
+            key="comp_tipo"
+        )
+
+        st.session_state.comp_condicion_pago = st.selectbox(
+            "Condición",
+            ["Contado", "Crédito"],
+            index=0 if st.session_state.comp_condicion_pago == "Contado" else 1,
+            key="comp_condicion_pago"
+        )
+
+    with c3:
+        st.session_state.comp_moneda = st.selectbox(
+            "Moneda",
+            ["UYU", "USD"],
+            index=0 if st.session_state.comp_moneda == "UYU" else 1,
+            key="comp_moneda"
+        )
+
+    st.markdown("### 📦 Artículos")
+
+    # -------------------------
+    # Item entry (1 renglón)
+    # -------------------------
+    # Si cambió el artículo, autocargar precio + reset campos del renglón
+    art_row = art_label_to_row.get(st.session_state.comp_articulo_sel, {}) if st.session_state.comp_articulo_sel else {}
+    iva_tipo_sugerido = _map_iva_tipo_from_articulo_row(art_row) if art_row else "22%"
+    precio_db = _map_precio_sin_iva_from_articulo_row(art_row) if art_row else 0.0
+
+    if st.session_state.comp_articulo_sel != st.session_state.comp_articulo_prev:
+        st.session_state.comp_articulo_prev = st.session_state.comp_articulo_sel
+
+        # Autocargar precio si hay precio en artículos (si no, queda 0)
+        st.session_state.comp_precio = float(precio_db or 0.0)
+
+        # Reset del resto del renglón
+        st.session_state.comp_cantidad = 1
+        st.session_state.comp_desc = 0.0
+        st.session_state.comp_lote = ""
+        st.session_state.comp_venc = date.today()
+
+    i1, i2, i3, i4, i5, i6, i7 = st.columns([2.6, 1, 1.2, 1.1, 1.1, 1.2, 1.4])
+
+    with i1:
+        st.session_state.comp_articulo_sel = st.selectbox(
+            "Artículo",
+            articulos_options,
+            index=articulos_options.index(st.session_state.comp_articulo_sel) if st.session_state.comp_articulo_sel in articulos_options else 0,
+            key="comp_articulo_sel"
+        )
+
+    with i2:
+        st.session_state.comp_cantidad = st.number_input("Cantidad", min_value=1, step=1, key="comp_cantidad")
+
+    with i3:
+        st.session_state.comp_precio = st.number_input("Precio unit. s/IVA", min_value=0.0, step=0.01, key="comp_precio")
+
+    with i4:
+        # IVA solo informativo (sale del artículo)
+        st.text_input("IVA", value=iva_tipo_sugerido, disabled=True)
+
+    with i5:
+        st.session_state.comp_desc = st.number_input("Desc. %", min_value=0.0, max_value=100.0, step=0.5, key="comp_desc")
+
+    with i6:
+        st.session_state.comp_lote = st.text_input("Lote", key="comp_lote")
+
+    with i7:
+        st.session_state.comp_venc = st.date_input("Vencimiento", key="comp_venc")
+
+    badd, bsave = st.columns([1, 1])
+
+    # -------------------------
+    # Agregar item
+    # -------------------------
+    if badd.button("➕ Agregar artículo", use_container_width=True):
+        if not st.session_state.comp_proveedor_sel:
+            st.error("Seleccioná un proveedor.")
+        elif not st.session_state.comp_articulo_sel:
+            st.error("Seleccioná un artículo.")
+        else:
+            art_row = art_label_to_row.get(st.session_state.comp_articulo_sel, {})
+            art_desc = _articulo_desc_from_row(art_row) or st.session_state.comp_articulo_sel
+            art_id = art_row.get("id")
+
+            iva_tipo_final = _map_iva_tipo_from_articulo_row(art_row)
+            iva_rate = _iva_rate_from_tipo(iva_tipo_final)
+
+            precio_unit_sin_iva = float(st.session_state.comp_precio or 0.0)
+            cantidad = int(st.session_state.comp_cantidad or 1)
+            descuento_pct = float(st.session_state.comp_desc or 0.0)
+
+            calc = _calc_linea(cantidad, precio_unit_sin_iva, iva_rate, descuento_pct)
+
+            rid = int(st.session_state.comp_next_rid)
+            st.session_state.comp_next_rid += 1
+
+            st.session_state.comp_items.append({
+                "_rid": rid,
+                "articulo": art_desc,
+                "articulo_id": art_id,
+                "cantidad": cantidad,
+                "precio_unit_sin_iva": float(precio_unit_sin_iva),
+                "iva_tipo": iva_tipo_final,
+                "iva_rate": float(iva_rate),
+                "descuento_pct": float(descuento_pct),
+                "descuento_monto": float(calc["descuento_monto"]),
+                "subtotal_sin_iva": float(calc["subtotal_sin_iva"]),
+                "iva_monto": float(calc["iva_monto"]),
+                "total_con_iva": float(calc["total_con_iva"]),
+                "lote": (st.session_state.comp_lote or "").strip(),
+                "vencimiento": str(st.session_state.comp_venc),
+                "moneda": st.session_state.comp_moneda,
+            })
+
+            # Reset del renglón para cargar el siguiente (esto es lo que pediste)
+            st.session_state.comp_articulo_sel = ""
+            st.session_state.comp_articulo_prev = ""
+            st.session_state.comp_cantidad = 1
+            st.session_state.comp_precio = 0.0
+            st.session_state.comp_desc = 0.0
+            st.session_state.comp_lote = ""
+            st.session_state.comp_venc = date.today()
+
+            st.rerun()
+
+    # -------------------------
+    # Tabla única + borrar
+    # -------------------------
+    if st.session_state.comp_items:
+        df_items = pd.DataFrame(st.session_state.comp_items)
+
+        # Columna para borrar (checkbox)
+        if "🗑 Eliminar" not in df_items.columns:
+            df_items["🗑 Eliminar"] = False
+
+        show_cols = [
+            "_rid",
+            "articulo",
+            "cantidad",
+            "precio_unit_sin_iva",
+            "iva_tipo",
+            "descuento_pct",
+            "subtotal_sin_iva",
+            "iva_monto",
+            "total_con_iva",
+            "lote",
+            "vencimiento",
+            "🗑 Eliminar",
+        ]
+
+        for c in show_cols:
+            if c not in df_items.columns:
+                df_items[c] = ""
+
+        edited = st.data_editor(
+            df_items[show_cols],
+            use_container_width=True,
+            hide_index=True,
+            height=240,
+            disabled=[c for c in show_cols if c != "🗑 Eliminar"],
+            key="comp_editor"
+        )
+
+        cdel1, cdel2 = st.columns([1, 3])
+
+        if cdel1.button("🗑 Quitar seleccionados", use_container_width=True):
+            try:
+                to_del = set(edited.loc[edited["🗑 Eliminar"] == True, "_rid"].tolist())
+                st.session_state.comp_items = [it for it in st.session_state.comp_items if it.get("_rid") not in to_del]
+                st.rerun()
+            except Exception as e:
+                st.error("No se pudo quitar. Ver detalle abajo.")
+                st.exception(e)
+
+        # Totales (sin keys para que se actualice siempre)
+        moneda_actual = st.session_state.comp_moneda
+        subtotal = float(df_items["subtotal_sin_iva"].sum()) if "subtotal_sin_iva" in df_items.columns else 0.0
+        iva_total = float(df_items["iva_monto"].sum()) if "iva_monto" in df_items.columns else 0.0
+        total_calculado = float(df_items["total_con_iva"].sum()) if "total_con_iva" in df_items.columns else 0.0
+        desc_total = float(df_items["descuento_monto"].sum()) if "descuento_monto" in df_items.columns else 0.0
+
+        t1, t2, t3, t4 = st.columns([2.2, 2.2, 2.2, 2.4])
+
+        with t1:
+            st.caption("SUB TOTAL")
+            st.text_input("SUB TOTAL", value=_fmt_money(subtotal, moneda_actual), disabled=True, label_visibility="collapsed")
+
+        with t2:
+            st.caption("DESC./REC.")
+            st.text_input("DESC./REC.", value=_fmt_money(desc_total, moneda_actual), disabled=True, label_visibility="collapsed")
+
+        with t3:
+            st.caption("IMPUESTOS")
+            st.text_input("IMPUESTOS", value=_fmt_money(iva_total, moneda_actual), disabled=True, label_visibility="collapsed")
+
+        with t4:
+            st.caption("TOTAL")
+            st.text_input("TOTAL", value=_fmt_money(total_calculado, moneda_actual), disabled=True, label_visibility="collapsed")
+
+    # -------------------------
+    # Guardar comprobante
+    # -------------------------
+    if bsave.button("💾 Guardar comprobante", use_container_width=True):
+        if not st.session_state.comp_proveedor_sel or not st.session_state.comp_nro or not st.session_state.comp_items:
+            st.error("Faltan datos obligatorios (Proveedor, Nº Comprobante y al menos 1 artículo).")
+            st.stop()
+
+        proveedor_nombre = str(st.session_state.comp_proveedor_sel).strip()
+        proveedor_id = prov_name_to_id.get(proveedor_nombre)
+        nro_norm = str(st.session_state.comp_nro).strip()
+
+        try:
+            # Duplicado (si la tabla/columna coincide)
+            try:
+                existe = (
+                    supabase.table(TABLA_COMPROBANTES)
+                    .select("id")
+                    .eq("proveedor", proveedor_nombre)
+                    .eq("nro_comprobante", nro_norm)
+                    .execute()
+                )
+                if existe.data:
+                    st.warning("Comprobante duplicado.")
+                    st.stop()
+            except Exception:
+                # Si falla por columna/RLS, no rompemos
+                pass
 
             df_items = pd.DataFrame(st.session_state.comp_items)
             subtotal = float(df_items["subtotal_sin_iva"].sum())
             iva_total = float(df_items["iva_monto"].sum())
             total_calculado = float(df_items["total_con_iva"].sum())
-
-            moneda_actual = st.session_state.comp_moneda
-            condicion_pago = st.session_state.comp_condicion_pago
 
             cabecera_full = {
-                "fecha": str(fecha),
+                "fecha": str(st.session_state.comp_fecha),
                 "proveedor": proveedor_nombre,
                 "proveedor_id": proveedor_id,
-                "tipo_comprobante": tipo_comprobante,
+                "tipo_comprobante": st.session_state.comp_tipo,
                 "nro_comprobante": nro_norm,
-                "condicion_pago": condicion_pago,
+                "condicion_pago": st.session_state.comp_condicion_pago,
                 "usuario": str(usuario_actual),
-                "moneda": moneda_actual,
+                "moneda": st.session_state.comp_moneda,
                 "subtotal": subtotal,
                 "iva_total": iva_total,
                 "total_calculado": total_calculado,
@@ -717,7 +672,7 @@ def mostrar_ingreso_comprobantes():
                     "vencimiento": item.get("vencimiento", ""),
                     "usuario": str(usuario_actual),
 
-                    "moneda": moneda_actual,
+                    "moneda": st.session_state.comp_moneda,
                     "precio_unit_sin_iva": float(item.get("precio_unit_sin_iva", 0.0)),
                     "iva_tipo": item.get("iva_tipo", "22%"),
                     "iva_rate": float(item.get("iva_rate", 0.22)),
@@ -731,96 +686,11 @@ def mostrar_ingreso_comprobantes():
                 _insert_detalle_con_fallback(detalle_full)
                 _impactar_stock(detalle_full["articulo"], detalle_full["cantidad"])
 
-            # PDF
-            try:
-                pdf_bytes = _generar_pdf_comprobante(cabecera_full, st.session_state.comp_items, moneda_actual)
-                st.session_state["ultimo_pdf_comprobante"] = pdf_bytes
-                st.session_state["ultimo_pdf_nombre"] = f"comprobante_{nro_norm}.pdf"
-            except Exception:
-                st.session_state["ultimo_pdf_comprobante"] = None
-                st.session_state["ultimo_pdf_nombre"] = None
-
             st.success("Comprobante guardado correctamente.")
             st.session_state.comp_items = []
+            st.rerun()
 
-        # Botón descarga PDF (si existe)
-        if st.session_state.get("ultimo_pdf_comprobante"):
-            st.download_button(
-                "⬇️ Descargar PDF del comprobante",
-                data=st.session_state["ultimo_pdf_comprobante"],
-                file_name=st.session_state.get("ultimo_pdf_nombre", "comprobante.pdf"),
-                mime="application/pdf",
-                use_container_width=True
-            )
-
-    # =========================
-    # CARGA POR ARCHIVO
-    # =========================
-    else:
-        archivo = st.file_uploader("Subir CSV o PDF", type=["csv", "pdf"])
-
-        if archivo and archivo.name.lower().endswith(".csv"):
-            df = pd.read_csv(archivo)
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
-            if st.button("Importar CSV"):
-                for _, row in df.iterrows():
-                    proveedor_norm = str(row.get("proveedor", "")).strip()
-                    nro_norm = str(row.get("nro_comprobante", "")).strip()
-
-                    moneda_row = str(row.get("moneda", st.session_state.comp_moneda)).strip().upper()
-                    if moneda_row not in ("UYU", "USD"):
-                        moneda_row = st.session_state.comp_moneda
-
-                    iva_tipo_row = str(row.get("iva_tipo", "22%")).strip()
-                    iva_rate_row = _safe_float(row.get("iva_rate", _iva_rate_from_tipo(iva_tipo_row)), 0.0)
-                    if iva_rate_row not in (0.0, 0.1, 0.22):
-                        iva_rate_row = _iva_rate_from_tipo(iva_tipo_row)
-
-                    cantidad_row = _safe_int(row.get("cantidad", 0), 0)
-                    precio_row = _safe_float(row.get("precio_unit_sin_iva", 0.0), 0.0)
-                    desc_pct_row = _safe_float(row.get("descuento_pct", 0.0), 0.0)
-
-                    calc = _calc_linea(cantidad_row, precio_row, iva_rate_row, desc_pct_row)
-
-                    cabecera_full = {
-                        "fecha": str(row.get("fecha", "")),
-                        "proveedor": proveedor_norm,
-                        "tipo_comprobante": str(row.get("tipo", "")),
-                        "nro_comprobante": nro_norm,
-                        "usuario": str(usuario_actual),
-                        "moneda": moneda_row,
-                        "subtotal": float(calc["subtotal_sin_iva"]),
-                        "iva_total": float(calc["iva_monto"]),
-                        "total_calculado": float(calc["total_con_iva"]),
-                        "total": float(calc["total_con_iva"]),
-                    }
-
-                    res = _insert_cabecera_con_fallback(cabecera_full)
-                    comprobante_id = res.data[0]["id"]
-
-                    detalle_full = {
-                        "comprobante_id": comprobante_id,
-                        "articulo": str(row.get("articulo", "")).strip(),
-                        "cantidad": int(cantidad_row),
-                        "lote": str(row.get("lote", "")).strip(),
-                        "vencimiento": str(row.get("vencimiento", "")).strip(),
-                        "usuario": str(usuario_actual),
-                        "moneda": moneda_row,
-                        "precio_unit_sin_iva": float(precio_row),
-                        "iva_tipo": iva_tipo_row,
-                        "iva_rate": float(iva_rate_row),
-                        "descuento_pct": float(desc_pct_row),
-                        "descuento_monto": float(calc["descuento_monto"]),
-                        "subtotal_sin_iva": float(calc["subtotal_sin_iva"]),
-                        "iva_monto": float(calc["iva_monto"]),
-                        "total_con_iva": float(calc["total_con_iva"]),
-                    }
-
-                    _insert_detalle_con_fallback(detalle_full)
-                    _impactar_stock(detalle_full["articulo"], detalle_full["cantidad"])
-
-                st.success("CSV importado correctamente.")
-
-        elif archivo:
-            st.info("PDF cargado (no parseado).")
+        except Exception as e:
+            st.error("Error guardando en Supabase (RLS/columnas). Mirá el log en Streamlit Cloud.")
+            st.exception(e)
+            st.stop()
