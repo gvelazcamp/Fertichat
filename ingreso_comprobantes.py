@@ -8,19 +8,8 @@ import pandas as pd
 from datetime import date
 import os
 import re
-import io
 
 from supabase import create_client
-
-# PDF (ReportLab) - opcional (no rompe si no está instalado)
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib import colors
-    REPORTLAB_OK = True
-except Exception:
-    REPORTLAB_OK = False
 
 # =====================================================================
 # CONFIGURACIÓN SUPABASE
@@ -34,8 +23,21 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-TABLA_COMPROBANTES = "comprobantes_compras"
-TABLA_DETALLE = "comprobantes_detalle"
+# Tablas base (candidatas para autodetección)
+TABLAS_CABECERA_CANDIDATAS = [
+    "comprobantes_compras",
+    "comprobantes",
+    "comprobantes_compra",
+    "comprobantes_cabecera",
+]
+
+TABLAS_DETALLE_CANDIDATAS = [
+    "comprobantes_detalle",
+    "comprobante_detalle",
+    "comprobantes_items",
+    "comprobantes_lineas",
+]
+
 TABLA_STOCK = "stock"
 TABLA_PROVEEDORES = "proveedores"
 TABLA_ARTICULOS = "articulos"
@@ -174,7 +176,7 @@ def _fmt_money(v: float, moneda: str) -> str:
     return f"{moneda} {s}"
 
 # =====================================================================
-# CACHE SUPABASE
+# CACHE SUPABASE (PAGINADO)
 # =====================================================================
 
 @st.cache_data(ttl=600)
@@ -204,7 +206,6 @@ def _cache_proveedores() -> list:
 
     return out
 
-
 @st.cache_data(ttl=600)
 def _cache_articulos() -> list:
     if not supabase:
@@ -217,7 +218,6 @@ def _cache_articulos() -> list:
 
     while start < max_rows:
         end = start + page - 1
-        # OJO: no ordeno por "descripción" porque puede no existir exactamente con ese nombre
         res = (
             supabase.table(TABLA_ARTICULOS)
             .select("*")
@@ -231,7 +231,6 @@ def _cache_articulos() -> list:
         start += page
 
     return out
-
 
 def _get_proveedor_options() -> tuple[list, dict]:
     data = _cache_proveedores()
@@ -256,6 +255,87 @@ def _get_articulo_options() -> tuple[list, dict]:
     return options, label_to_row
 
 # =====================================================================
+# RESOLVER TABLAS COMPROBANTES (AUTO)
+# =====================================================================
+
+def _pick_table_name(candidates: list[str]) -> str | None:
+    if not supabase:
+        return None
+
+    for name in candidates:
+        try:
+            supabase.table(name).select("*").limit(1).execute()
+            return name
+        except Exception as e:
+            s = str(e)
+            if ("PGRST205" in s) or ("schema cache" in s) or ("Could not find the table" in s):
+                continue
+            # Otro error (RLS/permiso): la tabla existe pero no se puede leer.
+            return name
+
+    return None
+
+def _resolver_tablas_o_stop() -> tuple[str, str]:
+    if "tabla_comp_cab" not in st.session_state:
+        st.session_state["tabla_comp_cab"] = _pick_table_name(TABLAS_CABECERA_CANDIDATAS)
+
+    if "tabla_comp_det" not in st.session_state:
+        st.session_state["tabla_comp_det"] = _pick_table_name(TABLAS_DETALLE_CANDIDATAS)
+
+    cab = st.session_state.get("tabla_comp_cab")
+    det = st.session_state.get("tabla_comp_det")
+
+    if not cab or not det:
+        st.error("No existe la tabla de comprobantes en Supabase (PGRST205).")
+        st.markdown("Creá estas tablas (nombres exactos) o cambiá las candidatas en el código:")
+        st.code(
+            """
+-- CABECERA
+create table if not exists public.comprobantes_compras (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  fecha date,
+  proveedor text,
+  proveedor_id uuid,
+  tipo_comprobante text,
+  nro_comprobante text,
+  condicion_pago text,
+  usuario text,
+  moneda text,
+  subtotal numeric,
+  iva_total numeric,
+  total numeric
+);
+
+-- DETALLE
+create table if not exists public.comprobantes_detalle (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  comprobante_id uuid references public.comprobantes_compras(id) on delete cascade,
+  articulo text,
+  articulo_id uuid,
+  cantidad integer,
+  moneda text,
+  precio_unit_sin_iva numeric,
+  iva_tipo text,
+  iva_rate numeric,
+  descuento_pct numeric,
+  descuento_monto numeric,
+  subtotal_sin_iva numeric,
+  iva_monto numeric,
+  total_con_iva numeric,
+  lote text,
+  vencimiento date,
+  usuario text
+);
+            """.strip(),
+            language="sql"
+        )
+        st.stop()
+
+    return cab, det
+
+# =====================================================================
 # STOCK
 # =====================================================================
 
@@ -278,36 +358,14 @@ def _impactar_stock(articulo: str, cantidad: int) -> None:
         supabase.table(TABLA_STOCK).insert({"articulo": articulo, "cantidad": int(cantidad)}).execute()
 
 # =====================================================================
-# INSERTS CON FALLBACK
+# INSERTS
 # =====================================================================
 
-def _insert_cabecera_con_fallback(cabecera_full: dict) -> dict:
-    try:
-        return supabase.table(TABLA_COMPROBANTES).insert(cabecera_full).execute()
-    except Exception:
-        cabecera_min = {
-            "fecha": cabecera_full.get("fecha"),
-            "proveedor": cabecera_full.get("proveedor"),
-            "tipo_comprobante": cabecera_full.get("tipo_comprobante"),
-            "nro_comprobante": cabecera_full.get("nro_comprobante"),
-            "total": cabecera_full.get("total", 0.0),
-            "usuario": cabecera_full.get("usuario"),
-        }
-        return supabase.table(TABLA_COMPROBANTES).insert(cabecera_min).execute()
+def _insert_cabecera(tabla_cab: str, cabecera: dict) -> dict:
+    return supabase.table(tabla_cab).insert(cabecera).execute()
 
-def _insert_detalle_con_fallback(detalle_full: dict) -> None:
-    try:
-        supabase.table(TABLA_DETALLE).insert(detalle_full).execute()
-    except Exception:
-        detalle_min = {
-            "comprobante_id": detalle_full.get("comprobante_id"),
-            "articulo": detalle_full.get("articulo"),
-            "cantidad": detalle_full.get("cantidad"),
-            "lote": detalle_full.get("lote", ""),
-            "vencimiento": detalle_full.get("vencimiento", ""),
-            "usuario": detalle_full.get("usuario"),
-        }
-        supabase.table(TABLA_DETALLE).insert(detalle_min).execute()
+def _insert_detalle(tabla_det: str, detalle: dict) -> None:
+    supabase.table(tabla_det).insert(detalle).execute()
 
 # =====================================================================
 # FUNCIÓN PRINCIPAL
@@ -322,19 +380,20 @@ def mostrar_ingreso_comprobantes():
         st.warning("Supabase no configurado.")
         st.stop()
 
+    # Detecta tablas reales o corta con SQL listo
+    tabla_cab, tabla_det = _resolver_tablas_o_stop()
+
     # -------------------------
-    # Estado inicial (defaults)
+    # Estado inicial
     # -------------------------
     if "comp_items" not in st.session_state:
         st.session_state["comp_items"] = []
-
     if "comp_next_rid" not in st.session_state:
         st.session_state["comp_next_rid"] = 1
-
     if "comp_reset_line" not in st.session_state:
         st.session_state["comp_reset_line"] = False
 
-    # Defaults de widgets (solo si no existen)
+    # Defaults widgets
     if "comp_fecha" not in st.session_state:
         st.session_state["comp_fecha"] = date.today()
     if "comp_proveedor_sel" not in st.session_state:
@@ -359,29 +418,35 @@ def mostrar_ingreso_comprobantes():
         st.session_state["comp_precio"] = 0.0
     if "comp_desc" not in st.session_state:
         st.session_state["comp_desc"] = 0.0
+
+    # Lote/venc (por defecto apagados)
+    if "comp_has_lote" not in st.session_state:
+        st.session_state["comp_has_lote"] = False
+    if "comp_has_venc" not in st.session_state:
+        st.session_state["comp_has_venc"] = False
     if "comp_lote" not in st.session_state:
         st.session_state["comp_lote"] = ""
-    if "comp_venc" not in st.session_state:
-        st.session_state["comp_venc"] = date.today()
+    if "comp_venc_date" not in st.session_state:
+        st.session_state["comp_venc_date"] = date.today()
 
-    # Reset del renglón (se ejecuta ANTES de crear widgets)
+    # Reset renglón de carga (ANTES de widgets)
     if st.session_state["comp_reset_line"]:
         st.session_state["comp_articulo_sel"] = ""
         st.session_state["comp_articulo_prev"] = ""
         st.session_state["comp_cantidad"] = 1
         st.session_state["comp_precio"] = 0.0
         st.session_state["comp_desc"] = 0.0
+        st.session_state["comp_has_lote"] = False
+        st.session_state["comp_has_venc"] = False
         st.session_state["comp_lote"] = ""
-        st.session_state["comp_venc"] = date.today()
+        st.session_state["comp_venc_date"] = date.today()
         st.session_state["comp_reset_line"] = False
 
-    # -------------------------
-    # Datos Supabase
-    # -------------------------
+    # Datos Supabase (cache)
     proveedores_options, prov_name_to_id = _get_proveedor_options()
     articulos_options, art_label_to_row = _get_articulo_options()
 
-    # Sanitizar selectbox si quedó un valor viejo
+    # Sanitizar selecciones viejas
     if st.session_state["comp_proveedor_sel"] not in proveedores_options:
         st.session_state["comp_proveedor_sel"] = ""
     if st.session_state["comp_articulo_sel"] not in articulos_options:
@@ -418,7 +483,7 @@ def mostrar_ingreso_comprobantes():
     with i1:
         st.selectbox("Artículo", articulos_options, key="comp_articulo_sel")
 
-    # Autocargar precio/IVA cuando cambia el artículo (ANTES de crear los otros widgets)
+    # Autocargar precio/IVA
     art_row = art_label_to_row.get(st.session_state["comp_articulo_sel"], {}) if st.session_state["comp_articulo_sel"] else {}
     iva_tipo_sugerido = _map_iva_tipo_from_articulo_row(art_row) if art_row else "22%"
     precio_db = _map_precio_sin_iva_from_articulo_row(art_row) if art_row else 0.0
@@ -428,8 +493,12 @@ def mostrar_ingreso_comprobantes():
         st.session_state["comp_precio"] = float(precio_db or 0.0)
         st.session_state["comp_cantidad"] = 1
         st.session_state["comp_desc"] = 0.0
+
+        # Cada renglón decide si lleva lote/vencimiento
+        st.session_state["comp_has_lote"] = False
+        st.session_state["comp_has_venc"] = False
         st.session_state["comp_lote"] = ""
-        st.session_state["comp_venc"] = date.today()
+        st.session_state["comp_venc_date"] = date.today()
 
     with i2:
         st.number_input("Cantidad", min_value=1, step=1, key="comp_cantidad")
@@ -439,10 +508,19 @@ def mostrar_ingreso_comprobantes():
         st.text_input("IVA", value=iva_tipo_sugerido, disabled=True)
     with i5:
         st.number_input("Desc. %", min_value=0.0, max_value=100.0, step=0.5, key="comp_desc")
+
     with i6:
-        st.text_input("Lote", key="comp_lote")
+        st.checkbox("Lote", key="comp_has_lote")
+        if not st.session_state["comp_has_lote"]:
+            st.session_state["comp_lote"] = ""
+        st.text_input(" ", key="comp_lote", disabled=not st.session_state["comp_has_lote"], label_visibility="collapsed")
+
     with i7:
-        st.date_input("Vencimiento", key="comp_venc")
+        st.checkbox("Venc.", key="comp_has_venc")
+        if st.session_state["comp_has_venc"]:
+            st.date_input(" ", key="comp_venc_date", label_visibility="collapsed")
+        else:
+            st.text_input(" ", value="", disabled=True, key="comp_venc_disabled", label_visibility="collapsed")
 
     badd, bsave = st.columns([1, 1])
 
@@ -471,6 +549,9 @@ def mostrar_ingreso_comprobantes():
             rid = int(st.session_state["comp_next_rid"])
             st.session_state["comp_next_rid"] = rid + 1
 
+            lote_val = (st.session_state["comp_lote"] or "").strip() if st.session_state["comp_has_lote"] else ""
+            venc_val = str(st.session_state["comp_venc_date"]) if st.session_state["comp_has_venc"] else ""
+
             st.session_state["comp_items"].append({
                 "_rid": rid,
                 "articulo": art_desc,
@@ -484,12 +565,12 @@ def mostrar_ingreso_comprobantes():
                 "subtotal_sin_iva": float(calc["subtotal_sin_iva"]),
                 "iva_monto": float(calc["iva_monto"]),
                 "total_con_iva": float(calc["total_con_iva"]),
-                "lote": (st.session_state["comp_lote"] or "").strip(),
-                "vencimiento": str(st.session_state["comp_venc"]),
+                "lote": lote_val,
+                "vencimiento": venc_val,
                 "moneda": st.session_state["comp_moneda"],
             })
 
-            # Pediste: al agregar, que quede listo para una nueva línea
+            # Reset del renglón para que "Agregar artículo" cree una NUEVA línea
             st.session_state["comp_reset_line"] = True
             st.rerun()
 
@@ -571,7 +652,7 @@ def mostrar_ingreso_comprobantes():
             iva_total = float(df_items["iva_monto"].sum())
             total_calculado = float(df_items["total_con_iva"].sum())
 
-            cabecera_full = {
+            cabecera = {
                 "fecha": str(st.session_state["comp_fecha"]),
                 "proveedor": proveedor_nombre,
                 "proveedor_id": proveedor_id,
@@ -585,11 +666,11 @@ def mostrar_ingreso_comprobantes():
                 "total": total_calculado,
             }
 
-            res = _insert_cabecera_con_fallback(cabecera_full)
+            res = _insert_cabecera(tabla_cab, cabecera)
             comprobante_id = res.data[0]["id"]
 
             for item in st.session_state["comp_items"]:
-                detalle_full = {
+                detalle = {
                     "comprobante_id": comprobante_id,
                     "articulo": item["articulo"],
                     "articulo_id": item.get("articulo_id"),
@@ -597,7 +678,6 @@ def mostrar_ingreso_comprobantes():
                     "lote": item.get("lote", ""),
                     "vencimiento": item.get("vencimiento", ""),
                     "usuario": str(usuario_actual),
-
                     "moneda": st.session_state["comp_moneda"],
                     "precio_unit_sin_iva": float(item.get("precio_unit_sin_iva", 0.0)),
                     "iva_tipo": item.get("iva_tipo", "22%"),
@@ -609,14 +689,14 @@ def mostrar_ingreso_comprobantes():
                     "total_con_iva": float(item.get("total_con_iva", 0.0)),
                 }
 
-                _insert_detalle_con_fallback(detalle_full)
-                _impactar_stock(detalle_full["articulo"], detalle_full["cantidad"])
+                _insert_detalle(tabla_det, detalle)
+                _impactar_stock(detalle["articulo"], detalle["cantidad"])
 
             st.success("Comprobante guardado correctamente.")
             st.session_state["comp_items"] = []
             st.rerun()
 
         except Exception as e:
-            st.error("No se pudo guardar en Supabase (RLS / columnas / permisos).")
+            st.error("No se pudo guardar en Supabase.")
             st.write(str(e))
             st.stop()
