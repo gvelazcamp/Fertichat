@@ -526,16 +526,19 @@ except:
 # =========================
 # TÍTULO Y CAMPANITA (SOLO PC - todo en HTML para poder ocultar)
 # =========================
-campana_html = f'<span style="font-size:26px;">🔔</span>'
+campana_html = '<span style="font-size:26px;">&#128276;</span>'
 if cant_pendientes > 0:
-    campana_html = f'<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">🔔 {cant_pendientes}</a>'
+    campana_html = f'<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">&#128276; {cant_pendientes}</a>'
+
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+  .header-desktop-wrapper { display: none !important; }
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown(f"""
-<style>
-@media (max-width: 768px) {{
-  .header-desktop-wrapper {{ display: none !important; }}
-}}
-</style>
 <div class="header-desktop-wrapper">
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
@@ -547,7 +550,6 @@ st.markdown(f"""
     <hr style="margin-top:16px; border:none; border-top:1px solid #e2e8f0;">
 </div>
 """, unsafe_allow_html=True)
-
 
 # =========================
 # SIDEBAR
