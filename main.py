@@ -365,21 +365,22 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #64748b !important;
   }
 
-  /* FORZAR CHAT INPUT BEIGE EN MÓVIL - ULTRA AGRESIVO */
-  [data-testid="stChatInput"] *,
+  /* FORZAR CHAT INPUT BEIGE EN MÓVIL - MÁXIMA PRIORIDAD */
   [data-testid="stChatInput"],
+  [data-testid="stChatInput"] *,
   [data-testid="stChatInput"] > div,
-  [data-testid="stChatInput"] > div > div,
-  [data-testid="stChatInput"] input,
+  [data-testid="stChatInput"] [data-baseweb="textarea"],
+  [data-testid="stChatInput"] [data-baseweb="base-input"],
   [data-testid="stChatInput"] textarea,
-  [data-testid="stChatInput"] div {
+  [data-testid="stChatInput"] input,
+  textarea[data-testid="stChatInputTextArea"],
+  [data-baseweb="textarea"] textarea {
     background: #f8fafc !important;
     background-color: #f8fafc !important;
     color: #0f172a !important;
   }
 
-  [data-testid="stChatInput"] input,
-  [data-testid="stChatInput"] textarea {
+  textarea[data-testid="stChatInputTextArea"] {
     font-size: 14px !important;
     height: 44px !important;
     min-height: 44px !important;
@@ -389,16 +390,29 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   }
   
   [data-testid="stChatInput"] input::placeholder,
-  [data-testid="stChatInput"] textarea::placeholder {
+  [data-testid="stChatInput"] textarea::placeholder,
+  textarea[data-testid="stChatInputTextArea"]::placeholder {
     color: #64748b !important;
     font-size: 14px !important;
   }
 
   [data-testid="stChatInput"] button {
     background: #f8fafc !important;
-    background-color: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
   }
+}
+
+/* OVERRIDE GLOBAL PARA CHAT INPUT (fuera del media query) */
+textarea[data-testid="stChatInputTextArea"] {
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="base-input"] {
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
 }
 </style>
 """, unsafe_allow_html=True)
