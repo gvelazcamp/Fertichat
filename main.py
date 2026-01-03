@@ -65,17 +65,17 @@ html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
 [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
 .block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
 
-/* HEADER BEIGE EN PC */
+/* HEADER BEIGE EN PC - MISMO COLOR DEL FONDO */
 [data-testid="stHeader"] {
-    background-color: #f5f5dc !important;
+    background-color: #f6f4ef !important;
 }
 
 .stAppHeader {
-    background-color: #f5f5dc !important;
+    background-color: #f6f4ef !important;
 }
 
 [data-testid="stToolbar"] {
-    background-color: #f5f5dc !important;
+    background-color: #f6f4ef !important;
 }
 
 /* Sidebar look */
