@@ -31,3 +31,6 @@ streamlit-autorefresh
 openpyxl
 
 streamlit-aggrid
+
+reportlab
+
