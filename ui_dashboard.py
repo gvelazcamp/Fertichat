@@ -522,6 +522,35 @@ def mostrar_resumen_compras_rotativo():
               font-size: 0.8rem;
             }
           }
+          
+          /* ========================================
+             FIX INPUT BUSCADOR EN MÓVIL
+             ======================================== */
+          @media (max-width: 768px) {
+            /* Input de búsqueda "Escribí tu consulta..." */
+            .block-container input[type="text"],
+            .block-container textarea,
+            [data-baseweb="input"] input,
+            [data-baseweb="textarea"] textarea {
+              font-size: 14px !important;
+              padding: 10px 12px !important;
+              min-height: 42px !important;
+              height: auto !important;
+            }
+            
+            /* Contenedor del input */
+            [data-baseweb="input"],
+            [data-baseweb="textarea"] {
+              min-height: auto !important;
+            }
+            
+            /* Placeholder text */
+            .block-container input::placeholder,
+            .block-container textarea::placeholder {
+              font-size: 14px !important;
+              opacity: 0.6;
+            }
+          }
         </style>
         """,
         unsafe_allow_html=True
