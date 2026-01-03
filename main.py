@@ -85,12 +85,12 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 #mobile-header { display: none; }
 
 /* =========================================================
-   DESKTOP REAL (mouse/trackpad):
+   DESKTOP (más de 768px):
    - sidebar siempre visible
    - oculto controles de colapsar/expandir para que no lo puedan cerrar en PC
    - puedo ocultar toolbar actions sin romper nada
 ========================================================= */
-@media (hover: hover) and (pointer: fine) {
+@media (min-width: 769px) {
   div[data-testid="stToolbarActions"] { display: none !important; }
 
   /* No permitir colapsar sidebar en PC */
@@ -105,11 +105,11 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 }
 
 /* =========================================================
-   MÓVIL REAL (touch):
+   MÓVIL (max-width 768px):
    - mostrar SI o SI el control nativo (☰ / flecha)
    - mantener visible el botón de cerrar del sidebar
 ========================================================= */
-@media (hover: none) and (pointer: coarse) {
+@media (max-width: 768px) {
   .block-container { padding-top: 70px !important; }
 
   #mobile-header {
@@ -153,41 +153,65 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   [data-testid="stMarkdownContainer"]:has(h1#ferti-chat) {
     display: none !important;
   }
+  
+  /* Selectores adicionales por si :has() no funciona */
+  h1#ferti-chat {
+    display: none !important;
+  }
+  
+  [data-testid="stHeadingWithActionElements"]:has(h1#ferti-chat) {
+    display: none !important;
+  }
+  
+  /* Ocultar el contenedor principal del título */
+  .block-container > div:first-child [data-testid="stHorizontalBlock"]:first-of-type {
+    display: none !important;
+  }
+  
+  /* Ocultar el hr debajo del título */
+  .block-container > div:first-child hr:first-of-type {
+    display: none !important;
+  }
 
   /* =========================================================
      SIDEBAR MÓVIL - FONDO BLANCO Y LETRAS NEGRAS
   ========================================================= */
-  section[data-testid="stSidebar"] {
+  section[data-testid="stSidebar"],
+  section[data-testid="stSidebar"] > div,
+  section[data-testid="stSidebar"] > div > div,
+  section[data-testid="stSidebar"] > div > div > div,
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlock"],
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"],
+  section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+  section[data-testid="stSidebar"] .st-emotion-cache-1cypcdb,
+  section[data-testid="stSidebar"] [class*="st-emotion-cache"] {
     background: #ffffff !important;
+    background-color: #ffffff !important;
   }
   
-  section[data-testid="stSidebar"] > div {
-    background: #ffffff !important;
-  }
-  
-  section[data-testid="stSidebar"] > div > div {
-    background: #ffffff !important;
-  }
-  
-  section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-    background: #ffffff !important;
-  }
-  
-  section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
-    background: #ffffff !important;
-  }
-  
-  /* Letras negras en todo el sidebar */
-  section[data-testid="stSidebar"] * {
-    color: #0f172a !important;
-  }
-  
+  /* Letras negras en TODO el sidebar */
+  section[data-testid="stSidebar"] *,
   section[data-testid="stSidebar"] p,
   section[data-testid="stSidebar"] span,
   section[data-testid="stSidebar"] label,
   section[data-testid="stSidebar"] h1,
   section[data-testid="stSidebar"] h2,
-  section[data-testid="stSidebar"] h3 {
+  section[data-testid="stSidebar"] h3,
+  section[data-testid="stSidebar"] div,
+  section[data-testid="stSidebar"] strong,
+  section[data-testid="stSidebar"] em,
+  section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+  section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+    color: #0f172a !important;
+  }
+  
+  /* Radio buttons con fondo claro */
+  section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  
+  section[data-testid="stSidebar"] div[role="radiogroup"] label span {
     color: #0f172a !important;
   }
   
@@ -195,11 +219,17 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   section[data-testid="stSidebar"] input {
     background: #f8fafc !important;
     color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
   }
   
   /* Botón cerrar sesión */
   section[data-testid="stSidebar"] button {
     background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  
+  section[data-testid="stSidebar"] button span {
     color: #0f172a !important;
   }
 }
