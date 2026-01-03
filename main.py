@@ -47,7 +47,7 @@ if "radio_menu" not in st.session_state:
 
 
 # =========================
-# CSS COMPLETO
+# CSS COMPLETO CORREGIDO
 # =========================
 st.markdown(r"""
 <style>
@@ -65,17 +65,17 @@ html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
 [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
 .block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
 
-/* HEADER BEIGE EN PC - MISMO COLOR DEL FONDO */
+/* HEADER MISMO COLOR DEL FONDO */
 [data-testid="stHeader"] {
-    background-color: #f6f4ef !important;
+    background: var(--fc-bg-1) !important;
 }
 
 .stAppHeader {
-    background-color: #f6f4ef !important;
+    background: var(--fc-bg-1) !important;
 }
 
 [data-testid="stToolbar"] {
-    background-color: #f6f4ef !important;
+    background: var(--fc-bg-1) !important;
 }
 
 /* Sidebar look */
@@ -178,9 +178,80 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   button[title="Close sidebar"] {
     display: inline-flex !important;
   }
+  
+  /* FORZAR INPUTS CLAROS EN MÓVIL - MÁXIMA PRIORIDAD */
+  
+  /* TEXT INPUT (Stock IA) */
+  [data-testid="stTextInput"],
+  [data-testid="stTextInput"] *,
+  [data-testid="stTextInput"] > div,
+  [data-testid="stTextInput"] [data-baseweb="input"],
+  [data-testid="stTextInput"] [data-baseweb="base-input"],
+  [data-testid="stTextInput"] input,
+  [data-baseweb="input"],
+  [data-baseweb="input"] *,
+  [data-baseweb="input"] > div,
+  [data-baseweb="base-input"],
+  [data-baseweb="base-input"] *,
+  input[type="text"] {
+    background: #f8fafc !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    font-size: 15px !important;
+    padding: 12px 14px !important;
+    min-height: 48px !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 8px !important;
+  }
+  
+  /* CHAT INPUT (Compras IA) */
+  [data-testid="stChatInput"],
+  [data-testid="stChatInput"] *,
+  [data-testid="stChatInput"] > div,
+  [data-testid="stChatInput"] [data-baseweb="textarea"],
+  [data-testid="stChatInput"] [data-baseweb="base-input"],
+  [data-testid="stChatInput"] textarea,
+  textarea[data-testid="stChatInputTextArea"],
+  [data-baseweb="textarea"],
+  [data-baseweb="textarea"] *,
+  [data-baseweb="textarea"] > div,
+  [data-baseweb="textarea"] textarea {
+    background: #f8fafc !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    font-size: 15px !important;
+    padding: 12px 14px !important;
+    min-height: 48px !important;
+    height: auto !important;
+    max-height: 120px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 8px !important;
+  }
+  
+  /* Placeholders */
+  input::placeholder,
+  textarea::placeholder {
+    color: #64748b !important;
+    opacity: 0.7 !important;
+    font-size: 14px !important;
+  }
+  
+  /* Botones de envío */
+  [data-testid="stChatInput"] button,
+  [data-testid="stTextInput"] button {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+  }
 }
 
-/* ESTILOS MÓVIL */
+/* ESTILOS MÓVIL GENERALES */
 @media (max-width: 768px) {
   .block-container h1,
   .block-container h2,
@@ -230,40 +301,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   [data-baseweb="select"] span,
   [data-baseweb="select"] div,
   [data-baseweb="select"] p {
-    color: #0f172a !important;
-  }
-  
-  .block-container input,
-  .block-container textarea,
-  .block-container select,
-  [data-baseweb="input"],
-  [data-baseweb="input"] > div,
-  [data-baseweb="base-input"],
-  [data-baseweb="base-input"] > div {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
-    border-color: #e2e8f0 !important;
-    font-size: 14px !important;
-    padding: 10px 12px !important;
-    min-height: 42px !important;
-  }
-  
-  [data-baseweb="textarea"],
-  [data-baseweb="textarea"] > div,
-  [data-baseweb="textarea"] textarea {
-    background: #f8fafc !important;
-    color: #0f172a !important;
-  }
-  
-  .block-container [role="radiogroup"] label {
-    background: #f8fafc !important;
-    color: #0f172a !important;
-  }
-  
-  [data-baseweb="datepicker"],
-  [data-baseweb="datepicker"] > div {
-    background: #f8fafc !important;
     color: #0f172a !important;
   }
   
@@ -370,62 +407,6 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   section[data-testid="stSidebar"] button span {
     color: #0f172a !important;
   }
-
-  .block-container input::placeholder,
-  .block-container textarea::placeholder {
-    font-size: 14px !important;
-    opacity: 0.6;
-    color: #64748b !important;
-  }
-
-  /* FORZAR CHAT INPUT BEIGE EN MÓVIL - MÁXIMA PRIORIDAD */
-  [data-testid="stChatInput"],
-  [data-testid="stChatInput"] *,
-  [data-testid="stChatInput"] > div,
-  [data-testid="stChatInput"] [data-baseweb="textarea"],
-  [data-testid="stChatInput"] [data-baseweb="base-input"],
-  [data-testid="stChatInput"] textarea,
-  [data-testid="stChatInput"] input,
-  textarea[data-testid="stChatInputTextArea"],
-  [data-baseweb="textarea"] textarea {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
-  }
-
-  textarea[data-testid="stChatInputTextArea"] {
-    font-size: 14px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 10px 12px !important;
-    border: 1px solid #e2e8f0 !important;
-  }
-  
-  [data-testid="stChatInput"] input::placeholder,
-  [data-testid="stChatInput"] textarea::placeholder,
-  textarea[data-testid="stChatInputTextArea"]::placeholder {
-    color: #64748b !important;
-    font-size: 14px !important;
-  }
-
-  [data-testid="stChatInput"] button {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-  }
-}
-
-/* OVERRIDE GLOBAL PARA CHAT INPUT (fuera del media query) */
-textarea[data-testid="stChatInputTextArea"] {
-  background: #f8fafc !important;
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-
-[data-testid="stChatInput"] [data-baseweb="textarea"],
-[data-testid="stChatInput"] [data-baseweb="base-input"] {
-  background: #f8fafc !important;
-  background-color: #f8fafc !important;
 }
 </style>
 """, unsafe_allow_html=True)
