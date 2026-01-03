@@ -1,6 +1,6 @@
 # =========================
 # UI_INICIO.PY - PANTALLA DE INICIO CON ACCESOS RÁPIDOS (CORPORATIVO)
-# LAS TARJETAS HERMOSAS ORIGINALES - FUNCIONANDO 100%
+# LAS TARJETAS HERMOSAS ORIGINALES - NAVEGACIÓN MANEJADA EN MAIN.PY
 # =========================
 
 import streamlit as st
@@ -11,36 +11,6 @@ import streamlit.components.v1 as components
 
 def mostrar_inicio():
     """Pantalla de inicio con accesos rápidos a los módulos (look corporativo)"""
-
-    # =========================
-    # SISTEMA DE NAVEGACIÓN CON KEY SEPARADA
-    # =========================
-    try:
-        go = st.query_params.get("go")
-        if go:
-            mapping = {
-                "compras": "🛒 Compras IA",
-                "buscador": "🔎 Buscador IA",
-                "stock": "📦 Stock IA",
-                "dashboard": "📊 Dashboard",
-                "pedidos": "📄 Pedidos internos",
-                "baja": "🧾 Baja de stock",
-                "ordenes": "📦 Órdenes de compra",
-                "indicadores": "📈 Indicadores (Power BI)",
-            }
-            destino = mapping.get(go.lower())
-            if destino:
-                # Usar key separada para evitar conflicto
-                st.session_state["nav_target"] = destino
-                st.query_params.clear()
-    except:
-        pass
-
-    # Sincronizar nav_target con radio_menu
-    if "nav_target" in st.session_state and st.session_state["nav_target"]:
-        st.session_state["radio_menu"] = st.session_state["nav_target"]
-        st.session_state["nav_target"] = None
-        st.rerun()
 
     # =========================
     # Datos usuario / saludo
