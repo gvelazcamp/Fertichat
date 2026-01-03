@@ -158,6 +158,10 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   #titulo-desktop {
     display: none !important;
   }
+  
+  #titulo-fertichat {
+    display: none !important;
+  }
 
   /* SIDEBAR - FONDO BLANCO */
   section[data-testid="stSidebar"],
@@ -234,7 +238,7 @@ col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
 with col_logo:
     st.markdown("""
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div id="titulo-fertichat" style="display: flex; align-items: center; gap: 12px;">
             <div>
                 <h1 style="margin: 0; font-size: 38px; font-weight: 900; color: #0f172a;">
                     FertiChat
