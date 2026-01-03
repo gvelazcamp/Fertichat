@@ -84,6 +84,9 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 /* Header móvil visual (solo estética) */
 #mobile-header { display: none; }
 
+/* Campana mobile oculta por defecto */
+#campana-mobile { display: none; }
+
 /* =========================================================
    DESKTOP REAL (mouse/trackpad):
    - sidebar siempre visible
@@ -118,17 +121,49 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     top: 0; left: 0; right: 0;
     height: 60px;
     background: #0b3b60;
-    z-index: 999996;           /* debajo del control nativo */
+    z-index: 999996;
     align-items: center;
-    padding: 0 16px 0 56px;    /* deja lugar al control nativo */
+    justify-content: space-between;
+    padding: 0 16px 0 56px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    pointer-events: none;      /* no bloquea clicks */
   }
 
   #mobile-header .logo {
     color: white;
     font-size: 20px;
     font-weight: 800;
+  }
+
+  /* Campana al lado de la flechita del sidebar */
+  #campana-mobile {
+    display: flex !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 52px !important;
+    z-index: 1000001 !important;
+    font-size: 22px;
+    text-decoration: none;
+    padding: 6px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  
+  #campana-mobile .notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
   }
 
   /* ✅ Abrir sidebar (nativo) */
@@ -154,17 +189,8 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
    CAMBIOS VISUALES MÓVIL (max-width para asegurar)
 ========================================================= */
 @media (max-width: 768px) {
-  /* Ocultar título FertiChat y Sistema de Gestión */
-  #titulo-desktop {
-    display: none !important;
-  }
-  
-  #titulo-fertichat {
-    display: none !important;
-  }
-  
-  /* Ocultar campana del contenido (queda solo la del toolbar) */
-  #campana-desktop {
+  /* Ocultar TODO el header desktop (título + campana + hr) */
+  #header-desktop {
     display: none !important;
   }
 
@@ -220,30 +246,55 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 
 
 # =========================
-# HEADER MÓVIL (visual)
-# =========================
-st.markdown("""
-<div id="mobile-header">
-    <div class="logo">🦋 FertiChat</div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# =========================
-# TÍTULO Y CAMPANITA (con ID para ocultar en móvil)
+# OBTENER NOTIFICACIONES (antes del header móvil)
 # =========================
 usuario_actual = user.get("usuario", user.get("email", ""))
 cant_pendientes = 0
 if usuario_actual:
     cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
-st.markdown('<div id="titulo-desktop">', unsafe_allow_html=True)
+
+# =========================
+# HEADER MÓVIL (visual) CON CAMPANA AL LADO DE LA FLECHITA
+# =========================
+badge_html = ""
+if cant_pendientes > 0:
+    badge_html = f'<span class="notif-badge">{cant_pendientes}</span>'
+
+st.markdown(f"""
+<div id="mobile-header">
+    <div class="logo">🦋 FertiChat</div>
+</div>
+<a id="campana-mobile" href="?ir_notif=1">
+    🔔
+    {badge_html}
+</a>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# MANEJAR CLICK EN CAMPANA MÓVIL
+# =========================
+try:
+    if st.query_params.get("ir_notif") == "1":
+        st.session_state["radio_menu"] = "📄 Pedidos internos"
+        st.query_params.clear()
+        st.rerun()
+except:
+    pass
+
+
+# =========================
+# TÍTULO Y CAMPANITA (SOLO PC)
+# =========================
+
+st.markdown('<div id="header-desktop">', unsafe_allow_html=True)
 
 col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
 with col_logo:
     st.markdown("""
-        <div id="titulo-fertichat" style="display: flex; align-items: center; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
             <div>
                 <h1 style="margin: 0; font-size: 38px; font-weight: 900; color: #0f172a;">
                     FertiChat
@@ -256,14 +307,12 @@ with col_logo:
     """, unsafe_allow_html=True)
 
 with col_notif:
-    st.markdown('<div id="campana-desktop">', unsafe_allow_html=True)
     if cant_pendientes > 0:
         if st.button(f"🔔 {cant_pendientes}", key="campanita_global"):
             st.session_state["radio_menu"] = "📄 Pedidos internos"
             st.rerun()
     else:
         st.markdown("<div style='text-align:right; font-size:26px;'>🔔</div>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<hr></div>', unsafe_allow_html=True)
 
