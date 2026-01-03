@@ -518,30 +518,6 @@ with st.sidebar:
     st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
 # =========================
-# DETECCIÓN DE NAVEGACIÓN DESDE TARJETAS (CRÍTICO - ANTES DEL ROUTER)
-# =========================
-try:
-    go = st.query_params.get("go")
-    if go:
-        mapping = {
-            "compras": "🛒 Compras IA",
-            "buscador": "🔎 Buscador IA",
-            "stock": "📦 Stock IA",
-            "dashboard": "📊 Dashboard",
-            "pedidos": "📄 Pedidos internos",
-            "baja": "🧾 Baja de stock",
-            "ordenes": "📦 Órdenes de compra",
-            "indicadores": "📈 Indicadores (Power BI)",
-        }
-        destino = mapping.get(go.lower())
-        if destino:
-            st.session_state["radio_menu"] = destino
-            st.query_params.clear()
-            st.rerun()
-except:
-    pass
-
-=========================
 # OBTENER NOTIFICACIONES
 # =========================
 usuario_actual = user.get("usuario", user.get("email", ""))
@@ -576,9 +552,102 @@ except:
 
 
 # =========================
-# ROUTER
+# HEADER MÓVIL
 # =========================
-menu_actual = st.session_state["radio_menu"]
+badge_html = ""
+if cant_pendientes > 0:
+    badge_html = f'<span class="notif-badge">{cant_pendientes}</span>'
+
+st.markdown(f"""
+<div id="mobile-header">
+    <div class="logo">🦋 FertiChat</div>
+</div>
+<a id="campana-mobile" href="?ir_notif=1">
+    🔔
+    {badge_html}
+</a>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# MANEJAR CLICK CAMPANA
+# =========================
+try:
+    if st.query_params.get("ir_notif") == "1":
+        st.session_state["radio_menu"] = "📄 Pedidos internos"
+        st.query_params.clear()
+        st.rerun()
+except:
+    pass
+
+
+# =========================
+# TÍTULO PC
+# =========================
+campana_html = f'<span style="font-size:26px;">🔔</span>'
+if cant_pendientes > 0:
+    campana_html = f'<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">🔔 {cant_pendientes}</a>'
+
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+  .header-desktop-wrapper { display: none !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="header-desktop-wrapper">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h1 style="margin:0; font-size:38px; font-weight:900; color:#0f172a;">FertiChat</h1>
+            <p style="margin:4px 0 0 0; font-size:15px; color:#64748b;">Sistema de Gestión de Compras</p>
+        </div>
+        <div>{campana_html}</div>
+    </div>
+    <hr style="margin-top:16px; border:none; border-top:1px solid #e2e8f0;">
+</div>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# SIDEBAR
+# =========================
+with st.sidebar:
+    st.markdown(f"""
+        <div style='
+            background: rgba(255,255,255,0.85);
+            padding: 16px;
+            border-radius: 18px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
+        '>
+            <div style='display:flex; align-items:center; gap:10px; justify-content:center;'>
+                <div style='font-size: 26px;'>🦋</div>
+                <div style='font-size: 20px; font-weight: 800; color:#0f172a;'>FertiChat</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.text_input("Buscar...", key="sidebar_search", label_visibility="collapsed", placeholder="Buscar...")
+
+    st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
+    if user.get('empresa'):
+        st.markdown(f"🏢 {user.get('empresa')}")
+    st.markdown(f"📧 _{user.get('Usuario', user.get('usuario', ''))}_")
+
+    st.markdown("---")
+
+    if st.button("🚪 Cerrar sesión", key="btn_logout_sidebar", use_container_width=True):
+        logout()
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("## 📌 Menú")
+
+    st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
+
 
 # =========================
 # ROUTER
