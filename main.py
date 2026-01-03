@@ -421,7 +421,7 @@ if usuario_actual:
 
 
 # =========================
-# DETECCIÓN DE NAVEGACIÓN DESDE TARJETAS (ANTES DE TODO)
+# DETECCIÓN DE NAVEGACIÓN DESDE TARJETAS (CRÍTICO - ANTES DEL SIDEBAR)
 # =========================
 try:
     go = st.query_params.get("go")
@@ -438,9 +438,24 @@ try:
         }
         destino = mapping.get(go.lower())
         if destino:
+            # PRIMERO cambiar el estado
             st.session_state["radio_menu"] = destino
+            # DESPUÉS limpiar params
             st.query_params.clear()
+            # RERUN inmediato
             st.rerun()
+except:
+    pass
+
+
+# =========================
+# MANEJAR CLICK CAMPANA (ANTES DEL SIDEBAR TAMBIÉN)
+# =========================
+try:
+    if st.query_params.get("ir_notif") == "1":
+        st.session_state["radio_menu"] = "📄 Pedidos internos"
+        st.query_params.clear()
+        st.rerun()
 except:
     pass
 
@@ -463,16 +478,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# =========================
-# MANEJAR CLICK CAMPANA
-# =========================
-try:
-    if st.query_params.get("ir_notif") == "1":
-        st.session_state["radio_menu"] = "📄 Pedidos internos"
-        st.query_params.clear()
-        st.rerun()
-except:
-    pass
+# (ELIMINAR el bloque "MANEJAR CLICK CAMPANA" que estaba acá)
 
 
 # =========================
@@ -502,7 +508,6 @@ st.markdown(f"""
     <hr style="margin-top:16px; border:none; border-top:1px solid #e2e8f0;">
 </div>
 """, unsafe_allow_html=True)
-
 
 # =========================
 # SIDEBAR
