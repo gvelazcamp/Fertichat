@@ -7,6 +7,7 @@
 # 3. Nueva lógica para detectar "comparar mes X año1 año2"
 # 4. Mejor orden de prioridades
 # 5. ✅ NUEVO: Intenciones de STOCK agregadas
+# 6. ✅ CORREGIDO: extraer_meses_para_comparacion ahora detecta año global
 
 import re
 import unicodedata
@@ -436,6 +437,9 @@ def extraer_meses_para_comparacion(texto: str) -> List[Tuple[int, int, str]]:
     """
     Extrae meses con su año para comparaciones.
     Retorna lista de tuplas (año, mes_numero, mes_key)
+    
+    ✅ CORREGIDO: Ahora detecta el año global del texto y lo aplica a todos los meses
+    Ejemplo: "comparar roche junio julio 2025" → [(2025, 6, "2025-06"), (2025, 7, "2025-07")]
     """
     texto_norm = normalizar_texto(texto)
     hoy = datetime.now()
@@ -455,17 +459,38 @@ def extraer_meses_para_comparacion(texto: str) -> List[Tuple[int, int, str]]:
         'diciembre': 12, 'dic': 12
     }
     
-    resultados = []
+    # 1️⃣ PRIMERO: Extraer el año global del texto (si existe)
+    anio_global = None
+    match_anio = re.search(r'\b(20\d{2})\b', texto_norm)
+    if match_anio:
+        anio_global = int(match_anio.group(1))
     
-    # Buscar patrones "mes año" o "mes de año"
+    resultados = []
+    meses_encontrados = set()  # Para evitar duplicados
+    
+    # 2️⃣ Buscar cada mes en el texto
     for mes_nombre, mes_num in meses_map.items():
-        patron = rf'{mes_nombre}\s*(?:de\s*)?(\d{{4}})?'
-        matches = re.finditer(patron, texto_norm)
-        for match in matches:
-            anio_str = match.group(1)
-            anio = int(anio_str) if anio_str else hoy.year
-            mes_key = f"{anio}-{mes_num:02d}"
-            resultados.append((anio, mes_num, mes_key))
+        if mes_nombre in texto_norm:
+            # Evitar duplicados (ej: "junio" y "jun" son el mismo mes)
+            if mes_num not in meses_encontrados:
+                meses_encontrados.add(mes_num)
+                
+                # Buscar si este mes tiene año específico inmediatamente después
+                patron_con_anio = rf'{mes_nombre}\s*(?:de\s*)?(20\d{{2}})'
+                match_especifico = re.search(patron_con_anio, texto_norm)
+                
+                if match_especifico:
+                    anio = int(match_especifico.group(1))
+                elif anio_global:
+                    anio = anio_global
+                else:
+                    anio = hoy.year
+                
+                mes_key = f"{anio}-{mes_num:02d}"
+                resultados.append((anio, mes_num, mes_key))
+    
+    # 3️⃣ Ordenar por mes para consistencia
+    resultados.sort(key=lambda x: (x[0], x[1]))
     
     return resultados
 
