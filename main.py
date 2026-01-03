@@ -1,5 +1,5 @@
 # =========================
-# MAIN.PY - SIDEBAR NATIVO (PC OK) + MÓVIL Z FLIP 5
+# MAIN.PY - SIDEBAR NATIVO (PC OK) + CONTROL NATIVO EN MÓVIL (Z FLIP 5)
 # =========================
 
 import streamlit as st
@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="auto"  # ✅ PC abierto / móvil auto (nativo)
 )
 
 # =========================
@@ -44,271 +44,181 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
-# Obtener notificaciones
-usuario_actual = user.get("usuario", user.get("email", ""))
-cant_pendientes = 0
-if usuario_actual:
-    cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
-
 
 # =========================
-# CSS COMPLETO
+# CSS (CLAVE: NO OCULTAR stToolbar EN MÓVIL)
 # =========================
-st.markdown(f"""
+st.markdown(r"""
 <style>
-/* Ocultar elementos de Streamlit */
-#MainMenu, footer {{ display: none !important; }}
-div[data-testid="stDecoration"] {{ display: none !important; }}
+/* Ocultar elementos (sin romper el control nativo del sidebar) */
+#MainMenu, footer { display: none !important; }
+div[data-testid="stDecoration"] { display: none !important; }
+
+/* ✅ NO ocultar stToolbar ni stHeader globalmente */
+/* Si ocultás stToolbar, en Z Flip 5 desaparece el botón ☰/flecha */
 
 /* Theme general */
-:root {{
-    --fc-bg-1: #f6f4ef; 
-    --fc-bg-2: #f3f6fb;
-    --fc-primary: #0b3b60; 
-    --fc-accent: #f59e0b;
-}}
+:root {
+    --fc-bg-1: #f6f4ef; --fc-bg-2: #f3f6fb;
+    --fc-primary: #0b3b60; --fc-accent: #f59e0b;
+}
 
-html, body {{ 
-    font-family: Inter, system-ui, sans-serif; 
-    color: #0f172a; 
-}}
+html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
+[data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
+.block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
 
-[data-testid="stAppViewContainer"] {{ 
-    background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); 
-}}
+/* Sidebar look */
+section[data-testid="stSidebar"] { border-right: 1px solid rgba(15, 23, 42, 0.08); }
+section[data-testid="stSidebar"] > div {
+    background: rgba(255,255,255,0.70);
+    backdrop-filter: blur(8px);
+}
+div[data-testid="stSidebar"] div[role="radiogroup"] label {
+    border-radius: 12px; padding: 8px 10px; margin: 3px 0; border: 1px solid transparent;
+}
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: rgba(37,99,235,0.06); }
+div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+    background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18);
+}
 
-.block-container {{ 
-    max-width: 1240px; 
-    padding-top: 1.25rem; 
-    padding-bottom: 2.25rem; 
-}}
+/* Header móvil visual (solo estética) */
+#mobile-header { display: none; }
 
-/* ==========================================
-   SIDEBAR BASE - FONDO BLANCO SIEMPRE
-========================================== */
-section[data-testid="stSidebar"] {{ 
-    border-right: 1px solid rgba(15, 23, 42, 0.08);
+/* =========================================================
+   DESKTOP REAL (mouse/trackpad):
+   - sidebar siempre visible
+   - oculto controles de colapsar/expandir para que no lo puedan cerrar en PC
+   - puedo ocultar toolbar actions sin romper nada
+========================================================= */
+@media (hover: hover) and (pointer: fine) {
+  div[data-testid="stToolbarActions"] { display: none !important; }
+
+  /* No permitir colapsar sidebar en PC */
+  div[data-testid="collapsedControl"] { display: none !important; }
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Close sidebar"],
+  button[title="Open sidebar"] {
+    display: none !important;
+  }
+}
+
+/* =========================================================
+   MÓVIL REAL (touch):
+   - mostrar SI o SI el control nativo (☰ / flecha)
+   - mantener visible el botón de cerrar del sidebar
+========================================================= */
+@media (hover: none) and (pointer: coarse) {
+  .block-container { padding-top: 70px !important; }
+
+  #mobile-header {
+    display: flex !important;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: #0b3b60;
+    z-index: 999996;           /* debajo del control nativo */
+    align-items: center;
+    padding: 0 16px 0 56px;    /* deja lugar al control nativo */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    pointer-events: none;      /* no bloquea clicks */
+  }
+
+  #mobile-header .logo {
+    color: white;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  /* ✅ Abrir sidebar (nativo) */
+  div[data-testid="collapsedControl"],
+  button[data-testid="stSidebarExpandButton"],
+  button[title="Open sidebar"] {
+    display: inline-flex !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 1000000 !important;
+  }
+
+  /* ✅ Cerrar sidebar (nativo) */
+  [data-testid="baseButton-header"],
+  button[data-testid="stSidebarCollapseButton"],
+  button[title="Close sidebar"] {
+    display: inline-flex !important;
+  }
+
+  /* =========================================================
+     SIDEBAR MÓVIL - FONDO BLANCO Y LETRAS NEGRAS
+  ========================================================= */
+  section[data-testid="stSidebar"] {
     background: #ffffff !important;
-}}
-
-section[data-testid="stSidebar"] > div {{
+  }
+  
+  section[data-testid="stSidebar"] > div {
     background: #ffffff !important;
-}}
-
-section[data-testid="stSidebar"] > div > div {{
+  }
+  
+  section[data-testid="stSidebar"] > div > div {
     background: #ffffff !important;
-}}
-
-section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
+  }
+  
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
     background: #ffffff !important;
-}}
-
-section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {{
-    background: transparent !important;
-}}
-
-/* Texto del sidebar SIEMPRE negro */
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] .stMarkdown p,
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {{
+  }
+  
+  section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background: #ffffff !important;
+  }
+  
+  /* Letras negras en todo el sidebar */
+  section[data-testid="stSidebar"] * {
     color: #0f172a !important;
-}}
-
-/* Input de búsqueda */
-section[data-testid="stSidebar"] input {{
+  }
+  
+  section[data-testid="stSidebar"] p,
+  section[data-testid="stSidebar"] span,
+  section[data-testid="stSidebar"] label,
+  section[data-testid="stSidebar"] h1,
+  section[data-testid="stSidebar"] h2,
+  section[data-testid="stSidebar"] h3 {
+    color: #0f172a !important;
+  }
+  
+  /* Input buscar */
+  section[data-testid="stSidebar"] input {
     background: #f8fafc !important;
     color: #0f172a !important;
-    border: 1px solid #e2e8f0 !important;
-}}
-
-section[data-testid="stSidebar"] input::placeholder {{
-    color: #94a3b8 !important;
-}}
-
-/* Radio buttons del menú */
-div[data-testid="stSidebar"] div[role="radiogroup"] label {{
-    border-radius: 12px; 
-    padding: 8px 10px; 
-    margin: 3px 0; 
-    border: 1px solid transparent;
-    background: #f8fafc !important;
-    color: #0f172a !important;
-}}
-
-div[data-testid="stSidebar"] div[role="radiogroup"] label span {{
-    color: #0f172a !important;
-}}
-
-div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{ 
-    background: rgba(37,99,235,0.06) !important; 
-}}
-
-div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
-    background: rgba(245,158,11,0.15) !important; 
-    border: 1px solid rgba(245,158,11,0.3) !important;
-}}
-
-/* Botón cerrar sesión */
-section[data-testid="stSidebar"] button {{
+  }
+  
+  /* Botón cerrar sesión */
+  section[data-testid="stSidebar"] button {
     background: #f1f5f9 !important;
     color: #0f172a !important;
-    border: 1px solid #e2e8f0 !important;
-}}
-
-/* Header móvil - oculto por defecto */
-#mobile-header {{ 
-    display: none; 
-}}
-
-/* ==========================================
-   DESKTOP (más de 768px)
-========================================== */
-@media (min-width: 769px) {{
-    div[data-testid="stToolbarActions"] {{ display: none !important; }}
-
-    /* No permitir colapsar sidebar en PC */
-    div[data-testid="collapsedControl"] {{ display: none !important; }}
-    button[data-testid="stSidebarCollapseButton"],
-    button[data-testid="stSidebarExpandButton"] {{
-        display: none !important;
-    }}
-}}
-
-/* ==========================================
-   MÓVIL (768px o menos) - Z FLIP 5
-========================================== */
-@media (max-width: 768px) {{
-    
-    /* OCULTAR título y campana del contenido principal */
-    #desktop-header {{
-        display: none !important;
-    }}
-    
-    /* Padding para el header móvil */
-    .block-container {{ 
-        padding-top: 70px !important; 
-    }}
-
-    /* HEADER MÓVIL con logo y campana */
-    #mobile-header {{
-        display: flex !important;
-        position: fixed;
-        top: 0; 
-        left: 0; 
-        right: 0;
-        height: 56px;
-        background: #0b3b60;
-        z-index: 999999;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 16px 0 56px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }}
-
-    #mobile-header .logo {{
-        color: white;
-        font-size: 20px;
-        font-weight: 800;
-    }}
-
-    #mobile-header .notif {{
-        font-size: 24px;
-        text-decoration: none;
-        position: relative;
-        padding: 8px;
-    }}
-    
-    #mobile-header .notif-badge {{
-        position: absolute;
-        top: 0px;
-        right: 0px;
-        background: #ef4444;
-        color: white;
-        font-size: 11px;
-        font-weight: 700;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 4px;
-    }}
-
-    /* Control nativo para abrir sidebar */
-    div[data-testid="collapsedControl"],
-    button[data-testid="stSidebarExpandButton"] {{
-        display: inline-flex !important;
-        position: fixed !important;
-        top: 10px !important;
-        left: 10px !important;
-        z-index: 9999999 !important;
-        background: white !important;
-        border-radius: 8px !important;
-    }}
-
-    /* Control nativo para cerrar sidebar */
-    button[data-testid="stSidebarCollapseButton"] {{
-        display: inline-flex !important;
-    }}
-
-    /* OCULTAR la barra de Streamlit (Share, estrella, GitHub) */
-    header[data-testid="stHeader"] {{
-        display: none !important;
-    }}
-    
-    div[data-testid="stToolbar"] {{
-        display: none !important;
-    }}
-
-    /* SIDEBAR MÓVIL - asegurar fondo blanco */
-    section[data-testid="stSidebar"],
-    section[data-testid="stSidebar"] > div,
-    section[data-testid="stSidebar"] > div > div,
-    section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-        background: #ffffff !important;
-    }}
-}}
+  }
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 # =========================
-# HEADER MÓVIL CON CAMPANA
+# HEADER MÓVIL (visual)
 # =========================
-badge_html = ""
-if cant_pendientes > 0:
-    badge_html = f'<span class="notif-badge">{cant_pendientes}</span>'
-
-st.markdown(f"""
+st.markdown("""
 <div id="mobile-header">
     <div class="logo">🦋 FertiChat</div>
-    <a href="?ir_notif=1" class="notif">
-        🔔
-        {badge_html}
-    </a>
 </div>
 """, unsafe_allow_html=True)
 
 
 # =========================
-# MANEJAR CLICK EN CAMPANA MÓVIL
+# TÍTULO Y CAMPANITA
 # =========================
-try:
-    if st.query_params.get("ir_notif") == "1":
-        st.session_state["radio_menu"] = "📄 Pedidos internos"
-        st.query_params.clear()
-        st.rerun()
-except:
-    pass
-
-
-# =========================
-# TÍTULO Y CAMPANITA (SOLO PC)
-# =========================
-st.markdown('<div id="desktop-header">', unsafe_allow_html=True)
+usuario_actual = user.get("usuario", user.get("email", ""))
+cant_pendientes = 0
+if usuario_actual:
+    cant_pendientes = contar_notificaciones_no_leidas(usuario_actual)
 
 col_logo, col_spacer, col_notif = st.columns([7, 2, 1])
 
@@ -334,7 +244,7 @@ with col_notif:
     else:
         st.markdown("<div style='text-align:right; font-size:26px;'>🔔</div>", unsafe_allow_html=True)
 
-st.markdown('<hr></div>', unsafe_allow_html=True)
+st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # =========================
@@ -343,7 +253,7 @@ st.markdown('<hr></div>', unsafe_allow_html=True)
 with st.sidebar:
     st.markdown(f"""
         <div style='
-            background: #ffffff;
+            background: rgba(255,255,255,0.85);
             padding: 16px;
             border-radius: 18px;
             margin-bottom: 14px;
@@ -359,10 +269,10 @@ with st.sidebar:
 
     st.text_input("Buscar...", key="sidebar_search", label_visibility="collapsed", placeholder="Buscar...")
 
-    st.markdown(f"<p style='color:#0f172a !important;'>👤 <strong>{user.get('nombre', 'Usuario')}</strong></p>", unsafe_allow_html=True)
+    st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
     if user.get('empresa'):
-        st.markdown(f"<p style='color:#0f172a !important;'>🏢 {user.get('empresa')}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#0f172a !important;'>📧 <em>{user.get('Usuario', user.get('usuario', ''))}</em></p>", unsafe_allow_html=True)
+        st.markdown(f"🏢 {user.get('empresa')}")
+    st.markdown(f"📧 _{user.get('Usuario', user.get('usuario', ''))}_")
 
     st.markdown("---")
 
@@ -371,9 +281,9 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("<h2 style='color:#0f172a !important;'>📌 Menú</h2>", unsafe_allow_html=True)
+    st.markdown("## 📌 Menú")
 
-    st.radio("Ir a:", MENU_OPTIONS, key="radio_menu", label_visibility="collapsed")
+    st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
 
 # =========================
