@@ -392,6 +392,23 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   section[data-testid="stSidebar"] button span {
     color: #0f172a !important;
   }
+  
+  /* FIX INPUTS MÓVIL */
+  .block-container [data-testid="stChatInput"] input,
+  .block-container [data-testid="stChatInput"] textarea,
+  .block-container [data-testid="stChatInput"] [data-baseweb="input"],
+  .block-container [data-testid="stChatInput"] [data-baseweb="base-input"] {
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    min-height: 42px !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  
+  .block-container [data-testid="stChatInput"] > div {
+    background: #f8fafc !important;
+  }
+}
 
   /* =========================================================
      FIX INPUTS/TEXTAREA - TAMAÑO Y FONDO BEIGE
