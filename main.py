@@ -547,13 +547,19 @@ campana_html = '<span style="font-size:26px;">&#128276;</span>'
 if cant_pendientes > 0:
     campana_html = '<a href="?ir_notif=1" style="text-decoration:none;font-size:18px;background:#0b3b60;color:white;padding:6px 12px;border-radius:8px;">&#128276; ' + str(cant_pendientes) + '</a>'
 
-st.markdown("""
-<style>
-@media (max-width: 768px) {
-  .header-desktop-wrapper { display: none !important; }
-}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    @media (max-width: 768px) {
+        .header-desktop-wrapper {
+            display: none !important;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 st.markdown(f"""
 <div class="header-desktop-wrapper">
