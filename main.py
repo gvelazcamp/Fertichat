@@ -536,6 +536,6 @@ elif menu_actual == "🏬 Depósitos":
     mostrar_depositos()
 elif menu_actual == "🧩 Familias":
     mostrar_familias()
-elif menu == "📑 Comprobantes":
-    mostrar_menu_comprobantes()
+elif menu_actual == "📑 Comprobantes":
+    mostrar_comprobantes()
 
