@@ -162,6 +162,11 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   #titulo-fertichat {
     display: none !important;
   }
+  
+  /* Ocultar campana del contenido (queda solo la del toolbar) */
+  #campana-desktop {
+    display: none !important;
+  }
 
   /* SIDEBAR - FONDO BLANCO */
   section[data-testid="stSidebar"],
@@ -251,12 +256,14 @@ with col_logo:
     """, unsafe_allow_html=True)
 
 with col_notif:
+    st.markdown('<div id="campana-desktop">', unsafe_allow_html=True)
     if cant_pendientes > 0:
         if st.button(f"🔔 {cant_pendientes}", key="campanita_global"):
             st.session_state["radio_menu"] = "📄 Pedidos internos"
             st.rerun()
     else:
         st.markdown("<div style='text-align:right; font-size:26px;'>🔔</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<hr></div>', unsafe_allow_html=True)
 
