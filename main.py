@@ -278,6 +278,72 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     background: #f8fafc !important;
     color: #0f172a !important;
   }
+  
+  /* BOTONES - fondo claro */
+  .block-container button,
+  .block-container [data-testid="stButton"] button,
+  .block-container [data-testid="stFormSubmitButton"] button,
+  .stButton > button,
+  button[kind="primary"],
+  button[kind="secondary"],
+  button[data-testid="baseButton-primary"],
+  button[data-testid="baseButton-secondary"] {
+    background: #f8fafc !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  
+  /* Botones con icono */
+  .block-container button span,
+  .block-container button p,
+  .block-container button div {
+    color: #0f172a !important;
+  }
+  
+  /* TABLAS/DATAFRAMES - fondo claro */
+  [data-testid="stDataFrame"],
+  [data-testid="stDataFrame"] > div,
+  [data-testid="stTable"],
+  [data-testid="stTable"] > div,
+  .stDataFrame,
+  div[class*="glideDataEditor"],
+  div[class*="dvn-scroller"] {
+    background: #f8fafc !important;
+    background-color: #f8fafc !important;
+  }
+  
+  /* Celdas de tabla */
+  [data-testid="stDataFrame"] td,
+  [data-testid="stDataFrame"] th,
+  [data-testid="stTable"] td,
+  [data-testid="stTable"] th {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  
+  /* Tabs */
+  [data-baseweb="tab-list"],
+  [data-baseweb="tab-panel"],
+  button[data-baseweb="tab"] {
+    background: transparent !important;
+    color: #0f172a !important;
+  }
+  
+  /* Expander */
+  [data-testid="stExpander"],
+  [data-testid="stExpander"] > div {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  
+  /* Alertas/Info boxes mantener sus colores pero texto negro */
+  [data-testid="stAlert"] p,
+  [data-testid="stAlert"] span,
+  .stAlert p,
+  .stAlert span {
+    color: #0f172a !important;
+  }
 
   /* SIDEBAR - FONDO BLANCO */
   section[data-testid="stSidebar"],
