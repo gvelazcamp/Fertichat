@@ -65,19 +65,6 @@ html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
 [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
 .block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
 
-/* HEADER MISMO COLOR DEL FONDO */
-[data-testid="stHeader"] {
-    background: var(--fc-bg-1) !important;
-}
-
-.stAppHeader {
-    background: var(--fc-bg-1) !important;
-}
-
-[data-testid="stToolbar"] {
-    background: var(--fc-bg-1) !important;
-}
-
 /* Sidebar look */
 section[data-testid="stSidebar"] { border-right: 1px solid rgba(15, 23, 42, 0.08); }
 section[data-testid="stSidebar"] > div {
@@ -98,6 +85,19 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
 
 /* DESKTOP (mouse/trackpad) */
 @media (hover: hover) and (pointer: fine) {
+  /* HEADER BEIGE SOLO EN PC */
+  [data-testid="stHeader"] {
+    background: var(--fc-bg-1) !important;
+  }
+
+  .stAppHeader {
+    background: var(--fc-bg-1) !important;
+  }
+
+  [data-testid="stToolbar"] {
+    background: var(--fc-bg-1) !important;
+  }
+
   div[data-testid="stToolbarActions"] { display: none !important; }
   div[data-testid="collapsedControl"] { display: none !important; }
   [data-testid="baseButton-header"],
