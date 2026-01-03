@@ -381,11 +381,9 @@ def _get_top_proveedores_anio(anio: int, top_n: int = 20) -> pd.DataFrame:
     return df
         
 # =========================
-# 🧾 RESUMEN COMPRAS (ROTATIVO)
+# 🧾 RESUMEN COMPRAS (ROTATIVO) - RESPONSIVE Z FLIP 5
 # =========================
-
 def mostrar_resumen_compras_rotativo():
-
     # 🔄 re-ejecuta cada 5 segundos
     tick = 0
     try:
@@ -393,23 +391,22 @@ def mostrar_resumen_compras_rotativo():
         tick = st_autorefresh(interval=5000, key="__rotar_proveedor_5s__") or 0
     except Exception:
         tick = 0
-
+    
     # Usar 2025 ya que 2026 no tiene datos todavía
     anio = 2025
     mes_key = "2025-12"  # Último mes con datos
-
+    
     tot_anio = _get_totales_anio(anio)
     tot_mes = _get_totales_mes(mes_key)
     dfp = _get_top_proveedores_anio(anio, top_n=20)
-
+    
     prov_nom = "—"
     prov_pesos = 0.0
     prov_usd = 0.0
-
+    
     if dfp is not None and not dfp.empty:
         idx = int(tick) % len(dfp)
         row = dfp.iloc[idx]
-
         for col in dfp.columns:
             if col.lower() == "proveedor":
                 nombre = str(row[col]) if pd.notna(row[col]) else "—"
@@ -418,16 +415,14 @@ def mostrar_resumen_compras_rotativo():
                 prov_pesos = _safe_float(row[col])
             elif col.lower() == "total_usd":
                 prov_usd = _safe_float(row[col])
-
+    
     total_anio_txt = f"$ {_fmt_num_latam(tot_anio['pesos'], 0)}"
     total_anio_sub = f"U$S {_fmt_num_latam(tot_anio['usd'], 0)}"
-
     prov_sub = f"$ {_fmt_num_latam(prov_pesos, 0)} | U$S {_fmt_num_latam(prov_usd, 0)}"
-
     mes_txt = f"$ {_fmt_num_latam(tot_mes['pesos'], 0)}"
     mes_sub = f"U$S {_fmt_num_latam(tot_mes['usd'], 0)}"
-
-    # 🎨 CSS – TARJETAS GRANDES, OSCURAS Y LEGIBLES
+    
+    # 🎨 CSS – RESPONSIVE PARA Z FLIP 5
     st.markdown(
         """
         <style>
@@ -436,7 +431,7 @@ def mostrar_resumen_compras_rotativo():
             gap: 16px;
             margin: 16px 0 20px 0;
           }
-
+          
           .mini-card {
             flex: 1;
             min-width: 0;
@@ -449,14 +444,14 @@ def mostrar_resumen_compras_rotativo():
             flex-direction: column;
             justify-content: space-between;
           }
-
+          
           .mini-t {
             font-size: 0.85rem;
             font-weight: 600;
             color: #9ca3af;
             margin: 0;
           }
-
+          
           .mini-v {
             font-size: 1.25rem;
             font-weight: 800;
@@ -466,17 +461,72 @@ def mostrar_resumen_compras_rotativo():
             overflow: hidden;
             text-overflow: ellipsis;
           }
-
+          
           .mini-s {
             font-size: 0.9rem;
             color: #d1d5db;
             margin: 0;
           }
+          
+          /* ========================================
+             MOBILE RESPONSIVE (Z Flip 5 y similares)
+             ======================================== */
+          @media (max-width: 768px) {
+            .mini-resumen {
+              flex-direction: column;
+              gap: 12px;
+              margin: 12px 0 16px 0;
+            }
+            
+            .mini-card {
+              height: auto;
+              min-height: 110px;
+              padding: 14px 16px;
+              background: #f6f4ef !important;
+              border: 1px solid #e2e8f0 !important;
+            }
+            
+            .mini-t {
+              font-size: 0.8rem;
+              color: #64748b !important;
+              margin-bottom: 6px;
+            }
+            
+            .mini-v {
+              font-size: 1.35rem;
+              font-weight: 800;
+              color: #0f172a !important;
+              margin: 0 0 6px 0;
+              line-height: 1.2;
+            }
+            
+            .mini-s {
+              font-size: 0.85rem;
+              color: #475569 !important;
+              font-weight: 500;
+            }
+          }
+          
+          /* Para pantallas MUY pequeñas (< 400px) */
+          @media (max-width: 400px) {
+            .mini-card {
+              padding: 12px 14px;
+              min-height: 100px;
+            }
+            
+            .mini-v {
+              font-size: 1.2rem;
+            }
+            
+            .mini-s {
+              font-size: 0.8rem;
+            }
+          }
         </style>
         """,
         unsafe_allow_html=True
     )
-
+    
     # 🧾 HTML FINAL
     st.markdown(
         f"""
@@ -486,13 +536,11 @@ def mostrar_resumen_compras_rotativo():
             <p class="mini-v">{total_anio_txt}</p>
             <p class="mini-s">{total_anio_sub}</p>
           </div>
-
           <div class="mini-card">
             <p class="mini-t">🏭 Proveedor</p>
             <p class="mini-v" title="{prov_nom}">{prov_nom}</p>
             <p class="mini-s">{prov_sub}</p>
           </div>
-
           <div class="mini-card">
             <p class="mini-t">🗓️ Mes actual</p>
             <p class="mini-v">{mes_txt}</p>
