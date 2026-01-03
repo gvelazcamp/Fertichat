@@ -5,7 +5,7 @@
 
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Dict, Any, List
 
 from supabase_client import supabase
@@ -309,6 +309,96 @@ def _upsert_stock_row(
 
 
 # =====================================================================
+# HISTORIAL DE COMPROBANTES - HELPERS
+# (requiere tablas: comprobantes_stock / comprobantes_stock_items)
+# =====================================================================
+
+def _codigo_comprobante(tipo: str, comprobante_id: int) -> str:
+    t = (tipo or "").strip().upper()
+    pref = {
+        "ALTA": "A",
+        "BAJA": "B",
+        "MOV": "M",
+        "VENC": "V",
+        "RECUENTO": "R",
+    }.get(t, "C")
+    return f"{pref}{int(comprobante_id):05d}"
+
+
+def _get_usuario_actual() -> str:
+    # No rompo tu login: intento detectar algo común y si no, vacío
+    for k in ["email", "user_email", "usuario", "username"]:
+        if k in st.session_state and st.session_state.get(k):
+            return str(st.session_state.get(k))
+    return ""
+
+
+def _crear_comprobante_historial(
+    tipo: str,
+    deposito_origen: str = "",
+    deposito_destino: str = "",
+    motivo: str = "",
+    notas: str = "",
+) -> int:
+    payload = {
+        "tipo": (tipo or "").upper(),
+        "created_at": datetime.utcnow().isoformat(),
+        "usuario": _get_usuario_actual() or None,
+        "deposito_origen": deposito_origen or None,
+        "deposito_destino": deposito_destino or None,
+        "motivo": motivo or None,
+        "notas": notas or None,
+    }
+    resp = supabase.table("comprobantes_stock").insert(payload).execute()
+    row = (resp.data or [None])[0]
+    if not row or "id" not in row:
+        raise Exception("No se pudo obtener el id del comprobante (insert historial).")
+    return int(row["id"])
+
+
+def _crear_items_historial(comprobante_id: int, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        return
+    payload = []
+    for it in items:
+        payload.append(
+            {
+                "comprobante_id": int(comprobante_id),
+                "familia": (it.get("familia") or None),
+                "codigo": (it.get("codigo") or None),
+                "articulo": (it.get("articulo") or None),
+                "lote": (it.get("lote") or None),
+                "vencimiento": (it.get("vencimiento") or None),
+                "cantidad": float(it.get("cantidad") or 0),
+                "precio": (float(it.get("precio")) if it.get("precio") is not None else None),
+            }
+        )
+    supabase.table("comprobantes_stock_items").insert(payload).execute()
+
+
+def _fetch_historial(limit: int = 200) -> pd.DataFrame:
+    resp = (
+        supabase.table("comprobantes_stock")
+        .select("*")
+        .order("id", desc=True)
+        .limit(int(limit))
+        .execute()
+    )
+    return pd.DataFrame(resp.data or [])
+
+
+def _fetch_historial_items(comprobante_id: int) -> pd.DataFrame:
+    resp = (
+        supabase.table("comprobantes_stock_items")
+        .select("*")
+        .eq("comprobante_id", int(comprobante_id))
+        .order("id", desc=False)
+        .execute()
+    )
+    return pd.DataFrame(resp.data or [])
+
+
+# =====================================================================
 # UI: COMPONENTE FILTRO ARTÍCULOS (DESDE TABLA ARTICULOS)
 # =====================================================================
 
@@ -417,7 +507,7 @@ def mostrar_comprobante_alta_stock():
                 st.markdown(f"**Línea #{i + 1}**")
             with top[1]:
                 if st.button("🗑️", key=f"alta_del_{i}", help="Eliminar esta línea"):
-                    # Re-armado simple: decrementa count y mueve el último sobre este
+                    # Re-armado simple: decrementa count
                     if st.session_state.alta_items_count > 1:
                         st.session_state.alta_items_count -= 1
                         st.rerun()
@@ -491,7 +581,6 @@ def mostrar_comprobante_alta_stock():
                 continue
             if it["cantidad"] <= 0:
                 errores.append(f"Línea #{idx}: cantidad debe ser > 0.")
-            # Precio “siempre”: dejo pasar 0 pero avisamos (por si querés cargar sin costo)
             if it["precio"] <= 0:
                 errores.append(f"Línea #{idx}: precio debe ser > 0 (lo pediste como obligatorio para FIFO).")
             if it["usa_lote"]:
@@ -505,6 +594,8 @@ def mostrar_comprobante_alta_stock():
             return
 
         ok = 0
+        hist_items: List[Dict[str, Any]] = []
+
         for it in items_to_process:
             art = it["art"]
             if not art:
@@ -515,13 +606,11 @@ def mostrar_comprobante_alta_stock():
             fam = art.get("familia", "").strip()
 
             if codigo == "":
-                # si no hay código interno, usamos el Id como código “de sistema”
                 codigo = f"ID:{art.get('id', '')}"
 
             lote = it["lote"] if it["usa_lote"] else ""
             venc = it["venc"] if it["usa_lote"] else ""
 
-            # Alta impacta en stock (cantidad)
             _upsert_stock_row(
                 deposito=deposito_destino,
                 familia=fam,
@@ -532,11 +621,43 @@ def mostrar_comprobante_alta_stock():
                 delta_stock=float(it["cantidad"]),
             )
 
+            hist_items.append(
+                {
+                    "familia": fam,
+                    "codigo": codigo,
+                    "articulo": desc,
+                    "lote": lote,
+                    "vencimiento": venc,
+                    "cantidad": float(it["cantidad"]),
+                    "precio": float(it["precio"]),
+                }
+            )
+
             ok += 1
 
-        st.success(f"Alta confirmada. Líneas procesadas: {ok}")
-        st.info("Nota: el precio se está capturando en la UI (obligatorio), pero tu tabla 'stock' no tiene columna de precio. "
-                "Cuando definas dónde persistir el precio (tabla de movimientos / comprobantes / costo por lote), lo conectamos sin cambiar esta lógica.")
+        # -------------------------
+        # HISTORIAL + MENSAJE FINAL
+        # -------------------------
+        comp_id = None
+        try:
+            comp_id = _crear_comprobante_historial(
+                tipo="ALTA",
+                deposito_origen="",
+                deposito_destino=deposito_destino,
+                motivo="",
+                notas="Alta de stock",
+            )
+            _crear_items_historial(comp_id, hist_items)
+        except Exception as e:
+            st.warning(f"Alta aplicada a STOCK, pero no se pudo guardar historial. Detalle: {e}")
+
+        codigo_txt = _codigo_comprobante("ALTA", comp_id) if comp_id else "ALTA (sin código)"
+        st.success(f"Felicitaciones: Alta {codigo_txt} cargada. Líneas procesadas: {ok}")
+
+        st.info(
+            "El precio quedó guardado en el historial del comprobante (comprobantes_stock_items). "
+            "Tu tabla 'stock' no tiene columna de precio, por eso no se guarda ahí."
+        )
 
 
 # =====================================================================
@@ -565,7 +686,6 @@ def mostrar_comprobante_baja_stock():
         st.info("No hay stock para ese depósito.")
         return
 
-    # Selector de artículo por CODIGO / ARTICULO
     buscar = st.text_input(
         "Buscar (código interno o artículo)",
         key="baja_buscar",
@@ -600,10 +720,8 @@ def mostrar_comprobante_baja_stock():
         st.warning("No se encontró stock para ese código en este depósito.")
         return
 
-    # Determina si tiene lote/venc
     has_lote = ((df_lotes["LOTE"].astype(str).str.strip() != "") | (df_lotes["VENCIMIENTO"].astype(str).str.strip() != "")).any()
 
-    # Orden FIFO por vencimiento (más viejo = vencimiento más cercano / menor fecha)
     df_lotes["_vdate"] = df_lotes["VENCIMIENTO"].apply(_to_date_safe)
     df_lotes["_v_sort"] = df_lotes["_vdate"].apply(lambda d: d if d else date(2100, 1, 1))
     df_lotes = df_lotes.sort_values(by=["_v_sort", "LOTE"], ascending=[True, True]).reset_index(drop=True)
@@ -621,7 +739,6 @@ def mostrar_comprobante_baja_stock():
     elif modo == "Más nuevo":
         chosen_idx = len(df_lotes) - 1
     else:
-        # manual
         idx_opt = list(range(len(df_lotes)))
         chosen_idx = st.selectbox(
             "Elegir lote",
@@ -641,12 +758,9 @@ def mostrar_comprobante_baja_stock():
     if has_lote:
         st.write(_fmt_lote_row(chosen.get("LOTE", ""), chosen.get("VENCIMIENTO", ""), chosen.get("STOCK", "")))
     else:
-        st.write(f'Stock disponible: {stock_actual:g} (sin lote/vencimiento)')
+        st.write(f"Stock disponible: {stock_actual:g} (sin lote/vencimiento)")
 
-    # Alerta si elige "más nuevo" y existe uno más viejo
-    requiere_confirm = False
     if modo == "Más nuevo" and len(df_lotes) > 1:
-        requiere_confirm = True
         st.warning("Estás eligiendo el lote MÁS NUEVO, pero existe un lote más viejo (FIFO).")
         confirmar = st.checkbox(
             "Sí, estoy seguro: quiero bajar el lote más nuevo",
@@ -685,7 +799,33 @@ def mostrar_comprobante_baja_stock():
             delta_stock=delta,
         )
 
-        st.success("Baja confirmada y aplicada a stock.")
+        # Historial BAJA (no rompe si falla)
+        try:
+            comp_id = _crear_comprobante_historial(
+                tipo="BAJA",
+                deposito_origen=deposito_origen,
+                deposito_destino="",
+                motivo=motivo,
+                notas="Baja de stock",
+            )
+            _crear_items_historial(
+                comp_id,
+                [
+                    {
+                        "familia": str(chosen.get("FAMILIA", "") or ""),
+                        "codigo": str(chosen.get("CODIGO", "") or ""),
+                        "articulo": str(chosen.get("ARTICULO", "") or ""),
+                        "lote": str(chosen.get("LOTE", "") or ""),
+                        "vencimiento": str(chosen.get("VENCIMIENTO", "") or ""),
+                        "cantidad": float(cant),
+                        "precio": None,
+                    }
+                ],
+            )
+            st.success(f"Baja confirmada. Comprobante { _codigo_comprobante('BAJA', comp_id) }")
+        except Exception as e:
+            st.success("Baja confirmada y aplicada a stock.")
+            st.warning(f"No se pudo guardar historial de BAJA. Detalle: {e}")
 
 
 # =====================================================================
@@ -794,9 +934,8 @@ def mostrar_comprobante_movimiento():
     if has_lote:
         st.write(_fmt_lote_row(chosen.get("LOTE", ""), chosen.get("VENCIMIENTO", ""), chosen.get("STOCK", "")))
     else:
-        st.write(f'Stock disponible: {stock_actual:g} (sin lote/vencimiento)')
+        st.write(f"Stock disponible: {stock_actual:g} (sin lote/vencimiento)")
 
-    # Alerta FIFO si elige más nuevo
     if modo == "Más nuevo" and len(df_lotes) > 1:
         st.warning("Estás eligiendo el lote MÁS NUEVO, pero existe un lote más viejo (FIFO).")
         confirmar = st.checkbox(
@@ -824,7 +963,6 @@ def mostrar_comprobante_movimiento():
             st.error("No podés mover más que el stock disponible.")
             return
 
-        # resta origen
         _upsert_stock_row(
             deposito=deposito_origen,
             familia=str(chosen.get("FAMILIA", "") or ""),
@@ -835,7 +973,6 @@ def mostrar_comprobante_movimiento():
             delta_stock=-float(cant),
         )
 
-        # suma destino (mismo lote/venc)
         _upsert_stock_row(
             deposito=deposito_destino,
             familia=str(chosen.get("FAMILIA", "") or ""),
@@ -846,7 +983,33 @@ def mostrar_comprobante_movimiento():
             delta_stock=float(cant),
         )
 
-        st.success("Movimiento confirmado y aplicado a stock.")
+        # Historial MOV (no rompe si falla)
+        try:
+            comp_id = _crear_comprobante_historial(
+                tipo="MOV",
+                deposito_origen=deposito_origen,
+                deposito_destino=deposito_destino,
+                motivo="",
+                notas="Movimiento entre depósitos",
+            )
+            _crear_items_historial(
+                comp_id,
+                [
+                    {
+                        "familia": str(chosen.get("FAMILIA", "") or ""),
+                        "codigo": str(chosen.get("CODIGO", "") or ""),
+                        "articulo": str(chosen.get("ARTICULO", "") or ""),
+                        "lote": str(chosen.get("LOTE", "") or ""),
+                        "vencimiento": str(chosen.get("VENCIMIENTO", "") or ""),
+                        "cantidad": float(cant),
+                        "precio": None,
+                    }
+                ],
+            )
+            st.success(f"Movimiento confirmado. Comprobante { _codigo_comprobante('MOV', comp_id) }")
+        except Exception as e:
+            st.success("Movimiento confirmado y aplicado a stock.")
+            st.warning(f"No se pudo guardar historial de MOV. Detalle: {e}")
 
 
 # =====================================================================
@@ -890,6 +1053,65 @@ def mostrar_comprobante_ajuste_recuento():
 
 
 # =====================================================================
+# HISTORIAL DE COMPROBANTES - UI
+# =====================================================================
+
+def mostrar_historial_comprobantes():
+    st.subheader("📜 Historial de comprobantes")
+
+    try:
+        df = _fetch_historial(limit=200)
+    except Exception as e:
+        st.error(f"No se pudo leer historial (RLS/policies). Detalle: {e}")
+        return
+
+    if df.empty:
+        st.info("No hay comprobantes registrados todavía.")
+        return
+
+    # Código visible
+    df = df.copy()
+    df["CODIGO"] = df.apply(lambda r: _codigo_comprobante(str(r.get("tipo", "")), int(r.get("id", 0) or 0)), axis=1)
+
+    cols_show = [c for c in ["CODIGO", "tipo", "created_at", "usuario", "deposito_origen", "deposito_destino", "motivo", "notas"] if c in df.columns]
+    st.dataframe(df[cols_show], use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("### Ver detalle")
+
+    # selector de comprobante
+    opts = df[["id", "CODIGO", "tipo"]].copy()
+    ids = opts["id"].astype(int).tolist()
+
+    def _fmt_id(i: int) -> str:
+        row = opts[opts["id"].astype(int) == int(i)]
+        if row.empty:
+            return str(i)
+        r = row.iloc[0]
+        return f'{r["CODIGO"]} ({r["tipo"]})'
+
+    comp_sel = st.selectbox(
+        "Seleccionar comprobante",
+        options=ids,
+        format_func=_fmt_id,
+        key="hist_sel_comp",
+    )
+
+    try:
+        df_items = _fetch_historial_items(int(comp_sel))
+    except Exception as e:
+        st.error(f"No se pudo leer items del comprobante. Detalle: {e}")
+        return
+
+    if df_items.empty:
+        st.info("Este comprobante no tiene items.")
+        return
+
+    cols_items = [c for c in ["familia", "codigo", "articulo", "lote", "vencimiento", "cantidad", "precio"] if c in df_items.columns]
+    st.dataframe(df_items[cols_items], use_container_width=True, hide_index=True)
+
+
+# =====================================================================
 # MENÚ PRINCIPAL COMPROBANTES
 # =====================================================================
 
@@ -904,7 +1126,8 @@ def mostrar_menu_comprobantes():
             "⬇️ Baja de stock",
             "🔁 Movimiento entre depósitos",
             "⏰ Baja por vencimiento",
-            "⚖️ Ajuste por recuento"
+            "⚖️ Ajuste por recuento",
+            "📜 Historial de comprobantes",
         ],
         key="menu_comprobantes_opcion",
     )
@@ -923,3 +1146,6 @@ def mostrar_menu_comprobantes():
 
     elif opcion == "⚖️ Ajuste por recuento":
         mostrar_comprobante_ajuste_recuento()
+
+    elif opcion == "📜 Historial de comprobantes":
+        mostrar_historial_comprobantes()
