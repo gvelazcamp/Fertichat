@@ -510,17 +510,25 @@ def mostrar_ingreso_comprobantes():
         st.number_input("Desc. %", min_value=0.0, max_value=100.0, step=0.5, key="comp_desc")
 
     with i6:
-        st.checkbox("Lote", key="comp_has_lote")
-        if not st.session_state["comp_has_lote"]:
-            st.session_state["comp_lote"] = ""
-        st.text_input(" ", key="comp_lote", disabled=not st.session_state["comp_has_lote"], label_visibility="collapsed")
+        st.caption("Lote")
+        c_chk, c_inp = st.columns([0.25, 0.75])
+        with c_chk:
+            if not st.session_state["comp_has_lote"]:
+                st.session_state["comp_lote"] = ""
+            st.checkbox(" ", key="comp_has_lote", label_visibility="collapsed")
+        with c_inp:
+            st.text_input(" ", key="comp_lote", disabled=not st.session_state["comp_has_lote"], label_visibility="collapsed")
 
     with i7:
-        st.checkbox("Venc.", key="comp_has_venc")
-        if st.session_state["comp_has_venc"]:
-            st.date_input(" ", key="comp_venc_date", label_visibility="collapsed")
-        else:
-            st.text_input(" ", value="", disabled=True, key="comp_venc_disabled", label_visibility="collapsed")
+        st.caption("Venc.")
+        c_chk, c_inp = st.columns([0.25, 0.75])
+        with c_chk:
+            st.checkbox(" ", key="comp_has_venc", label_visibility="collapsed")
+        with c_inp:
+            if st.session_state["comp_has_venc"]:
+                st.date_input(" ", key="comp_venc_date", label_visibility="collapsed")
+            else:
+                st.text_input(" ", value="", disabled=True, key="comp_venc_disabled", label_visibility="collapsed")
 
     badd, bsave = st.columns([1, 1])
 
