@@ -353,16 +353,17 @@ def Compras_IA():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Input del usuario (compatible móvil)
-    prompt = st.text_input(
-        "Escribí tu consulta de compras:",
-        placeholder="Ej: compras roche noviembre 2025",
-        key="input_compras_ia",
-        label_visibility="collapsed"
-    )
-    
-    # Botón para enviar
-    enviar = st.button("🔍 Consultar", key="btn_consultar_compras", use_container_width=True)
+    # Input del usuario (compatible móvil) - CON FORM PARA ENTER
+    with st.form(key="form_compras_ia", clear_on_submit=True):
+        prompt = st.text_input(
+            "Escribí tu consulta de compras:",
+            placeholder="Ej: compras roche noviembre 2025",
+            key="input_compras_ia",
+            label_visibility="collapsed"
+        )
+        
+        # Submit button (oculto visualmente pero funcional con Enter)
+        enviar = st.form_submit_button("🔍 Consultar", use_container_width=True)
 
     if prompt and enviar:
         # Agregar mensaje del usuario
