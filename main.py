@@ -517,12 +517,31 @@ with st.sidebar:
 
     st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
-Entiendo! El problema es que el CSS se inyecta después de renderizar. Y además, necesitamos verificar que tengas el código de detección de query params en main.py.
-Te doy la solución completa en 2 pasos:
+# =========================
+# DETECCIÓN DE NAVEGACIÓN DESDE TARJETAS (CRÍTICO - ANTES DEL ROUTER)
+# =========================
+try:
+    go = st.query_params.get("go")
+    if go:
+        mapping = {
+            "compras": "🛒 Compras IA",
+            "buscador": "🔎 Buscador IA",
+            "stock": "📦 Stock IA",
+            "dashboard": "📊 Dashboard",
+            "pedidos": "📄 Pedidos internos",
+            "baja": "🧾 Baja de stock",
+            "ordenes": "📦 Órdenes de compra",
+            "indicadores": "📈 Indicadores (Power BI)",
+        }
+        destino = mapping.get(go.lower())
+        if destino:
+            st.session_state["radio_menu"] = destino
+            st.query_params.clear()
+            st.rerun()
+except:
+    pass
 
-PASO 1: Actualizá main.py
-Agregá este código ANTES del Router (justo después de obtener notificaciones):
-python# =========================
+=========================
 # OBTENER NOTIFICACIONES
 # =========================
 usuario_actual = user.get("usuario", user.get("email", ""))
