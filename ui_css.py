@@ -300,4 +300,50 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
 }
+/* =========================
+   LOGIN - TARJETA CENTRAL
+   ========================= */
+
+div[data-testid="stForm"] {
+  background: #ffffff !important;
+  border-radius: 22px !important;
+  padding: 32px 36px !important;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Logo / títulos */
+.block-container h1 {
+  color: #0b3b60 !important;
+}
+
+/* Inputs claros */
+div[data-baseweb="input"],
+div[data-baseweb="base-input"] {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+}
+
+/* Texto input */
+div[data-baseweb="input"] input,
+div[data-baseweb="base-input"] input {
+  color: #0f172a !important;
+  background: transparent !important;
+}
+
+/* Botón principal */
+button[kind="secondaryFormSubmit"],
+button[type="submit"] {
+  background: #0b3b60 !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Fondo general (login + app) */
+.stApp {
+  background: linear-gradient(135deg, #f6f4ef, #f3f6fb) !important;
+}
 """
+
