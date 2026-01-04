@@ -65,8 +65,14 @@ div[data-testid="stDecoration"] { display: none !important; }
 }
 
 html, body { font-family: Inter, system-ui, sans-serif; color: #0f172a; }
-[data-testid="stAppViewContainer"] { background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2)); }
-.block-container { max-width: 1240px; padding-top: 1.25rem; padding-bottom: 2.25rem; }
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, var(--fc-bg-1), var(--fc-bg-2));
+}
+.block-container {
+    max-width: 1240px;
+    padding-top: 1.25rem;
+    padding-bottom: 2.25rem;
+}
 
 /* Sidebar look */
 section[data-testid="stSidebar"] { border-right: 1px solid rgba(15, 23, 42, 0.08); }
@@ -75,33 +81,33 @@ section[data-testid="stSidebar"] > div {
     backdrop-filter: blur(8px);
 }
 div[data-testid="stSidebar"] div[role="radiogroup"] label {
-    border-radius: 12px; padding: 8px 10px; margin: 3px 0; border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin: 3px 0;
+    border: 1px solid transparent;
 }
-div[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: rgba(37,99,235,0.06); }
+div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(37,99,235,0.06);
+}
 div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-    background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.18);
+    background: rgba(245,158,11,0.10);
+    border: 1px solid rgba(245,158,11,0.18);
 }
 
 /* Header móvil visual */
 #mobile-header { display: none; }
 #campana-mobile { display: none; }
 
-/* DESKTOP (mouse/trackpad) */
+/* DESKTOP */
 @media (hover: hover) and (pointer: fine) {
-  [data-testid="stHeader"] {
-    background: var(--fc-bg-1) !important;
-  }
-
-  .stAppHeader {
-    background: var(--fc-bg-1) !important;
-  }
-
+  [data-testid="stHeader"],
+  .stAppHeader,
   [data-testid="stToolbar"] {
     background: var(--fc-bg-1) !important;
   }
 
-  div[data-testid="stToolbarActions"] { display: none !important; }
-  div[data-testid="collapsedControl"] { display: none !important; }
+  div[data-testid="stToolbarActions"],
+  div[data-testid="collapsedControl"],
   [data-testid="baseButton-header"],
   button[data-testid="stSidebarCollapseButton"],
   button[data-testid="stSidebarExpandButton"],
@@ -111,7 +117,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   }
 }
 
-/* MÓVIL (touch) */
+/* MÓVIL */
 @media (hover: none) and (pointer: coarse) {
   .block-container { padding-top: 70px !important; }
 
@@ -147,31 +153,23 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     border-radius: 8px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
-  
-st.markdown(
-    """
-    <style>
-    #campana-mobile .notif-badge {
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        background: #ef4444;
-        color: white;
-        font-size: 10px;
-        font-weight: 700;
-        min-width: 16px;
-        height: 16px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 3px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
+  #campana-mobile .notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+  }
 
   div[data-testid="collapsedControl"],
   button[data-testid="stSidebarExpandButton"],
@@ -188,6 +186,10 @@ st.markdown(
   button[title="Close sidebar"] {
     display: inline-flex !important;
   }
+}
+</style>
+""", unsafe_allow_html=True)
+
   
   /* ============================================= */
   /* 🔥 SELECTBOX MÓVIL - NUCLEAR MODE 🔥 */
