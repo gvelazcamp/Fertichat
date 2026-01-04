@@ -86,6 +86,34 @@ from intent_detector import (
     construir_where_clause,
 )
 
+# =====================================================================
+# ✅ NUEVO: REWRITE "LENGUAJE HUMANO" → COMANDO ESTÁNDAR
+# =====================================================================
+
+def es_comando_estandar(texto: str) -> bool:
+    t = normalizar_texto(texto)
+    patrones = [
+        r'^(compras|detalle compras|total compras)\b',
+        r'^(comparar)\b',
+        r'^(gastos familias)\b',
+        r'^(top proveedores)\b',
+        r'^(ultima factura)\b',
+        r'^(detalle factura)\b',
+    ]
+    return any(re.search(p, t) for p in patrones)
+
+
+def resolver_a_comando(pregunta_original: str) -> str:
+    # Si ya es comando, no tocamos nada
+    if es_comando_estandar(pregunta_original):
+        return pregunta_original
+
+    sug = obtener_sugerencia_ejecutable(pregunta_original)
+    cmd = (sug or {}).get("sugerencia", "").strip()
+
+    # Si OpenAI no pudo armar comando, devolvemos original
+    return cmd if cmd else pregunta_original
+
 
 def extraer_numero_factura(pregunta: str) -> Optional[str]:
     """Extrae número de factura desde texto."""
@@ -269,6 +297,21 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
     tipo = intencion.get('tipo', 'consulta_general')
     params = intencion.get('parametros', {})
     debug = intencion.get('debug', '')
+
+    # =====================================================================
+    # ✅ NUEVO: SI NO MATCHEA BIEN → REWRITE A COMANDO Y RE-DETECTAR
+    # =====================================================================
+    if tipo in ('consulta_general', 'desconocido'):
+        pregunta_cmd = resolver_a_comando(pregunta)
+
+        if pregunta_cmd and pregunta_cmd.strip() and pregunta_cmd != pregunta:
+            print(f"🧠 REWRITE: '{pregunta}' → '{pregunta_cmd}'")
+            pregunta = pregunta_cmd
+
+            intencion = detectar_intencion(pregunta)
+            tipo = intencion.get('tipo', 'consulta_general')
+            params = intencion.get('parametros', {})
+            debug = intencion.get('debug', '')
 
     print(f"🎯 INTENCIÓN: {tipo}")
     print(f"📦 PARÁMETROS: {params}")
@@ -484,15 +527,15 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
                 pregunta,
                 ['cuando', 'vino', 'llego', 'entro', 'ultima', 'vez', 'de', 'del', 'la', 'el']
             )
-        
+
         if not articulo:
             return "¿De qué artículo querés saber cuándo vino?", None
-        
+
         df = get_ultima_factura_inteligente(articulo)
-        
+
         if df is None or df.empty:
             return f"No encontré registros de '{articulo}'.", None
-        
+
         return f"🧾 Última vez que vino **{articulo.upper()}**:", formatear_dataframe(df)
 
     # =====================================================================
