@@ -34,5 +34,6 @@ streamlit-aggrid
 
 reportlab
 
-
+chainlit
+asyncpg
 
