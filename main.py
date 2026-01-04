@@ -179,6 +179,109 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     display: inline-flex !important;
   }
   
+  /* ============================================= */
+  /* SELECTBOX MÓVIL - FORZAR BLANCO - MÁXIMA PRIORIDAD */
+  /* ============================================= */
+  
+  /* Container principal del selectbox */
+  [data-testid="stSelectbox"],
+  [data-testid="stSelectbox"] > div,
+  [data-testid="stSelectbox"] > div > div,
+  [data-testid="stSelectbox"] [data-baseweb="select"],
+  [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+  [data-testid="stSelectbox"] [data-baseweb="select"] > div > div {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+  }
+  
+  /* Baseweb select - todos los niveles */
+  [data-baseweb="select"],
+  [data-baseweb="select"] > div,
+  [data-baseweb="select"] > div > div,
+  [data-baseweb="select"] > div > div > div,
+  [data-baseweb="select"] [class*="container"],
+  [data-baseweb="select"] [class*="control"],
+  [data-baseweb="select"] [class*="ValueContainer"],
+  [data-baseweb="select"] [class*="singleValue"],
+  [data-baseweb="select"] [class*="Input"],
+  [data-baseweb="select"] [class*="placeholder"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #e2e8f0 !important;
+  }
+  
+  /* Input dentro del select */
+  [data-baseweb="select"] input,
+  [data-baseweb="select"] input[type="text"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  /* Texto y spans dentro del select */
+  [data-baseweb="select"] span,
+  [data-baseweb="select"] div,
+  [data-baseweb="select"] p,
+  [data-testid="stSelectbox"] span,
+  [data-testid="stSelectbox"] div,
+  [data-testid="stSelectbox"] p {
+    color: #0f172a !important;
+  }
+  
+  /* Dropdown/Popover del select */
+  [data-baseweb="popover"],
+  [data-baseweb="popover"] > div,
+  [data-baseweb="popover"] > div > div,
+  [data-baseweb="popover"] [class*="List"],
+  [data-baseweb="popover"] ul,
+  [data-baseweb="popover"] li {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  /* Menu del select */
+  [data-baseweb="menu"],
+  [data-baseweb="menu"] > div,
+  [data-baseweb="menu"] ul,
+  [data-baseweb="menu"] li,
+  [data-baseweb="menu"] [class*="option"],
+  [data-baseweb="menu"] [class*="Option"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  /* Opción hover en el menu */
+  [data-baseweb="menu"] li:hover,
+  [data-baseweb="menu"] [class*="option"]:hover {
+    background: #f1f5f9 !important;
+    background-color: #f1f5f9 !important;
+  }
+  
+  /* Icono dropdown */
+  [data-baseweb="select"] svg,
+  [data-baseweb="select"] [class*="indicator"],
+  [data-baseweb="select"] [class*="Indicator"] {
+    fill: #64748b !important;
+    color: #64748b !important;
+  }
+  
+  /* MULTISELECT también */
+  [data-testid="stMultiSelect"],
+  [data-testid="stMultiSelect"] > div,
+  [data-testid="stMultiSelect"] [data-baseweb="select"],
+  [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  /* ============================================= */
+  /* FIN SELECTBOX */
+  /* ============================================= */
+  
   /* FORZAR INPUTS CLAROS EN MÓVIL - MÁXIMA PRIORIDAD */
   
   /* TEXT INPUT (Stock IA) */
@@ -194,8 +297,8 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   [data-baseweb="base-input"],
   [data-baseweb="base-input"] *,
   input[type="text"] {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
     border: 1px solid #e2e8f0 !important;
     font-size: 15px !important;
@@ -206,6 +309,30 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     width: 100% !important;
     box-sizing: border-box !important;
     border-radius: 8px !important;
+  }
+  
+  /* NUMBER INPUT */
+  [data-testid="stNumberInput"],
+  [data-testid="stNumberInput"] > div,
+  [data-testid="stNumberInput"] > div > div,
+  [data-testid="stNumberInput"] input,
+  input[type="number"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  
+  /* DATE INPUT */
+  [data-testid="stDateInput"],
+  [data-testid="stDateInput"] > div,
+  [data-testid="stDateInput"] > div > div,
+  [data-testid="stDateInput"] input,
+  input[type="date"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
   }
   
   /* CHAT INPUT (Compras IA) */
@@ -220,8 +347,8 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   [data-baseweb="textarea"] *,
   [data-baseweb="textarea"] > div,
   [data-baseweb="textarea"] textarea {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
     border: 1px solid #e2e8f0 !important;
     font-size: 15px !important;
@@ -245,7 +372,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   /* Botones de envío */
   [data-testid="stChatInput"] button,
   [data-testid="stTextInput"] button {
-    background: #f8fafc !important;
+    background: #ffffff !important;
     color: #0f172a !important;
     border: 1px solid #e2e8f0 !important;
   }
@@ -281,19 +408,19 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
+  /* ============================================= */
+  /* SELECTBOX MÓVIL 768px - REFUERZO */
+  /* ============================================= */
+  
   [data-baseweb="select"],
   [data-baseweb="select"] > div,
   [data-baseweb="select"] > div > div,
-  [data-baseweb="popover"],
-  [data-baseweb="popover"] > div,
-  [data-baseweb="menu"],
-  [data-baseweb="menu"] > div,
   div[data-baseweb="select"] div[class*="container"],
   div[data-baseweb="select"] div[class*="control"],
   div[data-baseweb="select"] div[class*="value"],
   div[data-baseweb="select"] input {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
     border-color: #e2e8f0 !important;
   }
@@ -304,6 +431,19 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     color: #0f172a !important;
   }
   
+  [data-baseweb="popover"],
+  [data-baseweb="popover"] > div,
+  [data-baseweb="menu"],
+  [data-baseweb="menu"] > div {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  /* ============================================= */
+  /* FIN REFUERZO SELECTBOX */
+  /* ============================================= */
+  
   .block-container button,
   .block-container [data-testid="stButton"] button,
   .block-container [data-testid="stFormSubmitButton"] button,
@@ -312,8 +452,8 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   button[kind="secondary"],
   button[data-testid="baseButton-primary"],
   button[data-testid="baseButton-secondary"] {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
     border: 1px solid #e2e8f0 !important;
     font-size: 14px !important;
@@ -334,15 +474,15 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   .stDataFrame,
   div[class*="glideDataEditor"],
   div[class*="dvn-scroller"] {
-    background: #f8fafc !important;
-    background-color: #f8fafc !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
   }
   
   [data-testid="stDataFrame"] td,
   [data-testid="stDataFrame"] th,
   [data-testid="stTable"] td,
   [data-testid="stTable"] th {
-    background: #f8fafc !important;
+    background: #ffffff !important;
     color: #0f172a !important;
   }
   
@@ -355,7 +495,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   
   [data-testid="stExpander"],
   [data-testid="stExpander"] > div {
-    background: #f8fafc !important;
+    background: #ffffff !important;
     color: #0f172a !important;
   }
   
@@ -395,7 +535,7 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
   }
   
   section[data-testid="stSidebar"] input {
-    background: #f8fafc !important;
+    background: #ffffff !important;
     color: #0f172a !important;
   }
   
