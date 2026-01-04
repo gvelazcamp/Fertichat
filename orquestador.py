@@ -59,7 +59,7 @@ from sql_queries import (
     get_lotes_vencidos,
     get_stock_bajo,
     get_stock_lote_especifico,
-    get_detalle_compras,.
+    get_detalle_compras,
     get_compras_anio,        
     get_total_compras_anio, 
 )
