@@ -4,6 +4,8 @@
 
 import streamlit as st
 from datetime import datetime
+from ui_css import CSS_GLOBAL
+st.markdown(CSS_GLOBAL, unsafe_allow_html=True)
 
 st.set_page_config(
     page_title="FertiChat",
