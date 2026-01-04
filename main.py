@@ -33,7 +33,6 @@ from depositos import mostrar_depositos
 from familias import mostrar_familias
 from comprobantes import mostrar_menu_comprobantes
 
-
 # =========================
 # INICIALIZACIÓN
 # =========================
