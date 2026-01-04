@@ -1,5 +1,8 @@
 # =========================
 # INTENT DETECTOR - DETECCIÓN DE INTENCIONES (COMPLETO Y CORREGIDO)
+# =========================
+# VERSIÓN FINAL - CON "CUANDO VINO" Y "COMPRAS 2025"
+# =========================
 
 import re
 import unicodedata
@@ -73,30 +76,6 @@ PALABRAS_STOCK = [
     'por vencer', 'proximo a vencer', 'proximos a vencer'
 ]
 
-# =====================================================================
-# ✅ NUEVO: STOPWORDS EXTRA PARA COMPARACIONES (solo para extraer proveedor)
-# =====================================================================
-
-PALABRAS_EXCLUIR_PROVEEDOR_COMPARACION = PALABRAS_EXCLUIR_PROVEEDOR + [
-    # Conectores temporales típicos en comparativas
-    'entre', 'desde', 'hasta',
-    # Preguntas típicas (si no las sacás, quedan pegadas al proveedor)
-    'como', 'cómo', 'que', 'qué', 'cual', 'cuál', 'cuanto', 'cuánto',
-    # Intensificadores/comparativos
-    'mas', 'más', 'menos', 'mayor', 'menor',
-    # Verbos/pedidos de comparativa
-    'evoluciono', 'evolucionaron', 'evolucion', 'evolucionar',
-    'aumento', 'aumentaron', 'aumentar',
-    'bajo', 'bajaron', 'bajar',
-    'variacion', 'variaciones', 'variar', 'variaron',
-    'cambio', 'cambios',
-    'explica', 'explicar',
-    # Finanzas frecuentes
-    'facturacion', 'facturado', 'facturar', 'factura',
-    # Conjunciones
-    'y', 'e', 'o',
-]
-
 
 # =====================================================================
 # HELPERS DE EXTRACCIÓN
@@ -133,8 +112,7 @@ def extraer_valores_multiples(texto: str, tipo: str) -> List[str]:
     match = re.search(patron, texto_norm)
     if match:
         valores_str = match.group(1).strip()
-        # ✅ Ajuste mínimo: también cortar listas por vs/versus/contra
-        valores = re.split(r'\s*,\s*|\s+y\s+|\s+vs\s+|\s+versus\s+|\s+contra\s+', valores_str)
+        valores = re.split(r'\s*,\s*|\s+y\s+', valores_str)
         valores = [v.strip() for v in valores if v.strip() and len(v.strip()) > 1]
         valores = [v for v in valores if not _es_token_mes_o_periodo(v)]
         return valores
@@ -231,6 +209,7 @@ def extraer_meses_para_comparacion(texto: str) -> List[Tuple[int, int, str]]:
         'diciembre': 12, 'dic': 12
     }
 
+    # Extraer el año global del texto (si existe)
     anio_global = None
     match_anio = re.search(r'\b(20\d{2})\b', texto_norm)
     if match_anio:
@@ -258,6 +237,7 @@ def extraer_meses_para_comparacion(texto: str) -> List[Tuple[int, int, str]]:
                 resultados.append((anio, mes_num, mes_key))
 
     resultados.sort(key=lambda x: (x[0], x[1]))
+
     return resultados
 
 
@@ -315,17 +295,12 @@ def _extraer_mes_keys_multiples(texto: str) -> List[str]:
     return [m[2] for m in meses]
 
 
-def _split_lista_libre(valores_str: str, excluir_palabras: Optional[List[str]] = None) -> List[str]:
+def _split_lista_libre(valores_str: str) -> List[str]:
     """Divide una lista libre tipo: "biodiagnostico, roche" """
     if not valores_str:
         return []
-    if excluir_palabras is None:
-        excluir_palabras = PALABRAS_EXCLUIR_PROVEEDOR
-
     s = normalizar_texto(valores_str)
-    # ✅ Ajuste mínimo: también soportar vs/versus/contra como separadores
-    partes = re.split(r'\s*,\s*|\s+y\s+|\s+e\s+|\s*&\s*|\s+vs\s+|\s+versus\s+|\s+contra\s+', s)
-
+    partes = re.split(r'\s*,\s*|\s+y\s+|\s+e\s+|\s*&\s*', s)
     out = []
     for p in partes:
         p = p.strip(" .;:|/\\-").strip()
@@ -333,12 +308,11 @@ def _split_lista_libre(valores_str: str, excluir_palabras: Optional[List[str]] =
             continue
         if _es_token_mes_o_periodo(p):
             continue
-        if p in excluir_palabras:
+        if p in PALABRAS_EXCLUIR_PROVEEDOR:
             continue
         if len(p) <= 1:
             continue
         out.append(p)
-
     seen = set()
     res = []
     for x in out:
@@ -348,15 +322,12 @@ def _split_lista_libre(valores_str: str, excluir_palabras: Optional[List[str]] =
     return res
 
 
-def _extraer_proveedores_multiples_libre(texto: str, excluir_palabras: Optional[List[str]] = None) -> List[str]:
+def _extraer_proveedores_multiples_libre(texto: str) -> List[str]:
     """Extrae proveedores aunque el usuario NO escriba 'proveedor'."""
-    if excluir_palabras is None:
-        excluir_palabras = PALABRAS_EXCLUIR_PROVEEDOR
-
-    patron_raw = _extraer_patron_libre(texto, excluir_palabras)
+    patron_raw = _extraer_patron_libre(texto, PALABRAS_EXCLUIR_PROVEEDOR)
     if not patron_raw:
         return []
-    return _split_lista_libre(patron_raw, excluir_palabras=excluir_palabras)
+    return _split_lista_libre(patron_raw)
 
 
 def _extraer_meses_numeros_en_orden(texto: str) -> List[int]:
@@ -417,73 +388,6 @@ def _generar_periodos_mes_keys(anios: List[int], meses_nums: List[int], anio_def
             seen.add(x)
             res.append(x)
     return res
-
-
-# =====================================================================
-# ✅ NUEVO: RESOLVEDOR DE COMPARACIONES (POR HECHOS)
-# =====================================================================
-
-def resolver_comparacion(hechos: Dict) -> Optional[Dict]:
-    """
-    Decide el tipo de comparación en base a hechos detectados.
-    Retorna dict {'tipo','parametros','debug'} o None.
-    """
-    proveedores: List[str] = hechos.get("proveedores") or []
-    anios: List[int] = hechos.get("anios") or []
-    meses_nums: List[int] = hechos.get("meses_nums") or []
-    meses_simple: List[Tuple[int, int, str]] = hechos.get("meses_simple") or []
-    moneda: Optional[str] = hechos.get("moneda")
-    es_familia: bool = bool(hechos.get("es_familia"))
-    tiene_gastos_comp: bool = bool(hechos.get("tiene_gastos_comp"))
-    anio_default: int = int(hechos.get("anio_default") or datetime.now().year)
-
-    params_base: Dict = {}
-    if moneda:
-        params_base["moneda"] = moneda
-
-    def _resp(tipo: str, params: Dict, dbg: str) -> Dict:
-        return {"tipo": tipo, "parametros": params, "debug": dbg}
-
-    # 1) Mismo mes + varios años (ej: nov 2024 vs nov 2025) o (meses + 2+ años)
-    if meses_nums and len(anios) >= 2:
-        periodos = _generar_periodos_mes_keys(anios, meses_nums, anio_default)
-        if len(periodos) >= 2:
-            params = dict(params_base)
-            params["meses"] = periodos
-
-            if es_familia or tiene_gastos_comp:
-                return _resp("comparar_familia_meses", params, f"Regla: comparar familia por períodos {periodos}")
-
-            if proveedores:
-                params["proveedores"] = proveedores
-            return _resp("comparar_proveedor_meses", params, f"Regla: comparar proveedor(es) {proveedores} por períodos {periodos}")
-
-    # 2) Comparar por años (sin meses)
-    if len(anios) >= 2 and not meses_nums:
-        params = dict(params_base)
-        params["anios"] = anios
-
-        if es_familia or tiene_gastos_comp:
-            return _resp("comparar_familia_anios", params, f"Regla: comparar familia por años {anios}")
-
-        if proveedores:
-            params["proveedores"] = proveedores
-            return _resp("comparar_proveedor_anios", params, f"Regla: comparar proveedor(es) {proveedores} por años {anios}")
-
-    # 3) Comparar por meses (2+ meses detectados)
-    if len(meses_simple) >= 2:
-        meses_keys = [m[2] for m in meses_simple]
-        params = dict(params_base)
-        params["meses"] = meses_keys
-
-        if es_familia or tiene_gastos_comp:
-            return _resp("comparar_familia_meses", params, f"Regla: comparar familia por meses {meses_keys}")
-
-        if proveedores:
-            params["proveedores"] = proveedores
-        return _resp("comparar_proveedor_meses", params, f"Regla: comparar proveedor(es) {proveedores} por meses {meses_keys}")
-
-    return None
 
 
 # =====================================================================
@@ -617,6 +521,88 @@ def detectar_intencion(texto: str) -> Dict:
     intencion = {'tipo': 'consulta_general', 'parametros': {}, 'debug': ''}
 
     # =====================================================================
+    # ✅ PRIORIDAD -1: CUANDO VINO / ULTIMA COMPRA DE [ARTICULO]
+    # Funciona en CUALQUIER módulo (Compras IA o Stock IA)
+    # 
+    # DOS CASOS:
+    # 1. CON "ultimo/ultima": "cuando vino ultimo vitek" → ultima_factura_articulo (1 registro)
+    # 2. SIN "ultimo/ultima": "cuando vino vitek" → cuando_vino_articulo (todas las facturas)
+    # =====================================================================
+    
+    # Detectar si tiene "ultimo/ultima"
+    tiene_ultimo = any(x in texto_norm for x in ['ultimo', 'ultima', 'ultim'])
+    
+    # Patrones que indican pregunta de última compra/factura (CON ultimo)
+    patrones_ultima_compra = [
+        'ultima vez que vino', 'ultima vez que llego', 'ultima vez que compramos',
+        'cuando fue la ultima', 'cuando fue el ultimo',
+        'ultima compra de', 'ultimo pedido de', 'ultima factura de'
+    ]
+    
+    # Patrones que indican "cuando vino" (puede ser con o sin ultimo)
+    patrones_cuando_vino = [
+        'cuando vino', 'cuando llego', 'cuando entro', 'cuando compramos',
+        'en que fecha vino', 'en que fecha llego', 'en que fecha se compro',
+        'en que fecha compramos', 'que fecha vino', 'que fecha llego'
+    ]
+    
+    tiene_patron_ultima = any(p in texto_norm for p in patrones_ultima_compra)
+    tiene_patron_cuando_vino = any(p in texto_norm for p in patrones_cuando_vino)
+    
+    # Detectar "ultimo/ultima [articulo]" directo (ej: "ultimo vitek", "ultima glucosa")
+    match_ultimo_art = re.search(r'\b(ultima?o?)\s+([a-z0-9]{2,})', texto_norm)
+    articulo_directo = None
+    
+    if match_ultimo_art:
+        posible_art = match_ultimo_art.group(2)
+        # Excluir palabras que NO son artículos
+        palabras_no_articulo = [
+            'factura', 'compra', 'vez', 'pedido', 'mes', 'ano', 'semana', 'dia',
+            'stock', 'lote', 'vencimiento', 'deposito', 'precio', 'costo'
+        ]
+        if posible_art not in palabras_no_articulo and len(posible_art) >= 2:
+            articulo_directo = posible_art
+    
+    # CASO 1: Con "ultimo" → ultima_factura_articulo (1 registro)
+    if tiene_ultimo and (tiene_patron_ultima or tiene_patron_cuando_vino or articulo_directo):
+        palabras_excluir_articulo = [
+            'cuando', 'vino', 'llego', 'entro', 'compramos', 'compro', 'se',
+            'ultima', 'ultimo', 'vez', 'que', 'fecha', 'en', 'fue', 'la', 'el',
+            'de', 'del', 'los', 'las', 'un', 'una', 'me', 'podes', 'podrias',
+            'decir', 'decime', 'mostrar', 'mostrame', 'dame', 'pasame',
+            'factura', 'pedido', 'compra', 'cual', 'cuales'
+        ]
+        
+        if articulo_directo:
+            articulo = articulo_directo
+        else:
+            articulo = _extraer_patron_libre(texto, palabras_excluir_articulo)
+
+        if articulo and len(articulo) >= 2:
+            intencion['tipo'] = 'ultima_factura_articulo'
+            intencion['parametros']['articulo'] = articulo
+            intencion['debug'] = f'Match: ÚLTIMA compra/factura de "{articulo}"'
+            return intencion
+    
+    # CASO 2: Sin "ultimo" pero con "cuando vino" → cuando_vino_articulo (todas las facturas)
+    if tiene_patron_cuando_vino and not tiene_ultimo:
+        palabras_excluir_articulo = [
+            'cuando', 'vino', 'llego', 'entro', 'compramos', 'compro', 'se',
+            'vez', 'que', 'fecha', 'en', 'fue', 'la', 'el',
+            'de', 'del', 'los', 'las', 'un', 'una', 'me', 'podes', 'podrias',
+            'decir', 'decime', 'mostrar', 'mostrame', 'dame', 'pasame',
+            'factura', 'pedido', 'compra', 'cual', 'cuales'
+        ]
+        
+        articulo = _extraer_patron_libre(texto, palabras_excluir_articulo)
+
+        if articulo and len(articulo) >= 2:
+            intencion['tipo'] = 'cuando_vino_articulo'
+            intencion['parametros']['articulo'] = articulo
+            intencion['debug'] = f'Match: TODAS las facturas de "{articulo}"'
+            return intencion
+
+    # =====================================================================
     # PRIORIDAD 0: CONSULTAS DE STOCK
     # =====================================================================
     if _es_consulta_stock(texto_norm):
@@ -692,6 +678,7 @@ def detectar_intencion(texto: str) -> Dict:
     tiene_cuando_vino = any(x in texto_norm for x in ['cuando vino', 'cuando llego', 'cuando entro', 'ultima vez que vino', 'ultima vez que llego'])
 
     if tiene_cuando_vino:
+        # Extraer el artículo
         articulo = _extraer_patron_libre(
             texto,
             ['cuando', 'vino', 'llego', 'entro', 'ultima', 'ultimo', 'vez', 'que',
@@ -738,7 +725,7 @@ def detectar_intencion(texto: str) -> Dict:
         return intencion
 
     # =====================================================================
-    # PRIORIDAD 7: COMPARACIONES (✅ RESUELTO POR HECHOS)
+    # PRIORIDAD 7: COMPARACIONES
     # =====================================================================
     if _es_comparacion(texto_norm):
         hoy = datetime.now()
@@ -747,16 +734,15 @@ def detectar_intencion(texto: str) -> Dict:
         meses_nums = _extraer_meses_numeros_en_orden(texto)
         meses_simple = extraer_meses_para_comparacion(texto)
 
-        # ✅ Extracción de proveedor(es) usando stopwords extendidas SOLO en comparaciones
-        proveedores: List[str] = []
+        proveedores = []
         if 'proveedor' in texto_norm or 'proveedores' in texto_norm:
             proveedores = extraer_valores_multiples(texto, 'proveedor')
 
         if not proveedores:
-            proveedores = _extraer_proveedores_multiples_libre(texto, excluir_palabras=PALABRAS_EXCLUIR_PROVEEDOR_COMPARACION)
+            proveedores = _extraer_proveedores_multiples_libre(texto)
 
         if not proveedores:
-            prov_limpio = _extraer_patron_libre(texto, PALABRAS_EXCLUIR_PROVEEDOR_COMPARACION)
+            prov_limpio = _extraer_proveedor_limpio(texto)
             proveedores = [prov_limpio] if prov_limpio else []
 
         es_familia = any(x in texto_norm for x in ['familia', 'familias', 'seccion', 'secciones'])
@@ -768,21 +754,73 @@ def detectar_intencion(texto: str) -> Dict:
         elif any(m in texto_norm for m in ['pesos', '$']):
             moneda = '$'
 
-        # ✅ RESOLVER POR HECHOS (sin depender de “prioridades” internas)
-        hechos = {
-            "proveedores": proveedores,
-            "anios": anios,
-            "meses_nums": meses_nums,
-            "meses_simple": meses_simple,
-            "moneda": moneda,
-            "es_familia": es_familia,
-            "tiene_gastos_comp": tiene_gastos_comp,
-            "anio_default": hoy.year,
-        }
+        # MESES + 2+ AÑOS
+        if meses_nums and len(anios) >= 2:
+            periodos = _generar_periodos_mes_keys(anios, meses_nums, hoy.year)
 
-        res = resolver_comparacion(hechos)
-        if res:
-            return res
+            if len(periodos) >= 2:
+                intencion['parametros']['meses'] = periodos
+                if moneda:
+                    intencion['parametros']['moneda'] = moneda
+
+                if es_familia or tiene_gastos_comp:
+                    intencion['tipo'] = 'comparar_familia_meses'
+                    intencion['debug'] = f"Match: comparar familia por períodos {periodos}"
+                    return intencion
+
+                if proveedores:
+                    intencion['parametros']['proveedores'] = proveedores
+                intencion['tipo'] = 'comparar_proveedor_meses'
+                intencion['debug'] = f"Match: comparar proveedor(es) {proveedores} por períodos {periodos}"
+                return intencion
+
+        # COMPARACIÓN POR AÑOS (sin meses)
+        if len(anios) >= 2 and not meses_nums:
+            intencion['parametros']['anios'] = anios
+
+            if moneda:
+                intencion['parametros']['moneda'] = moneda
+
+            if es_familia or tiene_gastos_comp:
+                intencion['tipo'] = 'comparar_familia_anios'
+                intencion['debug'] = f'Match: comparar familia años {anios}'
+                return intencion
+
+            if proveedores:
+                intencion['parametros']['proveedores'] = proveedores
+                intencion['tipo'] = 'comparar_proveedor_anios'
+                intencion['debug'] = f'Match: comparar proveedor(es) {proveedores} años {anios}'
+                return intencion
+
+            articulo = _extraer_proveedor_limpio(texto)
+            if articulo:
+                intencion['parametros']['articulo_like'] = articulo
+                intencion['tipo'] = 'comparar_articulo_anios'
+                intencion['debug'] = f'Match: comparar artículo {articulo} años {anios}'
+                return intencion
+
+        # COMPARACIÓN POR MESES
+        if len(meses_simple) >= 2:
+            intencion['parametros']['meses'] = [m[2] for m in meses_simple]
+
+            if moneda:
+                intencion['parametros']['moneda'] = moneda
+
+            if proveedores:
+                intencion['parametros']['proveedores'] = proveedores
+                intencion['tipo'] = 'comparar_proveedor_meses'
+                intencion['debug'] = f"Match: comparar proveedor(es) {proveedores} meses {[m[2] for m in meses_simple]}"
+                return intencion
+
+            if es_familia or tiene_gastos_comp:
+                intencion['tipo'] = 'comparar_familia_meses'
+                intencion['debug'] = f"Match: comparar familia meses {[m[2] for m in meses_simple]}"
+                return intencion
+
+            intencion['tipo'] = 'comparar_proveedor_meses'
+            intencion['parametros']['proveedores'] = proveedores
+            intencion['debug'] = f"Match: comparar (default) meses {[m[2] for m in meses_simple]}"
+            return intencion
 
         intencion['tipo'] = 'consulta_general'
         intencion['debug'] = 'Comparación detectada pero sin parámetros suficientes → IA'
