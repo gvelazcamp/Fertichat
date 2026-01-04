@@ -20,7 +20,6 @@ OPENAI_MODEL = "gpt-4o-mini"
 # =========================
 MENU_OPTIONS = [
     "🏠 Inicio",
-    "💬 Chat (Chainlit)",
     "🛒 Compras IA",
     "🔎 Buscador IA",
     "📦 Stock IA",
