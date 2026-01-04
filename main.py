@@ -148,22 +148,30 @@ div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
   
-  #campana-mobile .notif-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #ef4444;
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    min-width: 16px;
-    height: 16px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
-  }
+st.markdown(
+    """
+    <style>
+    #campana-mobile .notif-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ef4444;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        min-width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 3px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
   div[data-testid="collapsedControl"],
   button[data-testid="stSidebarExpandButton"],
