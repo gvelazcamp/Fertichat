@@ -675,35 +675,51 @@ menu_actual = st.session_state["radio_menu"]
 
 if menu_actual == "🏠 Inicio":
     mostrar_inicio()
-elif menu_actual == "💬 Chat (Chainlit)":
+
+# Aceptar ambos textos posibles del menú (por diferencia de emojis/label)
+elif menu_actual == "💬 Chat (Chainlit)" or menu_actual == "☁️ Chat (Chainlit)⌨️":
     mostrar_chat_chainlit()
+
 elif menu_actual == "🛒 Compras IA":
     mostrar_resumen_compras_rotativo()
     Compras_IA()
+
 elif menu_actual == "📦 Stock IA":
     mostrar_resumen_stock_rotativo()
     mostrar_stock_ia()
+
 elif menu_actual == "🔎 Buscador IA":
     mostrar_buscador_ia()
+
 elif menu_actual == "📥 Ingreso de comprobantes":
     mostrar_ingreso_comprobantes()
+
 elif menu_actual == "📊 Dashboard":
     mostrar_dashboard()
+
 elif menu_actual == "📄 Pedidos internos":
     mostrar_pedidos_internos()
+
 elif menu_actual == "🧾 Baja de stock":
     mostrar_baja_stock()
+
 elif menu_actual == "📈 Indicadores (Power BI)":
     mostrar_indicadores_ia()
+
 elif menu_actual == "📦 Órdenes de compra":
     mostrar_ordenes_compra()
+
 elif menu_actual == "📒 Ficha de stock":
     mostrar_ficha_stock()
+
 elif menu_actual == "📚 Artículos":
     mostrar_articulos()
+
 elif menu_actual == "🏬 Depósitos":
     mostrar_depositos()
+
 elif menu_actual == "🧩 Familias":
     mostrar_familias()
+
 elif menu_actual == "📑 Comprobantes":
-   mostrar_menu_comprobantes()
+    mostrar_menu_comprobantes()
