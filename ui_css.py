@@ -91,49 +91,85 @@ div[data-testid="stSidebar"] * {
 }
 
 /* =========================================================
-   LOGIN - TARJETA CENTRAL
+   LOGIN - ESTILO COMPLETO (COMO ANTES)
    ========================================================= */
-div[data-testid="stForm"] {
-  background: #ffffff !important;
-  border-radius: 22px !important;
-  padding: 32px 36px !important;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12) !important;
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+
+/* Fondo violeta SOLO para login */
+.stApp {
+  background: linear-gradient(180deg, #6b6eea 0%, #7b4fa3 50%, #f6f4ef 100%) !important;
 }
 
-/* Título */
+/* Tarjeta LOGO */
 .block-container h1 {
-  color: #0b3b60 !important;
-  font-weight: 800 !important;
+  font-size: 42px !important;
+  font-weight: 900 !important;
+  margin-bottom: 6px !important;
+  color: #5b5fd6 !important;
+}
+
+.block-container p {
+  color: #64748b !important;
+  font-size: 15px !important;
+}
+
+/* Tarjeta blanca del LOGO */
+.block-container > div:first-child > div {
+  background: rgba(255,255,255,0.96) !important;
+  border-radius: 26px !important;
+  padding: 28px 36px !important;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.18) !important;
+  margin-bottom: 22px !important;
+}
+
+/* Tarjeta del FORM */
+div[data-testid="stForm"] {
+  background: rgba(255,255,255,0.97) !important;
+  border-radius: 24px !important;
+  padding: 32px 36px !important;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18) !important;
+  border: none !important;
+}
+
+/* Tabs */
+div[data-baseweb="tab-list"] {
+  background: #f1f5f9 !important;
+  border-radius: 14px !important;
+  padding: 6px !important;
+}
+
+button[data-baseweb="tab"] {
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+  background: #ffffff !important;
+  color: #5b5fd6 !important;
+  box-shadow: 0 6px 16px rgba(15,23,42,0.15) !important;
 }
 
 /* Inputs */
 div[data-baseweb="input"],
 div[data-baseweb="base-input"] {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
+  background: #f8fafc !important;
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 14px !important;
 }
 
+/* Texto inputs */
 div[data-baseweb="input"] input,
 div[data-baseweb="base-input"] input {
-  color: #0f172a !important;
+  color: #1e293b !important;
   background: transparent !important;
 }
 
-/* Botón principal */
-button[kind="secondaryFormSubmit"],
+/* Botón INGRESAR */
 button[type="submit"] {
-  background: #0b3b60 !important;
+  background: linear-gradient(135deg, #6b6eea, #7b4fa3) !important;
   color: #ffffff !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
+  border-radius: 14px !important;
+  font-weight: 800 !important;
+  padding: 14px 28px !important;
+  box-shadow: 0 12px 30px rgba(107,110,234,0.45) !important;
 }
-
-/* Fondo general */
-.stApp {
-  background: linear-gradient(135deg, #f6f4ef, #f3f6fb) !important;
-}
-
-</style>
-"""
