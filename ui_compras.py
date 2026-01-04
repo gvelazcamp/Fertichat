@@ -1397,4 +1397,3 @@ def Compras_IA():
         })
         
         st.rerun()
-                    
