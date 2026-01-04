@@ -10,7 +10,12 @@ from datetime import datetime
 import pandas as pd
 
 from openai import OpenAI
-from config import OPENAI_API_KEY, OPENAI_MODEL
+from config import OPENAI_MODEL
+from config_runtime import get_secret
+
+OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
+
+
 from intent_detector import normalizar_texto
 from sql_queries import ejecutar_consulta
 
