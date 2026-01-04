@@ -32,6 +32,7 @@ from articulos import mostrar_articulos
 from depositos import mostrar_depositos
 from familias import mostrar_familias
 from comprobantes import mostrar_menu_comprobantes
+from ui_chat_chainlit import mostrar_chat_chainlit
 
 # =========================
 # INICIALIZACIÓN
@@ -674,6 +675,8 @@ menu_actual = st.session_state["radio_menu"]
 
 if menu_actual == "🏠 Inicio":
     mostrar_inicio()
+elif menu == "💬 Chat (Compras,Stock)":
+    mostrar_chat_chainlit()
 elif menu_actual == "🛒 Compras IA":
     mostrar_resumen_compras_rotativo()
     Compras_IA()
