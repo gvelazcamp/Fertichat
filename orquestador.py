@@ -201,7 +201,10 @@ def es_conocimiento_general(pregunta: str) -> bool:
 
 def procesar_pregunta_router(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
     """Alias para compatibilidad."""
-    intencion_info = detectar_intencion(pregunta)
+    # ✅ NUEVO: primero reescribir a comando estándar (si aplica)
+    pregunta_cmd = resolver_a_comando(pregunta)
+
+    intencion_info = detectar_intencion(pregunta_cmd)
     tipo = intencion_info.get('tipo', 'desconocido')
     debug = intencion_info.get('debug', '')
 
@@ -234,14 +237,17 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
     if not pregunta or not pregunta.strip():
         return "Por favor, escribe una pregunta.", None
 
+    # ✅ NUEVO: guardo original (para fallbacks OpenAI-SQL y mensajes)
+    pregunta_original = pregunta
+
     print(f"\n{'='*60}")
-    print(f"PREGUNTA: {pregunta}")
+    print(f"PREGUNTA: {pregunta_original}")
     print(f"{'='*60}")
 
     # =====================================================================
     # DETALLE FACTURA (ROBUSTO Y EXACTO)
     # =====================================================================
-    nro_raw = extraer_numero_factura(pregunta)
+    nro_raw = extraer_numero_factura(pregunta_original)
 
     if nro_raw:
         nro_mostrar = str(nro_raw).strip()
@@ -277,18 +283,26 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
     # =====================================================================
     # PASO 1: ¿Es saludo/conversación?
     # =====================================================================
-    if es_saludo_o_conversacion(pregunta):
-        respuesta = responder_con_openai(pregunta, "conversacion")
+    if es_saludo_o_conversacion(pregunta_original):
+        respuesta = responder_con_openai(pregunta_original, "conversacion")
         print(f"✅ TIPO: Conversación → OpenAI")
         return f"💬 {respuesta}", None
 
     # =====================================================================
     # PASO 2: ¿Es pregunta de conocimiento?
     # =====================================================================
-    if es_pregunta_conocimiento(pregunta):
-        respuesta = responder_con_openai(pregunta, "conocimiento")
+    if es_pregunta_conocimiento(pregunta_original):
+        respuesta = responder_con_openai(pregunta_original, "conocimiento")
         print(f"✅ TIPO: Conocimiento → OpenAI")
         return f"📚 {respuesta}", None
+
+    # =====================================================================
+    # ✅ PASO 2.5: REWRITE "HUMANO" → COMANDO (SOLO SI HACE FALTA)
+    # =====================================================================
+    pregunta = resolver_a_comando(pregunta_original)
+
+    if DEBUG_MODE and pregunta != pregunta_original:
+        print(f"🧠 REWRITE: '{pregunta_original}'  →  '{pregunta}'")
 
     # =====================================================================
     # PASO 3: Detectar intención (REGLAS)
@@ -297,6 +311,10 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
     tipo = intencion.get('tipo', 'consulta_general')
     params = intencion.get('parametros', {})
     debug = intencion.get('debug', '')
+
+    print(f"🎯 INTENCIÓN: {tipo}")
+    print(f"📦 PARÁMETROS: {params}")
+    print(f"🔍 DEBUG: {debug}")
 
     # =====================================================================
     # ✅ NUEVO: SI NO MATCHEA BIEN → REWRITE A COMANDO Y RE-DETECTAR
