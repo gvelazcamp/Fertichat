@@ -10,25 +10,18 @@
 import os
 import re
 import json
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 from datetime import datetime
+
+import streamlit as st
 from openai import OpenAI
+from config import OPENAI_MODEL
 
 # =====================================================================
 # CONFIGURACIÓN
 # =====================================================================
 
-try:
-    from config_runtime import get_secret
-    OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
-except:
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-try:
-    from config import OPENAI_MODEL
-except:
-    OPENAI_MODEL = "gpt-4o-mini"
-
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
