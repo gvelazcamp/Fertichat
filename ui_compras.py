@@ -1,9 +1,10 @@
 # =========================
-# UI_COMPRAS.PY - VERSIÓN SIMPLIFICADA Y FUNCIONAL
+# UI_COMPRAS.PY - CON TOTALES Y PESTAÑAS
 # =========================
 
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from datetime import datetime
 
 # IMPORTS
@@ -53,6 +54,162 @@ from sql_queries import (
 def inicializar_historial():
     if "historial_compras" not in st.session_state:
         st.session_state["historial_compras"] = []
+
+
+# =========================
+# CALCULAR TOTALES POR MONEDA
+# =========================
+
+def calcular_totales_por_moneda(df: pd.DataFrame) -> dict:
+    """
+    Calcula totales separados por moneda si la columna 'Moneda' existe
+    """
+    if df is None or len(df) == 0:
+        return {"Pesos": 0, "USD": 0}
+    
+    # Verificar si existe columna de moneda
+    col_moneda = None
+    for col in df.columns:
+        if col.lower() in ['moneda', 'currency']:
+            col_moneda = col
+            break
+    
+    # Verificar si existe columna de total
+    col_total = None
+    for col in df.columns:
+        if col.lower() in ['total', 'monto', 'importe', 'valor']:
+            col_total = col
+            break
+    
+    if not col_moneda or not col_total:
+        return None
+    
+    try:
+        # Limpiar y convertir totales
+        df_calc = df.copy()
+        df_calc[col_total] = df_calc[col_total].astype(str).str.replace('.', '').str.replace(',', '.').str.replace('$', '').str.strip()
+        df_calc[col_total] = pd.to_numeric(df_calc[col_total], errors='coerce').fillna(0)
+        
+        # Calcular por moneda
+        totales = {}
+        
+        # Pesos
+        pesos_df = df_calc[df_calc[col_moneda].str.contains('$|peso|ARS|ars', case=False, na=False)]
+        totales['Pesos'] = pesos_df[col_total].sum()
+        
+        # USD
+        usd_df = df_calc[df_calc[col_moneda].str.contains('USD|US|dolar|dólar', case=False, na=False)]
+        totales['USD'] = usd_df[col_total].sum()
+        
+        return totales
+    
+    except Exception as e:
+        print(f"Error calculando totales: {e}")
+        return None
+
+
+# =========================
+# GENERAR EXPLICACIÓN CON IA
+# =========================
+
+def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
+    """
+    Genera una explicación de los resultados usando OpenAI
+    """
+    try:
+        if df is None or len(df) == 0:
+            return "No hay datos para analizar."
+        
+        # Resumen básico
+        resumen = f"La consulta '{pregunta}' devolvió {len(df)} resultados.\n\n"
+        
+        # Totales por moneda
+        totales = calcular_totales_por_moneda(df)
+        if totales:
+            resumen += f"**Totales:**\n"
+            if totales.get('Pesos', 0) > 0:
+                resumen += f"- Pesos: ${totales['Pesos']:,.2f}\n"
+            if totales.get('USD', 0) > 0:
+                resumen += f"- USD: ${totales['USD']:,.2f}\n"
+        
+        # Top 3 items si hay columna de proveedor o artículo
+        if 'proveedor' in df.columns:
+            top3 = df.groupby('proveedor').size().sort_values(ascending=False).head(3)
+            resumen += f"\n**Top 3 proveedores por cantidad de registros:**\n"
+            for prov, cant in top3.items():
+                resumen += f"- {prov}: {cant} registros\n"
+        
+        elif 'articulo' in df.columns:
+            top3 = df.groupby('articulo').size().sort_values(ascending=False).head(3)
+            resumen += f"\n**Top 3 artículos por cantidad de registros:**\n"
+            for art, cant in top3.items():
+                resumen += f"- {art}: {cant} registros\n"
+        
+        return resumen
+    
+    except Exception as e:
+        return f"No se pudo generar explicación: {str(e)}"
+
+
+# =========================
+# GENERAR GRÁFICO
+# =========================
+
+def generar_grafico(df: pd.DataFrame, tipo: str) -> object:
+    """
+    Genera un gráfico según el tipo de consulta
+    """
+    try:
+        if df is None or len(df) == 0:
+            return None
+        
+        # GRÁFICO DE BARRAS - Top proveedores/artículos
+        if 'proveedor' in df.columns and 'total' in df.columns:
+            # Agrupar por proveedor
+            df_grouped = df.groupby('proveedor')['total'].sum().sort_values(ascending=False).head(10)
+            fig = px.bar(
+                x=df_grouped.values,
+                y=df_grouped.index,
+                orientation='h',
+                title="Top 10 Proveedores por Total",
+                labels={'x': 'Total', 'y': 'Proveedor'}
+            )
+            return fig
+        
+        elif 'articulo' in df.columns and 'total' in df.columns:
+            # Agrupar por artículo
+            df_grouped = df.groupby('articulo')['total'].sum().sort_values(ascending=False).head(10)
+            fig = px.bar(
+                x=df_grouped.values,
+                y=df_grouped.index,
+                orientation='h',
+                title="Top 10 Artículos por Total",
+                labels={'x': 'Total', 'y': 'Artículo'}
+            )
+            return fig
+        
+        # GRÁFICO DE LÍNEA TEMPORAL - Si hay fechas
+        elif 'Fecha' in df.columns or 'fecha' in df.columns:
+            col_fecha = 'Fecha' if 'Fecha' in df.columns else 'fecha'
+            df_temp = df.copy()
+            df_temp[col_fecha] = pd.to_datetime(df_temp[col_fecha], errors='coerce')
+            df_temp = df_temp.dropna(subset=[col_fecha])
+            
+            if len(df_temp) > 0:
+                df_grouped = df_temp.groupby(df_temp[col_fecha].dt.to_period('M')).size()
+                fig = px.line(
+                    x=[str(p) for p in df_grouped.index],
+                    y=df_grouped.values,
+                    title="Registros por mes",
+                    labels={'x': 'Mes', 'y': 'Cantidad'}
+                )
+                return fig
+        
+        return None
+    
+    except Exception as e:
+        print(f"Error generando gráfico: {e}")
+        return None
 
 
 # =========================
@@ -173,22 +330,58 @@ def Compras_IA():
     st.markdown("---")
     
     # MOSTRAR HISTORIAL
-    for msg in st.session_state["historial_compras"]:
+    for idx, msg in enumerate(st.session_state["historial_compras"]):
         with st.chat_message(msg["role"]):
+            
+            # Texto
             st.markdown(msg["content"])
             
-            # Si hay tabla
+            # Si hay tabla y totales
             if "df" in msg and msg["df"] is not None:
-                st.dataframe(msg["df"], use_container_width=True, height=400)
+                df = msg["df"]
                 
-                csv = msg["df"].to_csv(index=False, encoding='utf-8-sig')
-                st.download_button(
-                    "📥 Descargar CSV",
-                    csv,
-                    f"resultado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    "text/csv",
-                    key=f"dl_{msg['timestamp']}"
-                )
+                # TOTALES AL COSTADO
+                totales = calcular_totales_por_moneda(df)
+                if totales:
+                    col1, col2, col3 = st.columns([1, 1, 3])
+                    with col1:
+                        st.metric("💵 Total Pesos", f"${totales.get('Pesos', 0):,.2f}")
+                    with col2:
+                        st.metric("💵 Total USD", f"${totales.get('USD', 0):,.2f}")
+                
+                st.markdown("---")
+                
+                # PESTAÑAS: Tabla / Gráfico / Explicación
+                tab1, tab2, tab3 = st.tabs(["📊 Tabla", "📈 Gráfico", "💡 Explicación"])
+                
+                with tab1:
+                    st.dataframe(df, use_container_width=True, height=400)
+                    
+                    # Generar Excel en memoria
+                    from io import BytesIO
+                    buffer = BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False, sheet_name='Resultados')
+                    buffer.seek(0)
+                    
+                    st.download_button(
+                        "📥 Descargar Excel",
+                        buffer,
+                        f"resultado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_{msg['timestamp']}_{idx}"
+                    )
+                
+                with tab2:
+                    fig = generar_grafico(df, msg.get("tipo", ""))
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("No se puede generar gráfico para este tipo de datos")
+                
+                with tab3:
+                    explicacion = generar_explicacion_ia(df, msg.get("pregunta", ""), msg.get("tipo", ""))
+                    st.markdown(explicacion)
     
     # INPUT
     pregunta = st.chat_input("Escribí tu consulta...")
@@ -203,11 +396,7 @@ def Compras_IA():
         })
         
         # Procesar
-        print(f"🔍 Pregunta: {pregunta}")
-        
         resultado = interpretar_pregunta(pregunta)
-        print(f"🤖 IA respondió: {resultado}")
-        
         tipo = resultado.get("tipo", "")
         parametros = resultado.get("parametros", {})
         
@@ -216,15 +405,11 @@ def Compras_IA():
         
         # CONVERSACIÓN
         if tipo == "conversacion":
-            print("💬 Es conversación, llamando a OpenAI...")
             respuesta_content = responder_con_openai(pregunta, tipo="conversacion")
-            print(f"✅ OpenAI respondió: {respuesta_content[:100]}...")
         
         # CONOCIMIENTO
         elif tipo == "conocimiento":
-            print("🧠 Es conocimiento, llamando a OpenAI...")
             respuesta_content = responder_con_openai(pregunta, tipo="conocimiento")
-            print(f"✅ OpenAI respondió: {respuesta_content[:100]}...")
         
         # NO ENTENDIDO
         elif tipo == "no_entendido":
@@ -235,7 +420,6 @@ def Compras_IA():
         # CONSULTA DE DATOS
         else:
             try:
-                print(f"📊 Ejecutando consulta tipo: {tipo}")
                 resultado_sql = ejecutar_consulta_por_tipo(tipo, parametros)
                 
                 if isinstance(resultado_sql, pd.DataFrame):
@@ -248,7 +432,6 @@ def Compras_IA():
                     respuesta_content = str(resultado_sql)
                 
             except Exception as e:
-                print(f"❌ Error: {e}")
                 respuesta_content = f"❌ Error: {str(e)}"
         
         # Agregar respuesta al historial
@@ -256,8 +439,9 @@ def Compras_IA():
             "role": "assistant",
             "content": respuesta_content,
             "df": respuesta_df,
+            "tipo": tipo,
+            "pregunta": pregunta,
             "timestamp": datetime.now().timestamp()
         })
         
-        print("🔄 Haciendo rerun...")
         st.rerun()
