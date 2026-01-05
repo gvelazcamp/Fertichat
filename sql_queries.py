@@ -173,8 +173,7 @@ def _sql_total_num_expr_general() -> str:
 def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
     """Ejecuta consulta SQL y retorna DataFrame."""
     try:
-        conn = get_db_connection()
-        if not conn:
+        conn = get_db_connection()        if not conn:
             return pd.DataFrame()
 
         if params is None:
@@ -327,14 +326,13 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
             "Moneda",
             {total_expr} AS Total
         FROM chatbot_raw 
-        WHERE LOWER("Cliente / Proveedor") LIKE %s
+        WHERE LOWER(REGEXP_REPLACE(TRIM("Cliente / Proveedor"), '\s+', ' ', 'g')) LIKE %s
           AND TRIM("Mes") = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         ORDER BY "Fecha" DESC NULLS LAST
     """
 
-    df = ejecutar_consulta(sql, (f"%{proveedor_like}%", mes_key))
-
+    df = ejecutar_consulta(sql, (f"%{proveedor_like.strip().lower()}%", mes_key))
     # =========================
     # FALLBACK AUTOMÁTICO DE MES
     # =========================
