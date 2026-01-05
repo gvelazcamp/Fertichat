@@ -363,21 +363,9 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     texto = pregunta.strip()
     texto_lower = texto.lower().strip()
 
-    # -------- conversacion (solo si es "solo saludo") --------
-    saludos_simples = {
-        "hola", "hola!", "hey", "hey!",
-        "buenos dias", "buen día", "buenas tardes", "buenas noches",
-        "gracias", "chau", "adios", "buenas"
-    }
-    if texto_lower in saludos_simples:
-        return {"tipo": "conversacion", "parametros": {}, "debug": "saludo simple"}
+    # -------- conversacion --------
+    ...
 
-    # -------- conocimiento --------
-    if any(x in texto_lower for x in ["que es ", "qué es ", "para que sirve", "para qué sirve", "como funciona", "cómo funciona"]) and \
-       not any(k in texto_lower for k in ["compra", "compras", "stock", "factura", "proveedor", "gasto", "familia", "comparar"]):
-        return {"tipo": "conocimiento", "parametros": {}, "debug": "pregunta de conocimiento"}
-
-    # Cargar índices BD
     idx_prov, idx_art = _get_indices()
     provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
     arts = _match_best(texto_lower, idx_art, max_items=MAX_ARTICULOS)
@@ -386,17 +374,12 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     meses_nombre = _extraer_meses_nombre(texto_lower)
     meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
 
-# ==========================================================
-# COMPARAR COMPRAS PROVEEDOR MES VS MES
-# - comparar compras roche junio julio 2025
-# - comparar compras roche 2025-06 2025-07
-# ==========================================================
-if "comparar" in texto_lower and "compra" in texto_lower:
+    # ==========================================================
+    # COMPARAR COMPRAS PROVEEDOR MES VS MES
+    # ==========================================================
+    if "comparar" in texto_lower and "compra" in texto_lower:
         proveedor = provs[0] if provs else None
 
-        # ==========================================================
-        # FALLBACK: proveedor libre (si no matcheó índice)
-        # ==========================================================
         proveedor_libre = None
         if not proveedor:
             tmp = texto_lower
@@ -418,12 +401,9 @@ if "comparar" in texto_lower and "compra" in texto_lower:
                 "tipo": "no_entendido",
                 "parametros": {},
                 "sugerencia": "No reconocí el proveedor. Probá: comparar compras roche junio julio 2025",
-                "debug": "comparar: proveedor no reconocido (ni índice ni libre)",
+                "debug": "comparar: proveedor no reconocido",
             }
 
-        # ==========================================================
-        # meses explícitos YYYY-MM
-        # ==========================================================
         if len(meses_yyyymm) >= 2:
             mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
             return {
@@ -438,9 +418,6 @@ if "comparar" in texto_lower and "compra" in texto_lower:
                 "debug": "comparar proveedor meses (YYYY-MM)",
             }
 
-        # ==========================================================
-        # meses por nombre + año
-        # ==========================================================
         if len(meses_nombre) >= 2 and len(anios) >= 1:
             anio = anios[0]
             mes1 = _to_yyyymm(anio, meses_nombre[0])
@@ -457,9 +434,6 @@ if "comparar" in texto_lower and "compra" in texto_lower:
                 "debug": "comparar proveedor meses (nombre+anio)",
             }
 
-        # ==========================================================
-        # comparar por años
-        # ==========================================================
         if len(anios) >= 2:
             return {
                 "tipo": "comparar_proveedor_anios",
@@ -482,8 +456,19 @@ if "comparar" in texto_lower and "compra" in texto_lower:
     # ==========================================================
     if "stock" in texto_lower:
         if arts:
-            return {"tipo": "stock_articulo", "parametros": {"articulo": arts[0]}, "debug": "stock articulo (bd)"}
+            return {"tipo": "stock_articulo", "parametros": {"articulo": arts[0]}, "debug": "stock articulo"}
         return {"tipo": "stock_total", "parametros": {}, "debug": "stock total"}
+
+    # ==========================================================
+    # DEFAULT
+    # ==========================================================
+    return {
+        "tipo": "no_entendido",
+        "parametros": {},
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025",
+        "debug": "no match",
+    }
+
 
     # ==========================================================
     # OPENAI (opcional)
