@@ -330,164 +330,157 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             return f"🧾 Detalle de factura {nro}:", formatear_dataframe(df), None
         
         
-# =========================================================
-# COMPARACIONES
-# =========================================================
 
-# =========================================================
-# COMPARACIONES
-# =========================================================
+        # =========================================================
+        # COMPARACIONES
+        # =========================================================
 
-if tipo == "comparar_proveedor_meses":
-    proveedor = params.get("proveedor")
-    mes1 = params.get("mes1")
-    mes2 = params.get("mes2")
-    
-    # ✅ FIX: Usar label1 y label2 de params si existen
-    label1 = params.get("label1", mes1)
-    label2 = params.get("label2", mes2)
+        if tipo == "comparar_proveedor_meses":
+            proveedor = params.get("proveedor")
+            mes1 = params.get("mes1")
+            mes2 = params.get("mes2")
+            label1 = params.get("label1", mes1)
+            label2 = params.get("label2", mes2)
 
-    if not proveedor or not mes1 or not mes2:
-        return "❌ Necesito proveedor y dos meses para comparar.", None, None
+            if not proveedor or not mes1 or not mes2:
+                return "❌ Necesito proveedor y dos meses para comparar.", None, None
 
-    # ✅ FIX: Llamar con TODOS los parámetros que espera la función SQL
-    df = get_comparacion_proveedor_meses(
-        proveedor,  # ← proveedor (no lista)
-        mes1,
-        mes2,
-        label1,
-        label2
-    )
+            df = get_comparacion_proveedor_meses(
+                proveedor,
+                mes1,
+                mes2,
+                label1,
+                label2
+            )
 
-    if df is None or df.empty:
-        return f"No encontré datos para comparar {proveedor.upper()} entre {label1} y {label2}.", None, None
+            if df is None or df.empty:
+                return f"No encontré datos para comparar {proveedor.upper()} entre {label1} y {label2}.", None, None
 
-    return (
-        f"📊 Comparación {proveedor.upper()}: {label1} vs {label2}",
-        formatear_dataframe(df),
-        None
-    )
+            return (
+                f"📊 Comparación {proveedor.upper()}: {label1} vs {label2}",
+                formatear_dataframe(df),
+                None
+            )
 
 
-if tipo == "comparar_proveedor_anios":
-    proveedor = params.get("proveedor")
-    anios = sorted(params.get("anios", []))
+        if tipo == "comparar_proveedor_anios":
+            proveedor = params.get("proveedor")
+            anios = sorted(params.get("anios", []))
 
-    if not proveedor or len(anios) < 2:
-        return "❌ Necesito proveedor y al menos dos años para comparar.", None, None
+            if not proveedor or len(anios) < 2:
+                return "❌ Necesito proveedor y al menos dos años para comparar.", None, None
 
-    # ✅ FIX: La función SQL espera [proveedores] como lista
-    df = get_comparacion_proveedor_anios_monedas(
-        anios,
-        [proveedor]  # ← Lista de proveedores
-    )
+            df = get_comparacion_proveedor_anios_monedas(
+                anios,
+                [proveedor]
+            )
 
-    if df is None or df.empty:
-        return f"No encontré datos para comparar {proveedor.upper()}.", None, None
+            if df is None or df.empty:
+                return f"No encontré datos para comparar {proveedor.upper()}.", None, None
 
-    anios_str = " vs ".join(map(str, anios))
-    return (
-        f"📊 Comparación {proveedor.upper()}: {anios_str}",
-        formatear_dataframe(df),
-        None
-    )
-
-
-if tipo == "comparar_articulo_meses":
-    articulo = params.get("articulo")
-    mes1 = params.get("mes1")
-    mes2 = params.get("mes2")
-
-    if not articulo or not mes1 or not mes2:
-        return "❌ Falta artículo o meses.", None, None
-
-    label1 = params.get("label1", mes1)
-    label2 = params.get("label2", mes2)
-
-    df = get_comparacion_articulo_meses(
-        mes1,
-        mes2,
-        label1,
-        label2,
-        [articulo]  # ← Lista de artículos
-    )
-
-    if df is None or df.empty:
-        return f"No encontré datos para comparar {articulo}.", None, None
-
-    return (
-        f"📊 Comparación {articulo.upper()}: {label1} vs {label2}",
-        formatear_dataframe(df),
-        None
-    )
+            anios_str = " vs ".join(map(str, anios))
+            return (
+                f"📊 Comparación {proveedor.upper()}: {anios_str}",
+                formatear_dataframe(df),
+                None
+            )
 
 
-if tipo == "comparar_articulo_anios":
-    articulo = params.get("articulo")
-    anios = sorted(params.get("anios", []))
+        if tipo == "comparar_articulo_meses":
+            articulo = params.get("articulo")
+            mes1 = params.get("mes1")
+            mes2 = params.get("mes2")
 
-    if not articulo or len(anios) < 2:
-        return "❌ Falta artículo o años.", None, None
+            if not articulo or not mes1 or not mes2:
+                return "❌ Falta artículo o meses.", None, None
 
-    df = get_comparacion_articulo_anios(anios, articulo)
+            label1 = params.get("label1", mes1)
+            label2 = params.get("label2", mes2)
 
-    if df is None or df.empty:
-        return f"No encontré datos para comparar {articulo}.", None, None
+            df = get_comparacion_articulo_meses(
+                mes1,
+                mes2,
+                label1,
+                label2,
+                [articulo]
+            )
 
-    anios_str = " vs ".join(map(str, anios))
-    return (
-        f"📊 Comparación {articulo.upper()}: {anios_str}",
-        formatear_dataframe(df),
-        None
-    )
+            if df is None or df.empty:
+                return f"No encontré datos para comparar {articulo}.", None, None
 
-
-if tipo == "comparar_familia_meses":
-    mes1 = params.get("mes1")
-    mes2 = params.get("mes2")
-    moneda = params.get("moneda", "$")
-
-    if not mes1 or not mes2:
-        return "❌ Necesito dos meses para comparar.", None, None
-
-    label1 = params.get("label1", mes1)
-    label2 = params.get("label2", mes2)
-
-    df = get_comparacion_familia_meses_moneda(
-        mes1,
-        mes2,
-        label1,
-        label2,
-        moneda
-    )
-
-    if df is None or df.empty:
-        return "No encontré datos para comparar.", None, None
-
-    return (
-        f"📊 Comparación familias: {label1} vs {label2} ({moneda})",
-        formatear_dataframe(df),
-        None
-    )
+            return (
+                f"📊 Comparación {articulo.upper()}: {label1} vs {label2}",
+                formatear_dataframe(df),
+                None
+            )
 
 
-if tipo == "comparar_familia_anios":
-    anios = sorted(params.get("anios", []))
+        if tipo == "comparar_articulo_anios":
+            articulo = params.get("articulo")
+            anios = sorted(params.get("anios", []))
 
-    if len(anios) < 2:
-        return "❌ Necesito al menos dos años para comparar.", None, None
+            if not articulo or len(anios) < 2:
+                return "❌ Falta artículo o años.", None, None
 
-    df = get_comparacion_familia_anios_monedas(anios)
+            df = get_comparacion_articulo_anios(anios, articulo)
 
-    if df is None or df.empty:
-        return "No encontré datos para comparar.", None, None
+            if df is None or df.empty:
+                return f"No encontré datos para comparar {articulo}.", None, None
 
-    anios_str = " vs ".join(map(str, anios))
-    return (
-        f"📊 Comparación familias: {anios_str}",
-        formatear_dataframe(df),
-        None
-    )
+            anios_str = " vs ".join(map(str, anios))
+            return (
+                f"📊 Comparación {articulo.upper()}: {anios_str}",
+                formatear_dataframe(df),
+                None
+            )
+
+
+        if tipo == "comparar_familia_meses":
+            mes1 = params.get("mes1")
+            mes2 = params.get("mes2")
+            moneda = params.get("moneda", "$")
+
+            if not mes1 or not mes2:
+                return "❌ Necesito dos meses para comparar.", None, None
+
+            label1 = params.get("label1", mes1)
+            label2 = params.get("label2", mes2)
+
+            df = get_comparacion_familia_meses_moneda(
+                mes1,
+                mes2,
+                label1,
+                label2,
+                moneda
+            )
+
+            if df is None or df.empty:
+                return "No encontré datos para comparar.", None, None
+
+            return (
+                f"📊 Comparación familias: {label1} vs {label2} ({moneda})",
+                formatear_dataframe(df),
+                None
+            )
+
+
+        if tipo == "comparar_familia_anios":
+            anios = sorted(params.get("anios", []))
+
+            if len(anios) < 2:
+                return "❌ Necesito al menos dos años para comparar.", None, None
+
+            df = get_comparacion_familia_anios_monedas(anios)
+
+            if df is None or df.empty:
+                return "No encontré datos para comparar.", None, None
+
+            anios_str = " vs ".join(map(str, anios))
+            return (
+                f"📊 Comparación familias: {anios_str}",
+                formatear_dataframe(df),
+                None
+            )
 
         
         # =========================================================
