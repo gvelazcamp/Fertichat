@@ -1,7 +1,7 @@
 # =========================
 # SQL QUERIES - SOLO CONSULTAS (POSTGRES / SUPABASE)
 # =========================
-# VERSIÓN FINAL - SIN DUPLICADOS - CORREGIDO
+# VERSIÓN CORREGIDA - get_comparacion_proveedor_anios_like CON LIKE
 # =========================
 
 import os
@@ -326,16 +326,15 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
             "Moneda",
             {total_expr} AS Total
         FROM chatbot_raw 
-        WHERE LOWER(REGEXP_REPLACE(TRIM("Cliente / Proveedor"), '\s+', ' ', 'g')) LIKE %s
+        WHERE LOWER(TRIM("Cliente / Proveedor")) LIKE %s
           AND TRIM("Mes") = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         ORDER BY "Fecha" DESC NULLS LAST
     """
 
-    df = ejecutar_consulta(sql, (f"%{proveedor_like.strip().lower()}%", mes_key))
-    # =========================
+    df = ejecutar_consulta(sql, (f"%{proveedor_like}%", mes_key))
+
     # FALLBACK AUTOMÁTICO DE MES
-    # =========================
     if df.empty:
         mes_alt = get_ultimo_mes_disponible_hasta(mes_key)
         if mes_alt and mes_alt != mes_key:
@@ -480,7 +479,6 @@ def get_detalle_compras_articulo_mes(articulo_like: str, mes_key: str) -> pd.Dat
 def get_detalle_compras_articulo_anio(articulo_like: str, anio: int, limite: int = 500) -> pd.DataFrame:
     """Detalle de compras de un artículo en un año."""
     total_expr = _sql_total_num_expr_general()
-    # ✅ CORREGIDO: limite siempre tiene valor por defecto
     if limite is None:
         limite = 500
     sql = f"""
@@ -678,9 +676,7 @@ def get_comparacion_proveedor_meses(*args, **kwargs) -> pd.DataFrame:
        donde proveedores puede ser ["ROCHE"] o None
     """
 
-    # -------------------------
-    # 1) Normalizar inputs
-    # -------------------------
+    # Normalizar inputs
     proveedor = None
     mes1 = None
     mes2 = None
@@ -723,7 +719,7 @@ def get_comparacion_proveedor_meses(*args, **kwargs) -> pd.DataFrame:
             if len(args) >= 5:
                 label2 = args[4]
 
-    # Defaults de labels (arregla tu error actual: llamada con 3 args)
+    # Defaults de labels
     if mes1 is None or mes2 is None:
         return pd.DataFrame()
 
@@ -732,16 +728,14 @@ def get_comparacion_proveedor_meses(*args, **kwargs) -> pd.DataFrame:
     if not label2:
         label2 = mes2
 
-    # Sanitizar labels (evita romper SQL por comillas)
+    # Sanitizar labels
     label1_sql = str(label1).replace('"', '').strip()
     label2_sql = str(label2).replace('"', '').strip()
 
     total_expr = _sql_total_num_expr_general()
     proveedor_norm = (proveedor or "").strip().lower()
 
-    # -------------------------
-    # 2) WHERE dinámico (con o sin proveedor)
-    # -------------------------
+    # WHERE dinámico (con o sin proveedor)
     prov_where = ""
     prov_param = []
     if proveedor_norm:
@@ -803,38 +797,10 @@ def get_comparacion_articulo_anios(anios: List[int], articulo_like: str) -> pd.D
     """
     return ejecutar_consulta(sql, (f"%{articulo_like.lower()}%",))
 
-def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) -> pd.DataFrame:
-    """
-    Compras por proveedor específico entre años.
-    Comparación precisa asegurando que el filtro funciona correctamente.
-    """
-    # Asegurarnos de que el proveedor sea manejado como exacto o bien trim/reduce para evitar ruidos.
-    proveedor_like = proveedor_like.strip().lower()
 
-    # Validar al menos dos años
-    if len(anios) < 2:
-        return pd.DataFrame()
-
-    a1, a2 = anios[0], anios[1]
-
-    # Ensamblar SQL con filtro de años y proveedor
-    total_expr = _sql_total_num_expr_general()
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a1}",
-            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a2}"
-        FROM chatbot_raw
-        WHERE LOWER(TRIM("Cliente / Proveedor")) = %s
-          AND "Año"::int IN (%s, %s)
-        GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY Proveedor
-    """
-
-    params = (a1, a2, proveedor_like, a1, a2)
-
-    return ejecutar_consulta(sql, params)
-
+# =====================================================================
+# ✅ FUNCIÓN CORREGIDA - get_comparacion_proveedor_anios_like
+# =====================================================================
 def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) -> pd.DataFrame:
     """
     ✅ CORREGIDO: Usa LIKE en vez de = para buscar proveedores.
@@ -886,30 +852,46 @@ def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) 
         a2,                        # segundo año en IN
     )
     
-    # Debug (opcional, comentar en producción)
-    if os.getenv("DEBUG_SQL") == "1":
-        print(f"\n🔍 DEBUG SQL:")
-        print(f"   Proveedor LIKE: '%{proveedor_like}%'")
-        print(f"   Años: {a1}, {a2}")
-        print(f"   Params: {params}")
-    
     return ejecutar_consulta(sql, params)
 
 
-# =========================
-# PRUEBA DE LA FUNCIÓN (opcional)
-# =========================
-if __name__ == "__main__":
-    # Test rápido
-    print("\n🧪 Probando get_comparacion_proveedor_anios_like...")
-    
-    df = get_comparacion_proveedor_anios_like("tresul", [2024, 2025])
-    
-    if df is not None and not df.empty:
-        print(f"\n✅ Encontrados {len(df)} proveedores:")
-        print(df)
-    else:
-        print("\n❌ No se encontraron resultados
+def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[str] = None) -> pd.DataFrame:
+    """Compara proveedores por años con separación de monedas."""
+    total_pesos = _sql_total_num_expr()
+    total_usd = _sql_total_num_expr_usd()
+    anios = sorted(anios)
+
+    prov_where = ""
+    prov_params = []
+    if proveedores:
+        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
+        prov_params = [f"%{p.lower()}%" for p in proveedores]
+        prov_where = f"AND ({' OR '.join(parts)})"
+
+    cols = []
+    for y in anios:
+        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
+        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
+
+    cols_sql = ",\n            ".join(cols)
+    y_last = anios[-1]
+    order_sql = f'"{y_last}_$" DESC, "{y_last}_USD" DESC'
+    anios_sql = ", ".join(str(y) for y in anios)
+
+    sql = f"""
+        SELECT
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            {cols_sql}
+        FROM chatbot_raw
+        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND "Año"::int IN ({anios_sql})
+          {prov_where}
+        GROUP BY TRIM("Cliente / Proveedor")
+        ORDER BY {order_sql}
+        LIMIT 300
+    """
+    return ejecutar_consulta(sql, tuple(prov_params) if prov_params else None)
+
 
 def get_comparacion_familia_anios_monedas(anios: List[int], familias: List[str] = None) -> pd.DataFrame:
     """Compara familias por años con separación de monedas."""
@@ -1178,7 +1160,6 @@ def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
 def get_ultimo_mes_disponible_hasta(mes_key: str) -> Optional[str]:
     """
     Devuelve el último mes disponible (YYYY-MM) menor o igual al mes_key.
-    Ej: si pedís 2025-11 y no existe, puede devolver 2023-12.
     """
     sql = """
         SELECT MAX(TRIM("Mes")) AS mes
