@@ -31,6 +31,20 @@ MAX_MESES = 6
 MAX_ANIOS = 4
 
 # =====================================================================
+# PROVEEDORES INVÁLIDOS (KEYWORDS QUE NO SON PROVEEDORES)
+# =====================================================================
+PROVEEDORES_INVALIDOS = {
+    "compras",
+    "comparar",
+    "comparame",
+    "compara",
+    "comparativa",
+    "comparativas",
+    "comparativo",
+    "comparativos",
+}
+
+# =====================================================================
 # TABLA CANÓNICA (SOLO COMPARATIVAS)
 # - Esto es el "spec" de funciones: ACCIÓN | OBJETO | TIEMPO | MULTI | TIPO | PARAMS
 # - El texto extra antes/después no importa; nos centramos en mapear a una función (TIPO) con PARAMS.
@@ -315,20 +329,6 @@ def interpretar_comparativas(pregunta: str) -> Dict:
     meses_nombre = _extraer_meses_nombre(texto_lower)
     meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
 
-# =========================
-# DEBUG COMPARATIVAS (VISIBLE)
-# =========================
-if st.session_state.get("DEBUG_MODE", True):
-    st.markdown("### 🐞 Debug comparativa")
-
-    st.code({
-        "pregunta": pregunta,
-        "tipo": res.get("tipo"),
-        "parametros": res.get("parametros"),
-        "debug": res.get("debug"),
-        "sugerencia": res.get("sugerencia"),
-    }, language="python")
-    
     # ==========================================================
     # DETECCIÓN "MODO COMPARATIVA"
     # - Si aparece alguna keyword de comparar, entramos.
@@ -347,13 +347,25 @@ if st.session_state.get("DEBUG_MODE", True):
         # 3) fallback proveedor libre (CLAVE para casos como "tresul" cuando tu tabla proveedores no lo tiene)
         proveedor_libre = _extraer_proveedor_libre(texto_lower)
 
-        proveedor_final = proveedor_alias or proveedor_lista
-
-        if not proveedor_final and proveedor_libre:
-            if proveedor_libre not in PROVEEDORES_INVALIDOS:
-                proveedor_final = proveedor_libre
-
-
+        # =========================
+        # ✅ FIX PRINCIPAL AQUÍ
+        # =========================
+        # Prioridad: alias > libre > lista
+        # (antes era: alias > lista > libre)
+        
+        proveedor_final = None
+        
+        # Primero alias (más específico)
+        if proveedor_alias:
+            proveedor_final = proveedor_alias
+        
+        # Si no hay alias, intentar con proveedor libre (texto crudo)
+        elif proveedor_libre and proveedor_libre not in PROVEEDORES_INVALIDOS:
+            proveedor_final = proveedor_libre
+        
+        # Por último, lista Supabase (puede traer falsos positivos)
+        elif proveedor_lista:
+            proveedor_final = proveedor_lista
 
         # --------------------------
         # SUGERENCIAS si falta "compras"
@@ -464,3 +476,23 @@ if st.session_state.get("DEBUG_MODE", True):
         "sugerencia": "Probá: comparar compras roche 2024 2025 | comparar compras tresul 2024 2025",
         "debug": "comparar: no match",
     }
+
+
+# =========================
+# DEBUG COMPARATIVAS (VISIBLE)
+# =========================
+if __name__ == "__main__":
+    # Test local
+    pruebas = [
+        "comparar compras tresul 2024 2025",
+        "comparar compras biodiagnostico 2024 2025",
+        "comparar compras roche 2024 2025",
+        "comparar compras cabinsur enero febrero 2025",
+    ]
+    
+    for p in pruebas:
+        print(f"\n🔍 Pregunta: {p}")
+        res = interpretar_comparativas(p)
+        print(f"   Tipo: {res.get('tipo')}")
+        print(f"   Params: {res.get('parametros')}")
+        print(f"   Debug: {res.get('debug')}")
