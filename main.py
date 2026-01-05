@@ -144,10 +144,12 @@ st.markdown(f"""
     <hr style="margin-top:16px; border:none; border-top:1px solid #e2e8f0;">
 </div>
 """, unsafe_allow_html=True)
+
 # =========================
-# GO DESDE TARJETAS (QUERY PARAMS) - SOLO COMPRAS
+# MAIN.PY - GO DESDE TARJETAS (QUERY PARAMS) - SOLO COMPRAS
+# PONER ANTES DE ARMAR EL MENU/SIDEBAR
 # =========================
-def _get_queryparam_first(key: str):
+def _get_qp_first(key: str):
     try:
         v = st.query_params.get(key)
         if isinstance(v, list):
@@ -158,18 +160,15 @@ def _get_queryparam_first(key: str):
         lst = qp.get(key)
         return lst[0] if isinstance(lst, list) and lst else None
 
-
-def _clear_queryparams():
+def _clear_qp():
     try:
         st.query_params.clear()
     except Exception:
         st.experimental_set_query_params()
 
-
-_go = _get_queryparam_first("go")
+_go = _get_qp_first("go")
 
 if _go == "compras":
-    # Busca dentro de MENU_OPTIONS la opción real (con emoji o sin)
     _target = None
     for _opt in MENU_OPTIONS:
         if "compras" in (_opt or "").lower():
@@ -177,11 +176,11 @@ if _go == "compras":
             break
 
     if _target:
-        # Asume que tu sidebar/radio usa key="menu" (lo más común en tu proyecto)
         st.session_state["menu"] = _target
 
-    _clear_queryparams()
+    _clear_qp()
     st.rerun()
+
 
 # =========================
 # SIDEBAR
