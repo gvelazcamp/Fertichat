@@ -805,6 +805,43 @@ def get_comparacion_articulo_anios(anios: List[int], articulo_like: str) -> pd.D
     """
     return ejecutar_consulta(sql, (f"%{articulo_like.lower()}%",))
 
+def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) -> pd.DataFrame:
+    """
+    Comparación por proveedor usando LIKE (ej: tresul, biodiagnostico, roche)
+    NO agrupa por alias, agrupa por proveedor real.
+    """
+    total_expr = _sql_total_num_expr_general()
+    anios = sorted(anios)
+
+    if len(anios) < 2:
+        return pd.DataFrame()
+
+    a1, a2 = anios[0], anios[1]
+
+    sql = f"""
+        SELECT
+            TRIM("Cliente / Proveedor") AS proveedor,
+            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a1}",
+            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a2}"
+        FROM chatbot_raw
+        WHERE
+            ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+            AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+            AND "Año"::int IN (%s, %s)
+        GROUP BY TRIM("Cliente / Proveedor")
+        ORDER BY proveedor
+    """
+
+    params = (
+        a1,
+        a2,
+        f"%{proveedor_like.lower()}%",
+        a1,
+        a2,
+    )
+
+    return ejecutar_consulta(sql, params)
+
 
 def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[str] = None) -> pd.DataFrame:
     """Compara proveedores por años con separación de monedas."""
