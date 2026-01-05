@@ -2,59 +2,73 @@
 # UI_CSS.PY - CSS GLOBAL
 # =========================
 
-CSS_GLOBAL = r"""
+CSS_GLOBAL = """
 <style>
 
-/* ===== RESET BÁSICO ===== */
+/* Ocultar menú Streamlit */
 #MainMenu, footer {
   display: none !important;
 }
 
-/* ===== FORZAR MODO CLARO ===== */
+div[data-testid="stDecoration"] {
+  display: none !important;
+}
+
+/* FORZAR MODO CLARO */
 html, body {
   color-scheme: light !important;
   background: #f6f4ef !important;
-  font-family: Inter, system-ui, sans-serif;
 }
 
-/* ===== CONTENEDOR PRINCIPAL ===== */
+/* Variables */
+:root {
+  --bg-main: #f6f4ef;
+  --bg-secondary: #ffffff;
+  --text-main: #0f172a;
+  --primary: #0b3b60;
+}
+
+/* Fondo general */
 .stApp,
 div[data-testid="stApp"],
 div[data-testid="stAppViewContainer"],
 div[data-testid="stAppViewContainer"] > .main {
   background: linear-gradient(135deg, #f6f4ef, #f3f6fb) !important;
-  color: #0f172a !important;
+  color: var(--text-main) !important;
 }
 
-/* ===== LOGIN - TARJETA ===== */
-div[data-testid="stForm"] {
+/* Tipografía */
+html, body {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] > div {
   background: #ffffff !important;
-  border-radius: 22px !important;
-  padding: 32px 36px !important;
-  box-shadow: 0 20px 45px rgba(15,23,42,0.15) !important;
-  border: 1px solid rgba(15,23,42,0.08) !important;
 }
 
-/* ===== INPUTS ===== */
+section[data-testid="stSidebar"] * {
+  color: var(--text-main) !important;
+}
+
+/* Inputs / select / date */
 div[data-baseweb="input"],
-div[data-baseweb="base-input"] {
+div[data-baseweb="base-input"],
+div[data-baseweb="select"],
+div[data-baseweb="datepicker"],
+textarea {
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
+  color: var(--text-main) !important;
+  border-color: #e2e8f0 !important;
 }
 
-div[data-baseweb="input"] input,
-div[data-baseweb="base-input"] input {
-  color: #0f172a !important;
-  background: transparent !important;
-}
-
-/* ===== BOTÓN ===== */
-button[type="submit"] {
-  background: #0b3b60 !important;
-  color: #ffffff !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
+/* Toolbar (campana / share / menú) — OCULTO */
+[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+[data-testid="stBaseButton-header"],
+button[kind="header"],
+button[kind="headerNoPadding"] {
+  display: none !important;
 }
 
 </style>
