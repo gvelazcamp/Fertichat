@@ -202,6 +202,7 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
 def _resolver_proveedor_alias(texto_lower: str, idx_prov: List[Tuple[str, str]]) -> Optional[str]:
     alias_terms = [
         "tresul",
+        "laboratorio tresul",
         "biodiagnostico",
         "cabinsur",
         "roche",
