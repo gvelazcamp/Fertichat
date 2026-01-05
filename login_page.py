@@ -1,7 +1,7 @@
 # =====================================================================
 # 🔐 PÁGINA DE LOGIN - FERTI CHAT
 # =====================================================================
-# Login por USUARIO (SIN CSS – hereda CSS_GLOBAL)
+# Login por USUARIO (SIN CSS OSCURO – hereda CSS_GLOBAL)
 # =====================================================================
 
 import streamlit as st
@@ -19,7 +19,7 @@ def show_logo():
         <div style="text-align:center; padding:10px 0 30px 0;">
             <div style="
                 display:inline-block;
-                background: rgba(255,255,255,0.9);
+                background: rgba(255,255,255,0.90);
                 border-radius: 20px;
                 padding: 20px 40px;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.10);
@@ -35,7 +35,7 @@ def show_logo():
                     letter-spacing: -1px;
                 ">🦋 FertiChat</h1>
                 <p style="
-                    color: #64748b;
+                    color: #475569;
                     font-size: 15px;
                     margin: 8px 0 0 0;
                     font-weight: 500;
@@ -49,7 +49,7 @@ def show_footer():
     st.markdown("""
         <div style="
             text-align: center;
-            color: rgba(255,255,255,0.85);
+            color: #64748b;
             font-size: 13px;
             padding-top: 30px;
             font-weight: 500;
@@ -66,7 +66,7 @@ def login_form():
     with st.form("login_form", clear_on_submit=False):
 
         st.markdown(
-            "<p style='text-align:center;'>Ingresá tus credenciales para continuar</p>",
+            "<p style='text-align:center; color:#334155;'>Ingresá tus credenciales para continuar</p>",
             unsafe_allow_html=True
         )
 
@@ -92,7 +92,7 @@ def change_password_form():
     with st.form("change_password_form", clear_on_submit=True):
 
         st.markdown(
-            "<p style='text-align:center;'>Actualizá tu contraseña de acceso</p>",
+            "<p style='text-align:center; color:#334155;'>Actualizá tu contraseña de acceso</p>",
             unsafe_allow_html=True
         )
 
@@ -122,7 +122,7 @@ def change_password_form():
 # =====================================================================
 
 def show_login_page():
-    # Marcador: el CSS global detecta login con esto
+    # Marcador: CSS_GLOBAL puede detectar login si lo necesita
     st.markdown('<div id="fc-login-marker"></div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
