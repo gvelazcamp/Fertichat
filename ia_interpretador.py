@@ -46,6 +46,18 @@ MAX_ARTICULOS = 5
 MAX_MESES = 6
 MAX_ANIOS = 4
 
+EJEMPLOS DE PROVEEDORES (CANÓNICOS OBLIGATORIOS):
+
+- ROCHE:
+  Incluye: "roche", "roche laboratorio", "roche diagnostics",
+            "roche international", "roche international ltd"
+
+- BIODIAGNOSTICO:
+  Incluye: "biodiagnostico", "biodiagnóstico",
+            "cabinsur", "cabin sur", "cabinsur srl"
+
+- TRESUL:
+  Incluye: "tresul", "tresul s.a", "laboratorio tresul"
 # =====================================================================
 # TABLA DE TIPOS
 # =====================================================================
@@ -70,16 +82,64 @@ TABLA_TIPOS = """
 # =====================================================================
 # TABLA CANÓNICA (50 combinaciones) - guía para IA (si se usa)
 # =====================================================================
+# =====================================================================
+# TABLA CANÓNICA (50 combinaciones permitidas) - PARA GUIAR A LA IA
+# (No rompe nada: es guía / contrato mental del intérprete)
+# =====================================================================
+
 TABLA_CANONICA_50 = r"""
-(la dejo igual que antes; si querés que sea literal con 50 filas, se puede, pero no afecta la lógica)
-- compras + proveedor + mes
-- compras + proveedor + año
-- compras + mes
-- compras + año
-- comparar compras + proveedor + mes mes + año
-- comparar compras + proveedor + año año
-- stock + artículo
-- stock total
+| # | ACCIÓN | OBJETO | TIEMPO | MULTI | TIPO (output) | PARAMS |
+|---|--------|--------|--------|-------|---------------|--------|
+| 01 | compras | (ninguno) | anio | no | compras_anio | anio |
+| 02 | compras | (ninguno) | mes | no | compras_mes | mes |
+| 03 | compras | proveedor | anio | no | compras_proveedor_anio | proveedor, anio |
+| 04 | compras | proveedor | mes | no | compras_proveedor_mes | proveedor, mes |
+| 05 | compras | proveedor | mes | si (<=5) | compras_proveedor_mes | proveedor(s), mes |
+| 06 | compras | proveedor | anio | si (<=5) | compras_proveedor_anio | proveedor(s), anio |
+| 07 | compras | (ninguno) | meses | si (<=6) | compras_mes | mes(s) |
+| 08 | compras | (ninguno) | anios | si (<=4) | compras_anio | anio(s) |
+| 09 | compras | articulo | (ninguno) | no | facturas_articulo | articulo |
+| 10 | compras | articulo | anio | no | facturas_articulo | articulo (+ filtro anio si existiera) |
+| 11 | compras | articulo | mes | no | facturas_articulo | articulo (+ filtro mes si existiera) |
+| 12 | stock | (ninguno) | (ninguno) | no | stock_total | - |
+| 13 | stock | articulo | (ninguno) | no | stock_articulo | articulo |
+| 14 | ultima_factura | articulo | (ninguno) | no | ultima_factura | patron |
+| 15 | ultima_factura | proveedor | (ninguno) | no | ultima_factura | patron |
+| 16 | comparar | proveedor | mes+mes (mismo anio) | no | comparar_proveedor_meses | proveedor, mes1, mes2, label1, label2 |
+| 17 | comparar | proveedor | anio+anio | no | comparar_proveedor_anios | proveedor, anios |
+| 18 | comparar compras | proveedor | mes+mes | no | comparar_proveedor_meses | proveedor, mes1, mes2 |
+| 19 | comparar compras | proveedor | anio+anio | no | comparar_proveedor_anios | proveedor, anios |
+| 20 | comparar | proveedor+proveedor | mismo mes | si (<=5) | compras_proveedor_mes | proveedor(s), mes |
+| 21 | comparar | proveedor+proveedor | mismo anio | si (<=5) | compras_proveedor_anio | proveedor(s), anio |
+| 22 | comparar | proveedor | meses (lista) | si (<=6) | comparar_proveedor_meses | proveedor, mes1, mes2 (si hay 2) |
+| 23 | comparar | proveedor | anios (lista) | si (<=4) | comparar_proveedor_anios | proveedor, anios |
+| 24 | compras | proveedor | "este mes" | no | compras_proveedor_mes | proveedor, mes(actual) |
+| 25 | compras | (ninguno) | "este mes" | no | compras_mes | mes(actual) |
+| 26 | compras | proveedor | "este anio" | no | compras_proveedor_anio | proveedor, anio(actual) |
+| 27 | compras | (ninguno) | "este anio" | no | compras_anio | anio(actual) |
+| 28 | compras | proveedor | mes (YYYY-MM) | no | compras_proveedor_mes | proveedor, mes |
+| 29 | compras | (ninguno) | mes (YYYY-MM) | no | compras_mes | mes |
+| 30 | comparar compras | proveedor | mes(YYYY-MM)+mes(YYYY-MM) | no | comparar_proveedor_meses | proveedor, mes1, mes2 |
+| 31 | comparar compras | proveedor | anio+anio | no | comparar_proveedor_anios | proveedor, anios |
+| 32 | compras | proveedor | "noviembre 2025" | no | compras_proveedor_mes | proveedor, 2025-11 |
+| 33 | compras | (ninguno) | "noviembre 2025" | no | compras_mes | 2025-11 |
+| 34 | comparar compras | proveedor | "junio julio 2025" | no | comparar_proveedor_meses | proveedor, 2025-06, 2025-07 |
+| 35 | comparar compras | proveedor | "noviembre diciembre 2025" | no | comparar_proveedor_meses | proveedor, 2025-11, 2025-12 |
+| 36 | comparar compras | proveedor | "2024 2025" | no | comparar_proveedor_anios | proveedor, [2024,2025] |
+| 37 | compras | proveedor | "2025" | no | compras_proveedor_anio | proveedor, 2025 |
+| 38 | compras | proveedor | "enero 2026" | no | compras_proveedor_mes | proveedor, 2026-01 |
+| 39 | compras | proveedor | "enero" (sin año) | no | compras_proveedor_mes | proveedor, mes(actual o pedir año) |
+| 40 | compras | (ninguno) | "enero" (sin año) | no | compras_mes | mes(actual o pedir año) |
+| 41 | comparar compras | proveedor | "enero febrero" (sin año) | no | comparar_proveedor_meses | proveedor, pedir año |
+| 42 | compras | proveedor | rango meses | si | compras_proveedor_mes | proveedor, mes(s) |
+| 43 | compras | proveedor | rango anios | si | compras_proveedor_anio | proveedor, anio(s) |
+| 44 | compras | proveedor+proveedor | mes | si | compras_proveedor_mes | proveedor(s), mes |
+| 45 | compras | proveedor+proveedor | anio | si | compras_proveedor_anio | proveedor(s), anio |
+| 46 | comparar | proveedor | mes vs mes | no | comparar_proveedor_meses | proveedor, mes1, mes2 |
+| 47 | comparar | proveedor | anio vs anio | no | comparar_proveedor_anios | proveedor, anios |
+| 48 | stock | proveedor | (ninguno) | no | no_entendido | sugerir: "compras proveedor ..." |
+| 49 | compras | articulo | (texto libre) | no | facturas_articulo | articulo |
+| 50 | no | (ambiguo) | (ambiguo) | - | no_entendido | sugerencia |
 """
 
 # =====================================================================
@@ -151,22 +211,34 @@ def _cargar_listas_supabase() -> Dict[str, List[str]]:
 
     return {"proveedores": proveedores, "articulos": articulos}
 
+
 def _get_indices() -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
     listas = _cargar_listas_supabase()
     prov = [(p, _key(p)) for p in (listas.get("proveedores") or []) if p]
     art = [(a, _key(a)) for a in (listas.get("articulos") or []) if a]
     return prov, art
 
+
 def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) -> List[str]:
     toks = _tokens(texto)
     if not toks or not index:
         return []
 
+    # ==========================================================
+    # 1) PRIORIDAD ABSOLUTA: MATCH EXACTO
+    # ==========================================================
+    toks_set = set(toks)
+    for orig, norm in index:
+        if norm in toks_set:
+            return [orig]
+
+    # ==========================================================
+    # 2) FALLBACK: substring + score (lógica original)
+    # ==========================================================
     candidatos: List[Tuple[int, str]] = []
     for orig, norm in index:
         for tk in toks:
             if tk and tk in norm:
-                # score: token largo manda, y preferimos nombre más específico
                 score = (len(tk) * 1000) - len(norm)
                 candidatos.append((score, orig))
 
@@ -182,7 +254,35 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
             out.append(orig)
         if len(out) >= max_items:
             break
+
     return out
+
+
+# =====================================================================
+# RESOLUCIÓN FINAL: PROVEEDOR → SI NO, ARTÍCULO
+# =====================================================================
+def detectar_proveedor_o_articulo(texto: str) -> Dict[str, List[str]]:
+    prov_index, art_index = _get_indices()
+
+    proveedores = _match_best(texto, prov_index, max_items=1)
+    if proveedores:
+        return {
+            "tipo": "proveedor",
+            "valores": proveedores,
+        }
+
+    articulos = _match_best(texto, art_index, max_items=1)
+    if articulos:
+        return {
+            "tipo": "articulo",
+            "valores": articulos,
+        }
+
+    return {
+        "tipo": "ninguno",
+        "valores": [],
+    }
+
 
 # =====================================================================
 # PARSEO TIEMPO
