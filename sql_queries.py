@@ -668,35 +668,42 @@ def get_facturas_de_articulo(patron_articulo: str, solo_ultima: bool = False) ->
 # COMPARACIONES POR MESES
 # =====================================================================
 
-def get_comparacion_proveedor_meses(mes1: str, mes2: str, label1: str, label2: str, proveedores: List[str] = None) -> pd.DataFrame:
-    """Compara proveedores entre dos meses."""
-    total_expr = _sql_total_num_expr_general()
+def get_comparacion_proveedor_meses(
+    proveedor: str,
+    mes1: str,
+    mes2: str,
+    label1: str,
+    label2: str
+) -> pd.DataFrame:
+    """Compara compras de un proveedor entre dos meses."""
 
-    prov_where = ""
-    prov_params = []
-    if proveedores:
-        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
-        prov_params = [f"%{p.lower()}%" for p in proveedores]
-        prov_where = f"AND ({' OR '.join(parts)})"
+    total_expr = _sql_total_num_expr_general()
+    proveedor = (proveedor or "").strip().lower()
 
     sql = f"""
         SELECT
-            TRIM("Cliente / Proveedor") AS Concepto,
+            TRIM("Cliente / Proveedor") AS Proveedor,
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label1}",
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label2}",
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) -
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS Diferencia
         FROM chatbot_raw
         WHERE TRIM("Mes") IN (%s, %s)
+          AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          {prov_where}
         GROUP BY TRIM("Cliente / Proveedor")
-        HAVING SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
-            OR SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
         ORDER BY Diferencia DESC
     """
-    params = (mes1, mes2, mes2, mes1, mes1, mes2, *prov_params, mes1, mes2)
+
+    params = (
+        mes1, mes2,
+        mes2, mes1,
+        mes1, mes2,
+        f"%{proveedor}%"
+    )
+
     return ejecutar_consulta(sql, params)
+
 
 
 def get_comparacion_articulo_meses(mes1: str, mes2: str, label1: str, label2: str, articulos: List[str] = None) -> pd.DataFrame:
