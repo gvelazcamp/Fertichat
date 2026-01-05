@@ -1,5 +1,5 @@
 # =========================
-# IA_COMPARATIVAS.PY - INTÉRPRETE COMPARATIVAS (CANÓNICO)
+# IA_COMPARATIVAS.PY - INTÉRPRETE COMPARATIVAS (CORREGIDO)
 # =========================
 
 import os
