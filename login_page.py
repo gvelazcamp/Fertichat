@@ -1,7 +1,7 @@
 # =====================================================================
 # 🔐 PÁGINA DE LOGIN - FERTI CHAT
 # =====================================================================
-# Login por USUARIO (CON CSS SOLO PARA LOGIN)
+# Login por USUARIO (SIN CSS – hereda CSS_GLOBAL desde main.py)
 # =====================================================================
 
 import streamlit as st
@@ -9,202 +9,6 @@ from auth import login_user, change_password, init_db
 
 # Inicializar base de datos
 init_db()
-
-# =====================================================================
-# 🎨 CSS DEL LOGIN (solo se inyecta cuando se muestra el login)
-# =====================================================================
-
-LOGIN_CSS = """
-<style>
-    /* Ocultar elementos de Streamlit (login) */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header[data-testid="stHeader"] {visibility: hidden !important;}
-    .stDeployButton {display: none !important;}
-
-    /* Toolbar / Share / botones header (login) */
-    [data-testid="stToolbar"],
-    [data-testid="stToolbarActions"],
-    [data-testid="stToolbarActionButton"],
-    [data-testid="stBaseButton-header"],
-    [data-testid="stBaseButton-headerNoPadding"],
-    .stAppToolbar {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        overflow: hidden !important;
-    }
-
-    /* Fondo violeta como tu captura */
-    .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%) !important;
-        min-height: 100vh;
-    }
-
-    /* Contenedor */
-    .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
-    }
-
-    /* Tarjeta del formulario (glass) */
-    [data-testid="stForm"] {
-        background: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 24px !important;
-        padding: 32px 36px !important;
-        border: none !important;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15) !important;
-        backdrop-filter: blur(10px) !important;
-    }
-
-    /* =========================================================
-       FIX MOBILE: INPUTS + BOTÓN OJO (evitar zona negra)
-    ========================================================= */
-
-    /* Wrapper BaseWeb (incluye el botón del ojo) */
-    div[data-baseweb="base-input"],
-    div[data-baseweb="input"]{
-        background: #f8fafc !important;
-        border: 2px solid #e2e8f0 !important;
-        border-radius: 12px !important;
-        box-shadow: none !important;
-        overflow: hidden !important;
-    }
-
-    /* Focus wrapper */
-    div[data-baseweb="base-input"]:focus-within,
-    div[data-baseweb="input"]:focus-within{
-        border-color: #667eea !important;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2) !important;
-    }
-
-    /* Input real */
-    div[data-baseweb="base-input"] input,
-    div[data-baseweb="input"] input{
-        border: none !important;
-        outline: none !important;
-        background: transparent !important;
-        color: #1e293b !important;
-        -webkit-text-fill-color: #1e293b !important;
-        padding: 12px 16px !important;
-        font-size: 16px !important;
-    }
-
-    /* Botón ojo */
-    div[data-baseweb="base-input"] button,
-    div[data-baseweb="input"] button{
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: #475569 !important;
-        padding-right: 10px !important;
-    }
-
-    /* Disabled: “Fertilab” legible */
-    div[data-baseweb="base-input"] input:disabled,
-    div[data-baseweb="input"] input:disabled{
-        color: #0f172a !important;
-        -webkit-text-fill-color: #0f172a !important;
-        opacity: 1 !important;
-        background: transparent !important;
-    }
-
-    /* Placeholder */
-    div[data-baseweb="base-input"] input::placeholder,
-    div[data-baseweb="input"] input::placeholder{
-        color: #64748b !important;
-        -webkit-text-fill-color: #64748b !important;
-        opacity: 1 !important;
-    }
-
-    /* Labels */
-    label {
-        color: #374151 !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-        margin-bottom: 6px !important;
-    }
-
-    /* Tabs */
-    [data-baseweb="tab-list"] {
-        background: #f1f5f9 !important;
-        border-radius: 12px !important;
-        padding: 4px !important;
-        gap: 4px !important;
-    }
-
-    button[data-baseweb="tab"] {
-        color: #64748b !important;
-        font-weight: 600 !important;
-        border-radius: 10px !important;
-        padding: 10px 20px !important;
-        background: transparent !important;
-    }
-
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #667eea !important;
-        background: white !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
-    }
-
-    /* Botón principal */
-    .stForm button[kind="secondaryFormSubmit"],
-    .stForm button[type="submit"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border-radius: 12px !important;
-        font-weight: 700 !important;
-        font-size: 16px !important;
-        padding: 14px 28px !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
-        transition: all 0.3s ease !important;
-        text-transform: none !important;
-    }
-
-    .stForm button[kind="secondaryFormSubmit"]:hover,
-    .stForm button[type="submit"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5) !important;
-    }
-
-    /* Alertas */
-    .stAlert {
-        border-radius: 12px !important;
-        border: none !important;
-    }
-
-    [data-testid="stAlert"] {
-        background: #fef2f2 !important;
-        border-left: 4px solid #ef4444 !important;
-    }
-
-    [data-testid="stAlert"][data-baseweb="notification"] {
-        background: #f0fdf4 !important;
-        border-left: 4px solid #22c55e !important;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        [data-testid="stForm"] {
-            padding: 24px 20px !important;
-            border-radius: 20px !important;
-        }
-
-        .block-container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-bottom: 4rem !important;
-        }
-    }
-
-    @media (max-width: 480px) {
-        [data-testid="stForm"] {
-            padding: 22px 18px !important;
-        }
-    }
-</style>
-"""
 
 # =====================================================================
 # UI COMPONENTS
@@ -264,7 +68,6 @@ def show_footer():
 
 def login_form():
     with st.form("login_form", clear_on_submit=False):
-
         st.markdown("""
             <p style="
                 text-align: center;
@@ -298,7 +101,6 @@ def login_form():
 
 def change_password_form():
     with st.form("change_password_form", clear_on_submit=True):
-
         st.markdown("""
             <p style="
                 text-align: center;
@@ -338,8 +140,8 @@ def change_password_form():
 # =====================================================================
 
 def show_login_page():
-    # CSS SOLO PARA LOGIN (para que se vea como tu captura)
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    # Marcador para que el CSS global sepa que está en login
+    st.markdown('<div id="fc-login-marker" style="display:none"></div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
