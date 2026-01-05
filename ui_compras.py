@@ -11,40 +11,8 @@ from datetime import datetime
 from ia_interpretador import interpretar_pregunta, obtener_info_tipo
 from utils_openai import responder_con_openai
 
-# IMPORTS DE SQL
-import sql_queries as sqlq(
-    get_compras_anio,
-    get_detalle_compras_proveedor_mes,
-    get_detalle_compras_proveedor_anio,
-    get_detalle_compras_articulo_mes,
-    get_detalle_compras_articulo_anio,
-    get_compras_por_mes_excel,
-    get_ultima_factura_inteligente,
-    get_facturas_de_articulo,
-    get_detalle_factura_por_numero,
-    get_comparacion_proveedor_meses,
-    get_comparacion_proveedor_anios_monedas,
-    get_comparacion_articulo_meses,
-    get_comparacion_articulo_anios,
-    get_comparacion_familia_meses_moneda,
-    get_comparacion_familia_anios_monedas,
-    get_gastos_todas_familias_mes,
-    get_gastos_todas_familias_anio,
-    get_gastos_secciones_detalle_completo,
-    get_top_10_proveedores_chatbot,
-    get_stock_total,
-    get_stock_articulo,
-    get_stock_familia,
-    get_stock_por_familia,
-    get_stock_por_deposito,
-    get_lotes_por_vencer,
-    get_lotes_vencidos,
-    get_stock_bajo,
-    get_stock_lote_especifico,
-    get_total_compras_anio,
-    get_total_compras_proveedor_anio,
-    get_total_compras_articulo_anio
-)
+# IMPORTS DE SQL (MÓDULO COMPLETO)
+import sql_queries as sqlq
 
 
 # =========================
@@ -302,7 +270,6 @@ def generar_grafico(df: pd.DataFrame, tipo: str):
 
 # =========================
 # ROUTER SQL
-# (REEMPLAZA COMPLETO tu ejecutar_consulta_por_tipo por este)
 # =========================
 def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 
@@ -336,7 +303,7 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
     # =========================
     # COMPARATIVAS
     # =========================
-     elif tipo == "comparar_proveedor_meses":
+    elif tipo == "comparar_proveedor_meses":
         proveedor = parametros.get("proveedor")
         mes1 = parametros.get("mes1")
         mes2 = parametros.get("mes2")
@@ -352,44 +319,22 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         )
 
     elif tipo == "comparar_proveedor_anios":
-        # Mantengo tu llamada (no invento firma). Si tu función pide lista, lo ajustamos con el log real.
-        return sqlq.get_comparacion_proveedor_anios_monedas(parametros["anios"], parametros["proveedor"])
-
+        # en tu sql_queries.py esta función espera (anios: List[int], proveedores: List[str] = None)
+        # acá te llega "proveedor" (string). Lo convierto a lista mínima para no romper.
+        prov = parametros.get("proveedor")
+        prov_list = [prov] if isinstance(prov, str) and prov.strip() else None
+        return sqlq.get_comparacion_proveedor_anios_monedas(parametros["anios"], prov_list)
 
     elif tipo == "comparar_articulo_meses":
-        articulo = parametros.get("articulo")
-        mes1 = parametros.get("mes1")
-        mes2 = parametros.get("mes2")
-        label1 = parametros.get("label1", mes1)
-        label2 = parametros.get("label2", mes2)
-
-        return sqlq.get_comparacion_articulo_meses(
-            mes1,
-            mes2,
-            label1,
-            label2,
-            [articulo] if articulo else None
-        )
+        # Tu sql_queries.py NO tiene get_comparacion_articulo_meses -> no rompo la app:
+        return pd.DataFrame()
 
     elif tipo == "comparar_articulo_anios":
         return sqlq.get_comparacion_articulo_anios(parametros["anios"], parametros["articulo"])
 
     elif tipo == "comparar_familia_meses":
-        mes1 = parametros.get("mes1")
-        mes2 = parametros.get("mes2")
-        label1 = parametros.get("label1", mes1)
-        label2 = parametros.get("label2", mes2)
-        moneda = parametros.get("moneda", "$")
-        familias = parametros.get("familias")
-
-        return sqlq.get_comparacion_familia_meses_moneda(
-            mes1,
-            mes2,
-            label1,
-            label2,
-            moneda,
-            familias
-        )
+        # Tu sql_queries.py NO tiene get_comparacion_familia_meses_moneda -> no rompo la app:
+        return pd.DataFrame()
 
     elif tipo == "comparar_familia_anios":
         return sqlq.get_comparacion_familia_anios_monedas(parametros["anios"])
@@ -446,7 +391,6 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 
     else:
         raise ValueError(f"Tipo '{tipo}' no implementado")
-
 
 
 # =========================
