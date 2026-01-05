@@ -257,7 +257,6 @@ def get_valores_unicos() -> dict:
         "articulos": get_lista_articulos()[1:]
     }
 
-
 # =====================================================================
 # COMPRAS POR AÑO (SIN FILTRO DE PROVEEDOR/ARTÍCULO)
 # =====================================================================
@@ -1585,6 +1584,21 @@ def get_stock_bajo(minimo: int = 10) -> pd.DataFrame:
         return ejecutar_consulta(sql, (int(minimo),))
     except Exception:
         return pd.DataFrame()
+
+def resolver_mes_existente(mes_key: str) -> str:
+    """
+    Si el mes existe, lo devuelve.
+    Si no existe, devuelve el último mes disponible menor.
+    """
+    sql = """
+        SELECT MAX(TRIM("Mes")) AS mes
+        FROM chatbot_raw
+        WHERE TRIM("Mes") <= %s
+    """
+    df = ejecutar_consulta(sql, (mes_key,))
+    if df is None or df.empty or not df.iloc[0]["mes"]:
+        return mes_key
+    return df.iloc[0]["mes"]
 
 
 def get_stock_lote_especifico(lote: str) -> pd.DataFrame:
