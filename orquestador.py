@@ -341,22 +341,26 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             label1 = params.get("label1", mes1)
             label2 = params.get("label2", mes2)
 
-            if not proveedor or not mes1 or not mes2:
-                return "❌ Necesito proveedor y dos meses para comparar.", None, None
+            if not mes1 or not mes2:
+                return "❌ Necesito dos meses para comparar.", None, None
+
+            proveedores = [proveedor] if proveedor else None
 
             df = get_comparacion_proveedor_meses(
-                proveedor,
                 mes1,
                 mes2,
                 label1,
-                label2
+                label2,
+                proveedores
             )
 
             if df is None or df.empty:
                 return "No encontré datos para comparar.", None, None
 
+            prov_str = proveedor.upper() if proveedor else "Proveedores"
+
             return (
-                f"📊 Comparación **{proveedor.upper()}**: {label1} vs {label2}:",
+                f"📊 Comparación {prov_str}: {label1} vs {label2}:",
                 formatear_dataframe(df),
                 None
             )
