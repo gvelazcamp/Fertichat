@@ -668,28 +668,98 @@ def get_facturas_de_articulo(patron_articulo: str, solo_ultima: bool = False) ->
 # COMPARACIONES POR MESES
 # =====================================================================
 
-def get_comparacion_proveedor_meses(
-    proveedor: str,
-    mes1: str,
-    mes2: str,
-    label1: str,
-    label2: str
-) -> pd.DataFrame:
-    """Compara compras de un proveedor entre dos meses."""
+def get_comparacion_proveedor_meses(*args, **kwargs) -> pd.DataFrame:
+    """
+    Compatible con 2 firmas (para no romper nada):
+
+    A) Nueva (canónica):
+       get_comparacion_proveedor_meses(proveedor, mes1, mes2, label1, label2)
+
+    B) Vieja (tu versión anterior):
+       get_comparacion_proveedor_meses(mes1, mes2, label1, label2, proveedores=None)
+       donde proveedores puede ser ["ROCHE"] o None
+    """
+
+    # -------------------------
+    # 1) Normalizar inputs
+    # -------------------------
+    proveedor = None
+    mes1 = None
+    mes2 = None
+    label1 = None
+    label2 = None
+
+    # Caso kwargs (si alguien llama con nombres)
+    if kwargs:
+        proveedor = kwargs.get("proveedor", None)
+        mes1 = kwargs.get("mes1", None)
+        mes2 = kwargs.get("mes2", None)
+        label1 = kwargs.get("label1", None)
+        label2 = kwargs.get("label2", None)
+
+        # compat vieja: proveedores=[...]
+        provs = kwargs.get("proveedores", None)
+        if (not proveedor) and isinstance(provs, (list, tuple)) and len(provs) > 0:
+            proveedor = provs[0]
+
+    # Caso args posicionales
+    if args and (mes1 is None and mes2 is None):
+        # Firma vieja: (mes1, mes2, label1, label2, proveedores?)
+        if len(args) >= 4 and isinstance(args[0], str) and isinstance(args[1], str) and (
+            args[0].startswith("202") and args[1].startswith("202")
+        ):
+            mes1 = args[0]
+            mes2 = args[1]
+            label1 = args[2]
+            label2 = args[3]
+            if len(args) >= 5 and isinstance(args[4], (list, tuple)) and len(args[4]) > 0:
+                proveedor = args[4][0]
+        else:
+            # Firma nueva: (proveedor, mes1, mes2, label1?, label2?)
+            if len(args) >= 3:
+                proveedor = args[0]
+                mes1 = args[1]
+                mes2 = args[2]
+            if len(args) >= 4:
+                label1 = args[3]
+            if len(args) >= 5:
+                label2 = args[4]
+
+    # Defaults de labels (arregla tu error actual: llamada con 3 args)
+    if mes1 is None or mes2 is None:
+        return pd.DataFrame()
+
+    if not label1:
+        label1 = mes1
+    if not label2:
+        label2 = mes2
+
+    # Sanitizar labels (evita romper SQL por comillas)
+    label1_sql = str(label1).replace('"', '').strip()
+    label2_sql = str(label2).replace('"', '').strip()
 
     total_expr = _sql_total_num_expr_general()
-    proveedor = (proveedor or "").strip().lower()
+    proveedor_norm = (proveedor or "").strip().lower()
+
+    # -------------------------
+    # 2) WHERE dinámico (con o sin proveedor)
+    # -------------------------
+    prov_where = ""
+    prov_param = []
+    if proveedor_norm:
+        prov_where = 'AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s'
+        prov_param = [f"%{proveedor_norm}%"]
 
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label1}",
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label2}",
+            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label1_sql}",
+            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label2_sql}",
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) -
             SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS Diferencia
         FROM chatbot_raw
         WHERE TRIM("Mes") IN (%s, %s)
-          AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+          {prov_where}
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         GROUP BY TRIM("Cliente / Proveedor")
         ORDER BY Diferencia DESC
@@ -699,77 +769,9 @@ def get_comparacion_proveedor_meses(
         mes1, mes2,
         mes2, mes1,
         mes1, mes2,
-        f"%{proveedor}%"
+        *prov_param
     )
 
-    return ejecutar_consulta(sql, params)
-
-def get_comparacion_articulo_meses(mes1: str, mes2: str, label1: str, label2: str, articulos: List[str] = None) -> pd.DataFrame:
-    """Compara artículos entre dos meses."""
-    total_expr = _sql_total_num_expr_general()
-
-    art_where = ""
-    art_params = []
-    if articulos:
-        parts = [f"LOWER(TRIM(\"Articulo\")) LIKE %s" for _ in articulos]
-        art_params = [f"%{a.lower()}%" for a in articulos]
-        art_where = f"AND ({' OR '.join(parts)})"
-
-    sql = f"""
-        SELECT
-            TRIM("Articulo") AS Concepto,
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label1}",
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label2}",
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) -
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS Diferencia
-        FROM chatbot_raw
-        WHERE TRIM("Mes") IN (%s, %s)
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          {art_where}
-        GROUP BY TRIM("Articulo")
-        HAVING SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
-            OR SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
-        ORDER BY Diferencia DESC
-    """
-    params = (mes1, mes2, mes2, mes1, mes1, mes2, *art_params, mes1, mes2)
-    return ejecutar_consulta(sql, params)
-
-
-def get_comparacion_familia_meses_moneda(mes1: str, mes2: str, label1: str, label2: str, moneda: str = "$", familias: List[str] = None) -> pd.DataFrame:
-    """Compara familias entre dos meses filtrado por moneda."""
-    mon = (moneda or "$").strip().upper()
-    if mon in ("U$S", "U$$", "USD"):
-        total_expr = _sql_total_num_expr_usd()
-        mon_filter = "TRIM(\"Moneda\") IN ('U$S', 'U$$')"
-    else:
-        total_expr = _sql_total_num_expr()
-        mon_filter = "TRIM(\"Moneda\") = '$'"
-
-    fam_where = ""
-    fam_params = []
-    if familias:
-        parts = [f"TRIM(COALESCE(\"Familia\", '')) = %s" for _ in familias]
-        fam_params = list(familias)
-        fam_where = f"AND ({' OR '.join(parts)})"
-
-    sql = f"""
-        SELECT
-            TRIM(COALESCE("Familia", 'SIN FAMILIA')) AS Familia,
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label1}",
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{label2}",
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) -
-            SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS Diferencia
-        FROM chatbot_raw
-        WHERE TRIM("Mes") IN (%s, %s)
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND {mon_filter}
-          {fam_where}
-        GROUP BY TRIM(COALESCE("Familia", 'SIN FAMILIA'))
-        HAVING SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
-            OR SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) > 0
-        ORDER BY Diferencia DESC
-    """
-    params = (mes1, mes2, mes2, mes1, mes1, mes2, *fam_params, mes1, mes2)
     return ejecutar_consulta(sql, params)
 
 
