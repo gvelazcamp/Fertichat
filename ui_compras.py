@@ -8,17 +8,16 @@ import plotly.express as px
 from datetime import datetime
 
 # IMPORTS
-from ia_interpretador import interpretar_pregunta, obtener_info_tipo
+from ia_router import interpretar_pregunta, obtener_info_tipo
 from utils_openai import responder_con_openai
 
-# IMPORTS DE SQL (MÓDULO COMPLETO)
+# IMPORTS DE SQL (evita ImportError por funciones no existentes)
 import sql_queries as sqlq
 
 
 # =========================
 # INICIALIZAR HISTORIAL
 # =========================
-
 def inicializar_historial():
     if "historial_compras" not in st.session_state:
         st.session_state["historial_compras"] = []
@@ -27,7 +26,6 @@ def inicializar_historial():
 # =========================
 # CALCULAR TOTALES POR MONEDA
 # =========================
-
 def calcular_totales_por_moneda(df: pd.DataFrame) -> dict:
     """
     Calcula totales separados por moneda si la columna 'Moneda' existe
@@ -83,7 +81,6 @@ def calcular_totales_por_moneda(df: pd.DataFrame) -> dict:
 # =========================
 # GENERAR EXPLICACIÓN
 # =========================
-
 def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
     """
     Genera una explicación natural y completa de los resultados
@@ -180,7 +177,6 @@ def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
 # =========================
 # GENERAR GRÁFICO
 # =========================
-
 def generar_grafico(df: pd.DataFrame, tipo: str):
     """
     Genera un gráfico según el tipo de consulta
@@ -222,7 +218,13 @@ def generar_grafico(df: pd.DataFrame, tipo: str):
             )
 
             fig.update_traces(texttemplate="$%{text:,.0f}", textposition="outside")
-            fig.update_layout(height=500, xaxis_title="Total", yaxis_title="Proveedor", showlegend=False, xaxis={"tickformat": "$,.0f"})
+            fig.update_layout(
+                height=500,
+                xaxis_title="Total",
+                yaxis_title="Proveedor",
+                showlegend=False,
+                xaxis={"tickformat": "$,.0f"},
+            )
             return fig
 
         # Top 10 artículos por total
@@ -239,7 +241,13 @@ def generar_grafico(df: pd.DataFrame, tipo: str):
             )
 
             fig.update_traces(texttemplate="$%{text:,.0f}", textposition="outside")
-            fig.update_layout(height=500, xaxis_title="Total", yaxis_title="Artículo", showlegend=False, xaxis={"tickformat": "$,.0f"})
+            fig.update_layout(
+                height=500,
+                xaxis_title="Total",
+                yaxis_title="Artículo",
+                showlegend=False,
+                xaxis={"tickformat": "$,.0f"},
+            )
             return fig
 
         # Línea temporal si hay fecha
@@ -315,26 +323,47 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
             mes1,
             mes2,
             label1,
-            label2
+            label2,
         )
 
     elif tipo == "comparar_proveedor_anios":
-        # en tu sql_queries.py esta función espera (anios: List[int], proveedores: List[str] = None)
-        # acá te llega "proveedor" (string). Lo convierto a lista mínima para no romper.
-        prov = parametros.get("proveedor")
-        prov_list = [prov] if isinstance(prov, str) and prov.strip() else None
-        return sqlq.get_comparacion_proveedor_anios_monedas(parametros["anios"], prov_list)
+        # Mantengo tu llamada (no invento firma).
+        return sqlq.get_comparacion_proveedor_anios_monedas(parametros["anios"], parametros["proveedor"])
 
     elif tipo == "comparar_articulo_meses":
-        # Tu sql_queries.py NO tiene get_comparacion_articulo_meses -> no rompo la app:
-        return pd.DataFrame()
+        articulo = parametros.get("articulo")
+        mes1 = parametros.get("mes1")
+        mes2 = parametros.get("mes2")
+        label1 = parametros.get("label1", mes1)
+        label2 = parametros.get("label2", mes2)
+
+        return sqlq.get_comparacion_articulo_meses(
+            mes1,
+            mes2,
+            label1,
+            label2,
+            [articulo] if articulo else None,
+        )
 
     elif tipo == "comparar_articulo_anios":
         return sqlq.get_comparacion_articulo_anios(parametros["anios"], parametros["articulo"])
 
     elif tipo == "comparar_familia_meses":
-        # Tu sql_queries.py NO tiene get_comparacion_familia_meses_moneda -> no rompo la app:
-        return pd.DataFrame()
+        mes1 = parametros.get("mes1")
+        mes2 = parametros.get("mes2")
+        label1 = parametros.get("label1", mes1)
+        label2 = parametros.get("label2", mes2)
+        moneda = parametros.get("moneda", "$")
+        familias = parametros.get("familias")
+
+        return sqlq.get_comparacion_familia_meses_moneda(
+            mes1,
+            mes2,
+            label1,
+            label2,
+            moneda,
+            familias,
+        )
 
     elif tipo == "comparar_familia_anios":
         return sqlq.get_comparacion_familia_anios_monedas(parametros["anios"])
@@ -396,7 +425,6 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 # =========================
 # UI PRINCIPAL
 # =========================
-
 def Compras_IA():
 
     inicializar_historial()
@@ -468,11 +496,13 @@ def Compras_IA():
     pregunta = st.chat_input("Escribí tu consulta...")
 
     if pregunta:
-        st.session_state["historial_compras"].append({
-            "role": "user",
-            "content": pregunta,
-            "timestamp": datetime.now().timestamp(),
-        })
+        st.session_state["historial_compras"].append(
+            {
+                "role": "user",
+                "content": pregunta,
+                "timestamp": datetime.now().timestamp(),
+            }
+        )
 
         resultado = interpretar_pregunta(pregunta)
         tipo = resultado.get("tipo", "")
@@ -508,13 +538,15 @@ def Compras_IA():
             except Exception as e:
                 respuesta_content = f"❌ Error: {str(e)}"
 
-        st.session_state["historial_compras"].append({
-            "role": "assistant",
-            "content": respuesta_content,
-            "df": respuesta_df,
-            "tipo": tipo,
-            "pregunta": pregunta,
-            "timestamp": datetime.now().timestamp(),
-        })
+        st.session_state["historial_compras"].append(
+            {
+                "role": "assistant",
+                "content": respuesta_content,
+                "df": respuesta_df,
+                "tipo": tipo,
+                "pregunta": pregunta,
+                "timestamp": datetime.now().timestamp(),
+            }
+        )
 
         st.rerun()
