@@ -626,17 +626,66 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     }
 
 # =====================================================================
-# MAPEO TIPO → FUNCIÓN SQL (se mantiene como estaba)
+# MAPEO TIPO → FUNCIÓN SQL (CANÓNICO)
 # =====================================================================
 MAPEO_FUNCIONES = {
-    "compras_anio": {"funcion": "get_compras_anio", "params": ["anio"], "resumen": "get_total_compras_anio"},
-    "compras_proveedor_mes": {"funcion": "get_detalle_compras_proveedor_mes", "params": ["proveedor", "mes"]},
-    "compras_proveedor_anio": {"funcion": "get_detalle_compras_proveedor_anio", "params": ["proveedor", "anio"], "resumen": "get_total_compras_proveedor_anio"},
-    "compras_mes": {"funcion": "get_compras_por_mes_excel", "params": ["mes"]},
-    "ultima_factura": {"funcion": "get_ultima_factura_inteligente", "params": ["patron"]},
-    "facturas_articulo": {"funcion": "get_facturas_de_articulo", "params": ["articulo"]},
-    "stock_total": {"funcion": "get_stock_total", "params": []},
-    "stock_articulo": {"funcion": "get_stock_articulo", "params": ["articulo"]},
+    "compras_anio": {
+        "funcion": "get_compras_anio",
+        "params": ["anio"],
+        "resumen": "get_total_compras_anio"
+    },
+
+    "compras_proveedor_anio": {
+        "funcion": "get_detalle_compras_proveedor_anio",
+        "params": ["proveedor", "anio"],
+        "resumen": "get_total_compras_proveedor_anio"
+    },
+
+    "compras_proveedor_mes": {
+        "funcion": "get_detalle_compras_proveedor_mes",
+        "params": ["proveedor", "mes"]
+    },
+
+    "compras_mes": {
+        "funcion": "get_compras_por_mes_excel",
+        "params": ["mes"]
+    },
+
+    # =========================
+    # COMPARATIVAS
+    # =========================
+    "comparar_proveedor_meses": {
+        "funcion": "get_comparacion_proveedor_meses",
+        "params": ["proveedor", "mes1", "mes2", "label1", "label2"]
+    },
+
+    "comparar_proveedor_anios": {
+        "funcion": "get_comparacion_proveedor_anios",
+        "params": ["proveedor", "anios", "label1", "label2"]
+    },
+
+    # =========================
+    # OTROS
+    # =========================
+    "ultima_factura": {
+        "funcion": "get_ultima_factura_inteligente",
+        "params": ["patron"]
+    },
+
+    "facturas_articulo": {
+        "funcion": "get_facturas_de_articulo",
+        "params": ["articulo"]
+    },
+
+    "stock_total": {
+        "funcion": "get_stock_total",
+        "params": []
+    },
+
+    "stock_articulo": {
+        "funcion": "get_stock_articulo",
+        "params": ["articulo"]
+    },
 }
 
 def obtener_info_tipo(tipo: str) -> Optional[Dict]:
