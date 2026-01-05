@@ -17,7 +17,36 @@ div[data-testid="stDecoration"] { display: none !important; }
 :root, html, body, .stApp {
   color-scheme: light !important;
 }
+/* ================================
+   FORZAR LIGHT MODE (ANTI DARK)
+   ================================ */
 
+/* Decirle al navegador que SOLO usamos light */
+:root {
+  color-scheme: light !important;
+}
+
+/* Evitar dark automático de Chrome */
+html {
+  background-color: #f6f4ef !important;
+}
+
+/* Inputs, cards, contenedores */
+* {
+  background-color: inherit;
+}
+
+/* Anti "forced dark" de Chrome */
+@media (prefers-color-scheme: dark) {
+  html, body {
+    background: #f6f4ef !important;
+    color: #0f172a !important;
+  }
+
+  * {
+    filter: none !important;
+  }
+}
 html, body {
   background: #f6f4ef !important;
   color: #0f172a !important;
@@ -33,6 +62,7 @@ html, body {
     color: #0f172a !important;
   }
 }
+
 
 /* =========================
    Fondo principal APP
@@ -266,5 +296,6 @@ html, body {
 
 </style>
 """
+
 
 
