@@ -1083,7 +1083,24 @@ def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
         ORDER BY TRIM("Mes")
     """
     return ejecutar_consulta(sql, (anio,))
+# =====================================================================
+# HELPERS SQL - FALLBACK DE MES
+# =====================================================================
 
+def get_ultimo_mes_disponible_hasta(mes_key: str) -> Optional[str]:
+    """
+    Devuelve el último mes disponible (YYYY-MM) menor o igual al mes_key.
+    Ej: si pedís 2025-11 y no existe, puede devolver 2023-12.
+    """
+    sql = """
+        SELECT MAX(TRIM("Mes")) AS mes
+        FROM chatbot_raw
+        WHERE TRIM("Mes") <= %s
+    """
+    df = ejecutar_consulta(sql, (mes_key,))
+    if df is None or df.empty:
+        return None
+    return df["mes"].iloc[0]
 
 def get_dashboard_top_proveedores(anio: int, top_n: int = 10, moneda: str = "$") -> pd.DataFrame:
     """Top proveedores para dashboard."""
