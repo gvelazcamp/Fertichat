@@ -25,6 +25,9 @@ MESES = {
     "diciembre": "12",
 }
 
+# Definición de restricciones o proveedores inválidos
+PROVEEDORES_INVALIDOS = []
+
 MAX_PROVEEDORES = 5
 MAX_ARTICULOS = 5
 MAX_MESES = 6
