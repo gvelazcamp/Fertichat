@@ -461,52 +461,78 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     if "compra" in texto_lower or "compras" in texto_lower:
         proveedor = provs[0] if provs else None
 
-        # proveedor + mes(YYYY-MM)
-        if proveedor and len(meses_yyyymm) >= 1:
+        # ==========================================================
+        # FALLBACK: proveedor libre (si no matcheó índice)
+        # ==========================================================
+        proveedor_libre = None
+        if not proveedor:
+            tmp = texto_lower
+            tmp = re.sub(r"(compras?|comparar)", "", tmp)
+            tmp = re.sub(
+                r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)",
+                "",
+                tmp
+            )
+            tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp)
+            tmp = tmp.strip()
+            if tmp and len(tmp) >= 3:
+                proveedor_libre = tmp
+
+        proveedor_final = proveedor or proveedor_libre
+
+        # ==========================================================
+        # proveedor + mes (YYYY-MM)
+        # ==========================================================
+        if proveedor_final and len(meses_yyyymm) >= 1:
             return {
                 "tipo": "compras_proveedor_mes",
-                "parametros": {"proveedor": proveedor, "mes": meses_yyyymm[0]},
+                "parametros": {
+                    "proveedor": proveedor_final,
+                    "mes": meses_yyyymm[0]
+                },
                 "debug": "compras proveedor mes (YYYY-MM)",
             }
 
-        # proveedor + mes(nombre) + anio
-        if proveedor and len(meses_nombre) >= 1 and len(anios) >= 1:
+        # ==========================================================
+        # proveedor + mes (nombre) + año
+        # ==========================================================
+        if proveedor_final and len(meses_nombre) >= 1 and len(anios) >= 1:
             anio = anios[0]
             mes = _to_yyyymm(anio, meses_nombre[0])
             return {
                 "tipo": "compras_proveedor_mes",
-                "parametros": {"proveedor": proveedor, "mes": mes},
+                "parametros": {
+                    "proveedor": proveedor_final,
+                    "mes": mes
+                },
                 "debug": "compras proveedor mes (nombre+anio)",
             }
 
-        # proveedor + anio
-        if proveedor and len(anios) >= 1 and len(meses_nombre) == 0 and len(meses_yyyymm) == 0:
+        # ==========================================================
+        # proveedor + año
+        # ==========================================================
+        if proveedor_final and len(anios) >= 1 and len(meses_nombre) == 0 and len(meses_yyyymm) == 0:
             anio = anios[0]
             return {
                 "tipo": "compras_proveedor_anio",
-                "parametros": {"proveedor": proveedor, "anio": anio},
+                "parametros": {
+                    "proveedor": proveedor_final,
+                    "anio": anio
+                },
                 "debug": "compras proveedor año",
             }
 
-        # si el usuario escribió algo como "compras X noviembre 2025" y no matcheó proveedor:
-        # evitamos traer todo.
-        if not proveedor and len(meses_nombre) >= 1 and len(anios) >= 1:
-            # detectamos probable “objeto” (la palabra entre compras y mes)
-            return {
-                "tipo": "no_entendido",
-                "parametros": {},
-                "sugerencia": "No reconocí el proveedor. Probá escribirlo como está en la lista (ej: ROCHE).",
-                "debug": "compras: mes+anio pero proveedor no reconocido (bd)",
-            }
-
-        # compras_mes
-        if not proveedor and len(meses_yyyymm) >= 1:
+        # ==========================================================
+        # compras por mes (sin proveedor)
+        # ==========================================================
+        if not proveedor_final and len(meses_yyyymm) >= 1:
             return {
                 "tipo": "compras_mes",
                 "parametros": {"mes": meses_yyyymm[0]},
                 "debug": "compras mes (YYYY-MM)",
             }
-        if not proveedor and len(meses_nombre) >= 1 and len(anios) >= 1:
+
+        if not proveedor_final and len(meses_nombre) >= 1 and len(anios) >= 1:
             mes = _to_yyyymm(anios[0], meses_nombre[0])
             return {
                 "tipo": "compras_mes",
@@ -514,8 +540,10 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "compras mes (nombre+anio)",
             }
 
-        # compras_anio
-        if not proveedor and len(anios) >= 1:
+        # ==========================================================
+        # compras por año (sin proveedor)
+        # ==========================================================
+        if not proveedor_final and len(anios) >= 1:
             return {
                 "tipo": "compras_anio",
                 "parametros": {"anio": anios[0]},
