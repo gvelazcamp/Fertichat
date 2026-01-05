@@ -835,43 +835,81 @@ def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) 
 
     return ejecutar_consulta(sql, params)
 
-def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[str] = None) -> pd.DataFrame:
-    """Compara proveedores por años con separación de monedas."""
-    total_pesos = _sql_total_num_expr()
-    total_usd = _sql_total_num_expr_usd()
+def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) -> pd.DataFrame:
+    """
+    ✅ CORREGIDO: Usa LIKE en vez de = para buscar proveedores.
+    
+    Comparación por proveedor usando LIKE (ej: tresul, biodiagnostico, roche)
+    NO agrupa por alias, agrupa por proveedor real en la base de datos.
+    
+    Args:
+        proveedor_like: Texto a buscar en nombre del proveedor (ej: "tresul")
+        anios: Lista de años a comparar (mínimo 2)
+    
+    Returns:
+        DataFrame con columnas: Proveedor, {año1}, {año2}
+    """
+    # Normalizar proveedor
+    proveedor_like = proveedor_like.strip().lower()
+    
+    # Validar años
     anios = sorted(anios)
-
-    prov_where = ""
-    prov_params = []
-    if proveedores:
-        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
-        prov_params = [f"%{p.lower()}%" for p in proveedores]
-        prov_where = f"AND ({' OR '.join(parts)})"
-
-    cols = []
-    for y in anios:
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
-
-    cols_sql = ",\n            ".join(cols)
-    y_last = anios[-1]
-    order_sql = f'"{y_last}_$" DESC, "{y_last}_USD" DESC'
-    anios_sql = ", ".join(str(y) for y in anios)
-
+    if len(anios) < 2:
+        print(f"⚠️ get_comparacion_proveedor_anios_like: necesita al menos 2 años, recibió {len(anios)}")
+        return pd.DataFrame()
+    
+    a1, a2 = anios[0], anios[1]
+    
+    # Expresión SQL para convertir montos
+    total_expr = _sql_total_num_expr_general()
+    
+    # ✅ CAMBIO PRINCIPAL: LIKE en vez de =
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
-            {cols_sql}
+            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a1}",
+            SUM(CASE WHEN "Año"::int = %s THEN {total_expr} ELSE 0 END) AS "{a2}"
         FROM chatbot_raw
-        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int IN ({anios_sql})
-          {prov_where}
+        WHERE LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND "Año"::int IN (%s, %s)
         GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY {order_sql}
-        LIMIT 300
+        ORDER BY Proveedor
     """
-    return ejecutar_consulta(sql, tuple(prov_params) if prov_params else None)
+    
+    # ✅ Parámetros con % para LIKE
+    params = (
+        a1,                        # primer año en CASE
+        a2,                        # segundo año en CASE
+        f"%{proveedor_like}%",     # LIKE con wildcards
+        a1,                        # primer año en IN
+        a2,                        # segundo año en IN
+    )
+    
+    # Debug (opcional, comentar en producción)
+    if os.getenv("DEBUG_SQL") == "1":
+        print(f"\n🔍 DEBUG SQL:")
+        print(f"   Proveedor LIKE: '%{proveedor_like}%'")
+        print(f"   Años: {a1}, {a2}")
+        print(f"   Params: {params}")
+    
+    return ejecutar_consulta(sql, params)
 
+
+# =========================
+# PRUEBA DE LA FUNCIÓN (opcional)
+# =========================
+if __name__ == "__main__":
+    # Test rápido
+    print("\n🧪 Probando get_comparacion_proveedor_anios_like...")
+    
+    df = get_comparacion_proveedor_anios_like("tresul", [2024, 2025])
+    
+    if df is not None and not df.empty:
+        print(f"\n✅ Encontrados {len(df)} proveedores:")
+        print(df)
+    else:
+        print("\n❌ No se encontraron resultados
 
 def get_comparacion_familia_anios_monedas(anios: List[int], familias: List[str] = None) -> pd.DataFrame:
     """Compara familias por años con separación de monedas."""
