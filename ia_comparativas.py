@@ -333,7 +333,13 @@ def interpretar_comparativas(pregunta: str) -> Dict:
         # 3) fallback proveedor libre (CLAVE para casos como "tresul" cuando tu tabla proveedores no lo tiene)
         proveedor_libre = _extraer_proveedor_libre(texto_lower)
 
-        proveedor_final = proveedor_alias or proveedor_lista or proveedor_libre
+        proveedor_final = proveedor_alias or proveedor_lista
+
+        if not proveedor_final and proveedor_libre:
+            if proveedor_libre not in PROVEEDORES_INVALIDOS:
+                proveedor_final = proveedor_libre
+
+
 
         # --------------------------
         # SUGERENCIAS si falta "compras"
