@@ -11,6 +11,43 @@ CSS_GLOBAL = r"""
 footer { visibility: hidden; }
 div[data-testid="stDecoration"] { display: none !important; }
 
+/* =========================================================
+   OCULTAR: ancla/link al lado del H1 (el iconito de enlace)
+   Ej: <span data-testid="stHeaderActionElements">...</span>
+   PC + CEL
+   ========================================================= */
+[data-testid="stHeaderActionElements"] {
+  display: none !important;
+}
+
+/* Por si Streamlit cambia el atributo y queda como clase */
+h1 > span.eqpbrs03,
+h2 > span.eqpbrs03,
+h3 > span.eqpbrs03 {
+  display: none !important;
+}
+
+/* =========================================================
+   OCULTAR: <div class="logo">🦋 FertiChat</div>
+   (tu header mobile custom)
+   PC + CEL
+   ========================================================= */
+#mobile-header .logo,
+div#mobile-header .logo {
+  display: none !important;
+}
+
+/* Si la clase "logo" existe en otros lados, NO la matamos global.
+   Solo dentro de #mobile-header. */
+
+/* =========================================================
+   OCULTAR: campana mobile <a id="campana-mobile">🔔</a>
+   PC + CEL
+   ========================================================= */
+#campana-mobile {
+  display: none !important;
+}
+
 /* =========================
    FORZAR MODO CLARO GLOBAL
    ========================= */
@@ -252,3 +289,4 @@ div[data-testid="stAppViewContainer"]:has(#fc-login-marker) .stForm button[type=
 }
 </style>
 """
+
