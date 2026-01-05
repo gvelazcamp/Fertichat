@@ -12,7 +12,7 @@ from ia_interpretador import interpretar_pregunta, obtener_info_tipo
 from utils_openai import responder_con_openai
 
 # IMPORTS DE SQL
-from sql_queries import (
+import sql_queries as sqlq(
     get_compras_anio,
     get_detalle_compras_proveedor_mes,
     get_detalle_compras_proveedor_anio,
