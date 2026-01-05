@@ -336,7 +336,7 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
     # =========================
     # COMPARATIVAS
     # =========================
-    elif tipo == "comparar_proveedor_meses":
+     elif tipo == "comparar_proveedor_meses":
         proveedor = parametros.get("proveedor")
         mes1 = parametros.get("mes1")
         mes2 = parametros.get("mes2")
@@ -354,6 +354,7 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
     elif tipo == "comparar_proveedor_anios":
         # Mantengo tu llamada (no invento firma). Si tu función pide lista, lo ajustamos con el log real.
         return sqlq.get_comparacion_proveedor_anios_monedas(parametros["anios"], parametros["proveedor"])
+
 
     elif tipo == "comparar_articulo_meses":
         articulo = parametros.get("articulo")
