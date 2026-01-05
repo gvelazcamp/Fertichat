@@ -1102,6 +1102,8 @@ def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
         ORDER BY TRIM("Mes")
     """
     return ejecutar_consulta(sql, (anio,))
+
+
 # =====================================================================
 # HELPERS SQL - FALLBACK DE MES
 # =====================================================================
@@ -1120,6 +1122,7 @@ def get_ultimo_mes_disponible_hasta(mes_key: str) -> Optional[str]:
     if df is None or df.empty:
         return None
     return df["mes"].iloc[0]
+
 
 def get_dashboard_top_proveedores(anio: int, top_n: int = 10, moneda: str = "$") -> pd.DataFrame:
     """Top proveedores para dashboard."""
@@ -1591,6 +1594,7 @@ def get_stock_bajo(minimo: int = 10) -> pd.DataFrame:
         return ejecutar_consulta(sql, (int(minimo),))
     except Exception:
         return pd.DataFrame()
+
 
 def resolver_mes_existente(mes_key: str) -> str:
     """
