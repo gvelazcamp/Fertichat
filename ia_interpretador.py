@@ -2,25 +2,13 @@
 # IA_INTERPRETADOR.PY
 # =========================
 
-import os
 import re
-import json
-from typing import Dict, Optional
-from datetime import datetime
+from typing import Dict, Optional, List
 
 import streamlit as st
-from openai import OpenAI
-from config import OPENAI_MODEL
 
 # =====================================================================
-# CONFIGURACIÓN OPENAI
-# =====================================================================
-
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-# =====================================================================
-# MAPA DE MESES (FORMATO CANÓNICO YYYY-MM)
+# MAPA DE MESES
 # =====================================================================
 
 MESES = {
@@ -41,44 +29,48 @@ MESES = {
 ANIOS_VALIDOS = ["2023", "2024", "2025", "2026"]
 
 # =====================================================================
-# CATÁLOGOS DESDE SUPABASE (CACHEADOS)
+# CATÁLOGOS DESDE TU SQL (YA EXISTENTE)
 # =====================================================================
 
 @st.cache_data(ttl=3600)
-def get_lista_proveedores() -> list[str]:
+def get_lista_proveedores() -> List[str]:
     """
-    Devuelve proveedores desde Supabase (columna: nombre)
+    Devuelve lista de proveedores desde Supabase
     """
-    from sql_queries import get_proveedores  # SQL EXISTENTE
+    from sql_queries import get_proveedores  # FUNCIÓN REAL TUYA
     df = get_proveedores()
-    return [p.lower() for p in df["nombre"].dropna().unique()]
+    return [p.lower() for p in df["proveedor"].dropna().unique()]
 
 
 @st.cache_data(ttl=3600)
-def get_lista_articulos() -> list[str]:
+def get_lista_articulos() -> List[str]:
     """
-    Devuelve artículos desde Supabase (columna: descripcion)
+    Devuelve lista de artículos desde Supabase
     """
-    from sql_queries import get_articulos  # SQL EXISTENTE
+    from sql_queries import get_articulos  # FUNCIÓN REAL TUYA
     df = get_articulos()
-    return [a.lower() for a in df["descripcion"].dropna().unique()]
+    return [a.lower() for a in df["articulo"].dropna().unique()]
 
 
-def detectar_proveedor(texto: str, proveedores: list[str]) -> Optional[str]:
+# =====================================================================
+# DETECTORES
+# =====================================================================
+
+def detectar_proveedor(texto: str, proveedores: List[str]) -> Optional[str]:
     for p in proveedores:
         if p in texto:
             return p
     return None
 
 
-def detectar_articulo(texto: str, articulos: list[str]) -> Optional[str]:
+def detectar_articulo(texto: str, articulos: List[str]) -> Optional[str]:
     for a in articulos:
         if a in texto:
             return a
     return None
 
 
-def detectar_mes_y_anio(texto: str) -> Optional[str]:
+def detectar_mes(texto: str) -> Optional[str]:
     meses_en_texto = [m for m in MESES if m in texto]
     anio_match = re.search(r"(2023|2024|2025|2026)", texto)
 
@@ -89,6 +81,7 @@ def detectar_mes_y_anio(texto: str) -> Optional[str]:
 
     return None
 
+
 # =====================================================================
 # FUNCIÓN PRINCIPAL
 # =====================================================================
@@ -98,66 +91,61 @@ def interpretar_pregunta(pregunta: str) -> Dict:
         return {
             "tipo": "no_entendido",
             "parametros": {},
-            "sugerencia": "Escribí una consulta válida.",
-            "debug": "pregunta vacía",
+            "debug": "pregunta vacía"
         }
 
     texto = pregunta.lower().strip()
 
-    # ==========================================================
+    # -------------------------
     # SALUDOS
-    # ==========================================================
+    # -------------------------
     if texto in ["hola", "buenos dias", "buenas", "gracias", "chau"]:
         return {
             "tipo": "conversacion",
             "parametros": {},
-            "debug": "saludo simple",
+            "debug": "saludo"
         }
 
-    # ==========================================================
-    # CARGA DE CATÁLOGOS
-    # ==========================================================
     proveedores = get_lista_proveedores()
     articulos = get_lista_articulos()
 
     proveedor = detectar_proveedor(texto, proveedores)
     articulo = detectar_articulo(texto, articulos)
-    mes = detectar_mes_y_anio(texto)
+    mes = detectar_mes(texto)
 
     # ==========================================================
-    # REGLA DIRECTA: COMPRAS PROVEEDOR + MES
+    # COMPRAS PROVEEDOR + MES
     # Ej: "compras roche noviembre 2025"
     # ==========================================================
-    if proveedor and mes and "compra" in texto:
+    if "compra" in texto and proveedor and mes:
         return {
             "tipo": "compras_proveedor_mes",
             "parametros": {
                 "proveedor": proveedor,
-                "mes": mes,
+                "mes": mes
             },
-            "debug": "regla directa proveedor + mes (supabase)",
+            "debug": "proveedor + mes (directo)"
         }
 
     # ==========================================================
-    # REGLA DIRECTA: COMPRAS PROVEEDOR + AÑO
+    # COMPRAS PROVEEDOR + AÑO
     # ==========================================================
-    if proveedor and "compra" in texto:
+    if "compra" in texto and proveedor:
         anio_match = re.search(r"(2023|2024|2025|2026)", texto)
         if anio_match:
             return {
                 "tipo": "compras_proveedor_anio",
                 "parametros": {
                     "proveedor": proveedor,
-                    "anio": int(anio_match.group(1)),
+                    "anio": int(anio_match.group(1))
                 },
-                "debug": "regla directa proveedor + año",
+                "debug": "proveedor + año"
             }
 
     # ==========================================================
-    # REGLA DIRECTA: COMPARAR PROVEEDOR MESES
-    # Ej: "comparar compras roche junio julio 2025"
+    # COMPARAR PROVEEDOR MESES
     # ==========================================================
-    if proveedor and "comparar" in texto:
+    if "comparar" in texto and proveedor:
         meses_en_texto = [m for m in MESES if m in texto]
         anio_match = re.search(r"(2023|2024|2025|2026)", texto)
 
@@ -171,82 +159,29 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "parametros": {
                     "proveedor": proveedor,
                     "mes1": mes1,
-                    "mes2": mes2,
-                    "label1": f"{meses_en_texto[0]} {anio}",
-                    "label2": f"{meses_en_texto[1]} {anio}",
+                    "mes2": mes2
                 },
-                "debug": "comparar proveedor meses (regla directa)",
+                "debug": "comparar proveedor meses"
             }
 
     # ==========================================================
     # STOCK ARTÍCULO
     # ==========================================================
-    if articulo and "stock" in texto:
+    if "stock" in texto and articulo:
         return {
             "tipo": "stock_articulo",
-            "parametros": {"articulo": articulo},
-            "debug": "stock articulo directo",
+            "parametros": {
+                "articulo": articulo
+            },
+            "debug": "stock articulo"
         }
 
     # ==========================================================
-    # FALLBACK A OPENAI (SOLO SI NO HUBO MATCH)
+    # FALLBACK
     # ==========================================================
-    if not client:
-        return {
-            "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "Probá con: compras roche noviembre 2025",
-            "debug": "sin openai",
-        }
-
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": "Devolvé SOLO JSON válido."},
-                {"role": "user", "content": pregunta},
-            ],
-            temperature=0.1,
-            max_tokens=300,
-        )
-
-        content = response.choices[0].message.content.strip()
-        content = re.sub(r"```json|```", "", content).strip()
-        return json.loads(content)
-
-    except Exception as e:
-        return {
-            "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "No pude interpretar la consulta.",
-            "debug": f"openai error: {str(e)[:80]}",
-        }
-
-# =====================================================================
-# MAPEO TIPO → SQL
-# =====================================================================
-
-MAPEO_FUNCIONES = {
-    "compras_proveedor_mes": {
-        "funcion": "get_detalle_compras_proveedor_mes",
-        "params": ["proveedor", "mes"],
-    },
-    "compras_proveedor_anio": {
-        "funcion": "get_detalle_compras_proveedor_anio",
-        "params": ["proveedor", "anio"],
-    },
-    "comparar_proveedor_meses": {
-        "funcion": "get_comparacion_proveedor_meses",
-        "params": ["proveedor", "mes1", "mes2", "label1", "label2"],
-    },
-    "stock_articulo": {
-        "funcion": "get_stock_articulo",
-        "params": ["articulo"],
-    },
-}
-
-def obtener_info_tipo(tipo: str) -> Optional[Dict]:
-    return MAPEO_FUNCIONES.get(tipo)
-
-def es_tipo_valido(tipo: str) -> bool:
-    return tipo in MAPEO_FUNCIONES or tipo in ["conversacion", "no_entendido"]
+    return {
+        "tipo": "no_entendido",
+        "parametros": {},
+        "sugerencia": "Probá: compras roche noviembre 2025",
+        "debug": "sin match"
+    }
