@@ -394,23 +394,42 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     if "comparar" in texto_lower and "compra" in texto_lower:
         proveedor = provs[0] if provs else None
 
-        # si el usuario claramente escribió un “objeto” pero no matcheó proveedor:
-        # evitamos caer en compras_mes (que trae todo)
+        # ==========================================================
+        # FALLBACK: proveedor libre (si no matcheó índice)
+        # ==========================================================
+        proveedor_libre = None
         if not proveedor:
+            tmp = texto_lower
+            tmp = re.sub(r"(comparar|compras?)", "", tmp)
+            tmp = re.sub(
+                r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)",
+                "",
+                tmp
+            )
+            tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp)
+            tmp = tmp.strip()
+            if tmp and len(tmp) >= 3:
+                proveedor_libre = tmp
+
+        proveedor_final = proveedor or proveedor_libre
+
+        if not proveedor_final:
             return {
                 "tipo": "no_entendido",
                 "parametros": {},
-                "sugerencia": "No reconocí el proveedor. Probá: compras ROCHE noviembre 2025",
-                "debug": "comparar: proveedor no reconocido (bd)",
+                "sugerencia": "No reconocí el proveedor. Probá: comparar compras roche junio julio 2025",
+                "debug": "comparar: proveedor no reconocido (ni índice ni libre)",
             }
 
-        # caso YYYY-MM explícitos
+        # ==========================================================
+        # meses explícitos YYYY-MM
+        # ==========================================================
         if len(meses_yyyymm) >= 2:
             mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
             return {
                 "tipo": "comparar_proveedor_meses",
                 "parametros": {
-                    "proveedor": proveedor,
+                    "proveedor": proveedor_final,
                     "mes1": mes1,
                     "mes2": mes2,
                     "label1": mes1,
@@ -419,7 +438,9 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "comparar proveedor meses (YYYY-MM)",
             }
 
-        # caso meses por nombre + 1 año
+        # ==========================================================
+        # meses por nombre + año
+        # ==========================================================
         if len(meses_nombre) >= 2 and len(anios) >= 1:
             anio = anios[0]
             mes1 = _to_yyyymm(anio, meses_nombre[0])
@@ -427,7 +448,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             return {
                 "tipo": "comparar_proveedor_meses",
                 "parametros": {
-                    "proveedor": proveedor,
+                    "proveedor": proveedor_final,
                     "mes1": mes1,
                     "mes2": mes2,
                     "label1": f"{meses_nombre[0]} {anio}",
@@ -436,11 +457,16 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "comparar proveedor meses (nombre+anio)",
             }
 
-        # comparar años (si te sirve)
+        # ==========================================================
+        # comparar por años
+        # ==========================================================
         if len(anios) >= 2:
             return {
                 "tipo": "comparar_proveedor_anios",
-                "parametros": {"proveedor": proveedor, "anios": [anios[0], anios[1]]},
+                "parametros": {
+                    "proveedor": proveedor_final,
+                    "anios": [anios[0], anios[1]],
+                },
                 "debug": "comparar proveedor años",
             }
 
