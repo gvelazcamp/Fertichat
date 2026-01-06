@@ -203,6 +203,53 @@ def get_lista_proveedores() -> list:
         return ["Todos"]
     return ["Todos"] + df['proveedor'].tolist()
 
+def get_lista_articulos_stock() -> list:
+    sql = """
+        SELECT DISTINCT TRIM("Articulo") AS articulo
+        FROM stock_raw
+        WHERE "Articulo" IS NOT NULL AND TRIM("Articulo") <> ''
+        ORDER BY articulo
+        LIMIT 500
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        return ["Todos"]
+    return ["Todos"] + df['articulo'].tolist()
+
+def get_lista_familias_stock() -> list:
+    sql = """
+        SELECT DISTINCT TRIM("Familia") AS familia
+        FROM stock_raw
+        WHERE "Familia" IS NOT NULL AND TRIM("Familia") <> ''
+        ORDER BY familia
+        LIMIT 500
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        return ["Todos"]
+    return ["Todos"] + df['familia'].tolist()
+
+def get_lista_depositos_stock() -> list:
+    sql = """
+        SELECT DISTINCT TRIM("Deposito") AS deposito
+        FROM stock_raw
+        WHERE "Deposito" IS NOT NULL AND TRIM("Deposito") <> ''
+        ORDER BY deposito
+        LIMIT 500
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        return ["Todos"]
+    return ["Todos"] + df['deposito'].tolist()
+
+def buscar_stock_por_lote(lote: str) -> pd.DataFrame:
+    sql = """
+        SELECT *
+        FROM stock_raw
+        WHERE TRIM("Lote") = %s
+    """
+    df = ejecutar_consulta(sql, (lote,))
+    return df
 
 def get_lista_tipos_comprobante() -> list:
     sql = """
