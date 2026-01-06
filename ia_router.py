@@ -8,6 +8,7 @@ import json
 import unicodedata
 from typing import Dict, Optional
 from datetime import datetime
+from ia_interpretador import interpretar_pregunta as interpretar_canonico
 from ia_comparativas import interpretar_comparativas
 import streamlit as st
 from openai import OpenAI
@@ -193,7 +194,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
         return interpretar_comparativas(pregunta)
 
     if "compra" in texto_lower or "compras" in texto_lower:
-        return interpretar_compras(pregunta)  # ✅ Ahora SÍ existe
+        return interpretar_canonico(pregunta) 
 
     # OPENAI (opcional)
     if client and USAR_OPENAI_PARA_DATOS:
