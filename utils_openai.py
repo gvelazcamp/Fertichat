@@ -16,7 +16,7 @@ from config_runtime import get_secret
 OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
 
 
-from intent_detector import normalizar_texto
+from ia_interpretador import normalizar_texto
 from sql_core import ejecutar_consulta
 
 # Cliente OpenAI
