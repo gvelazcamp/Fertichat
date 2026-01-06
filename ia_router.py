@@ -63,17 +63,17 @@ def interpretar_compras(pregunta: str) -> Dict:
     """
     texto = pregunta.strip()
     texto_lower = texto.lower()
-    
+
     anios = _extraer_anios(texto)
     meses_nombre = _extraer_meses_nombre(texto)
     proveedor = _extraer_proveedor(texto)
-    
+
     # Caso: compras noviembre 2025
     if meses_nombre and anios:
         anio = anios[0]
         mes_nombre = meses_nombre[0]
         mes_yyyymm = f"{anio}-{MESES[mes_nombre]}"
-        
+
         if proveedor:
             # compras roche noviembre 2025
             return {
@@ -93,11 +93,11 @@ def interpretar_compras(pregunta: str) -> Dict:
                 },
                 "debug": f"compras mes: {mes_yyyymm}",
             }
-    
+
     # Caso: compras 2025 o compras roche 2025
     if anios:
         anio = anios[0]
-        
+
         if proveedor:
             # compras roche 2025
             return {
@@ -117,7 +117,7 @@ def interpretar_compras(pregunta: str) -> Dict:
                 },
                 "debug": f"compras año: {anio}",
             }
-    
+
     # No entendido
     return {
         "tipo": "no_entendido",
@@ -136,17 +136,17 @@ def interpretar_stock(pregunta: str) -> Dict:
     - stock vitek
     """
     texto_lower = pregunta.lower()
-    
+
     if "total" in texto_lower:
         return {
             "tipo": "stock_total",
             "parametros": {},
             "debug": "stock total",
         }
-    
+
     # Extraer artículo (básico)
     articulo = re.sub(r"\b(stock|de|del|el)\b", "", texto_lower).strip()
-    
+
     if articulo and len(articulo) >= 3:
         return {
             "tipo": "stock_articulo",
@@ -155,7 +155,7 @@ def interpretar_stock(pregunta: str) -> Dict:
             },
             "debug": f"stock artículo: {articulo}",
         }
-    
+
     return {
         "tipo": "no_entendido",
         "parametros": {},
@@ -184,7 +184,8 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # Saludos / conversación
     saludos = {"hola", "buenas", "buenos", "gracias", "ok", "dale", "perfecto", "genial"}
     if any(re.search(rf"\b{re.escape(w)}\b", texto_lower) for w in saludos):
-        if not any(k in texto_lower for k in ["compra", "compar", "stock"]):
+        # IMPORTANTE: si hay intención de datos, NO lo tomes como conversación
+        if not any(k in texto_lower for k in ["compra", "compras", "compar", "stock", "factura", "facturas", "detalle"]):
             return {"tipo": "conversacion", "parametros": {}, "debug": "saludo"}
 
     # ✅ ROUTING POR KEYWORDS
@@ -194,8 +195,13 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     if "comparar" in texto_lower or "comparame" in texto_lower or "compara" in texto_lower:
         return interpretar_comparativas(pregunta)
 
+    # ✅ FACTURAS (detalle/última/etc.) -> va al intérprete canónico
+    # Ej: "Detalle factura 275217", "última factura tresul", "facturas de X"
+    if "factura" in texto_lower or "facturas" in texto_lower or re.search(r"\bdetalle\s+factura\b", texto_lower):
+        return interpretar_canonico(pregunta)
+
     if "compra" in texto_lower or "compras" in texto_lower:
-        return interpretar_canonico(pregunta) 
+        return interpretar_canonico(pregunta)
 
     # OPENAI (opcional)
     if client and USAR_OPENAI_PARA_DATOS:
@@ -230,7 +236,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     return {
         "tipo": "no_entendido",
         "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche 2024 2025",
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche 2024 2025 | detalle factura 275217",
         "debug": "router: no match.",
     }
 
@@ -265,6 +271,15 @@ MAPEO_FUNCIONES = {
     "ultima_factura": {
         "funcion": "get_ultima_factura_inteligente",
         "params": ["patron"],
+    },
+    # ✅ agregado alias de tipo por compatibilidad (si el intérprete devuelve este)
+    "detalle_factura": {
+        "funcion": "get_detalle_factura_por_numero",
+        "params": ["nro_factura"],
+    },
+    "detalle_factura_numero": {
+        "funcion": "get_detalle_factura_por_numero",
+        "params": ["nro_factura"],
     },
     "stock_total": {
         "funcion": "get_stock_total",
