@@ -739,7 +739,6 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     }
 
 # =====================================================================
-# =====================================================================
 # MAPEO TIPO → FUNCIÓN SQL (CANÓNICO)
 # =====================================================================
 MAPEO_FUNCIONES = {
@@ -809,6 +808,19 @@ MAPEO_FUNCIONES = {
         "params": ["articulo"]
     },
 }
+
+def obtener_info_tipo(tipo: str) -> Optional[Dict]:
+    return MAPEO_FUNCIONES.get(tipo)
+
+def es_tipo_valido(tipo: str) -> bool:
+    tipos_especiales = [
+        "conversacion",
+        "conocimiento",
+        "no_entendido",
+        "comparar_proveedor_meses",
+        "comparar_proveedor_anios",
+    ]
+    return tipo in MAPEO_FUNCIONES or tipo in tipos_especiales
 
 def obtener_info_tipo(tipo: str) -> Optional[Dict]:
     return MAPEO_FUNCIONES.get(tipo)
