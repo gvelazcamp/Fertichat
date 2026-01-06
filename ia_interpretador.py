@@ -35,6 +35,7 @@ MESES = {
     "julio": "07",
     "agosto": "08",
     "septiembre": "09",
+    "setiembre": "09",
     "octubre": "10",
     "noviembre": "11",
     "diciembre": "12",
@@ -77,13 +78,9 @@ TABLA_TIPOS = """
 """
 
 # =====================================================================
-# TABLA CANÓNICA (50 combinaciones) - guía para IA (si se usa)
-# =====================================================================
-# =====================================================================
 # TABLA CANÓNICA (50 combinaciones permitidas) - PARA GUIAR A LA IA
 # (No rompe nada: es guía / contrato mental del intérprete)
 # =====================================================================
-
 TABLA_CANONICA_50 = r"""
 | # | ACCIÓN | OBJETO | TIEMPO | MULTI | TIPO (output) | PARAMS |
 |---|--------|--------|--------|-------|---------------|--------|
@@ -168,25 +165,23 @@ def normalizar_texto(texto: str) -> str:
     """
     Normaliza un texto quitando acentos, ruido y palabras no relevantes.
     """
-    if not texto:  # Si el texto es vacío, retornar vacío
+    if not texto:
         return ""
 
-    # Sustituye palabras irrelevantes (como nombres o frases sociales)
     ruido = ["gonzalo", "quiero", "por favor", "las", "los", "una", "un"]
     texto = texto.lower().strip()
     for r in ruido:
-        texto = re.sub(fr"\b{r}\b", "", texto)  # Reemplazar las palabras completas
+        texto = re.sub(fr"\b{r}\b", "", texto)
 
-    # Quita acentos, caracteres especiales y espacios redundantes
     texto = "".join(
         c
         for c in unicodedata.normalize("NFD", texto)
         if unicodedata.category(c) != "Mn"
     )
-    texto = re.sub(r"[^\w\s]", "", texto)  # Elimina caracteres no alfanuméricos
-    texto = re.sub(r"\s+", " ", texto).strip()  # Simplifica espacios extra
-
+    texto = re.sub(r"[^\w\s]", "", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
     return texto
+
 # =====================================================================
 # CARGA LISTAS DESDE SUPABASE (cache)
 # =====================================================================
@@ -225,7 +220,6 @@ def _cargar_listas_supabase() -> Dict[str, List[str]]:
     except Exception:
         return {"proveedores": [], "articulos": []}
 
-    # Dedup
     proveedores = sorted(list(set([p for p in proveedores if p])))
     articulos = sorted(list(set([a for a in articulos if a])))
 
@@ -244,17 +238,13 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
     if not toks or not index:
         return []
 
-    # ==========================================================
     # 1) PRIORIDAD ABSOLUTA: MATCH EXACTO
-    # ==========================================================
     toks_set = set(toks)
     for orig, norm in index:
         if norm in toks_set:
             return [orig]
 
-    # ==========================================================
-    # 2) FALLBACK: substring + score (lógica original)
-    # ==========================================================
+    # 2) FALLBACK: substring + score
     candidatos: List[Tuple[int, str]] = []
     for orig, norm in index:
         for tk in toks:
@@ -277,7 +267,6 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
 
     return out
 
-
 # =====================================================================
 # RESOLUCIÓN FINAL: PROVEEDOR → SI NO, ARTÍCULO
 # =====================================================================
@@ -286,38 +275,28 @@ def detectar_proveedor_o_articulo(texto: str) -> Dict[str, List[str]]:
 
     proveedores = _match_best(texto, prov_index, max_items=1)
     if proveedores:
-        return {
-            "tipo": "proveedor",
-            "valores": proveedores,
-        }
+        return {"tipo": "proveedor", "valores": proveedores}
 
     articulos = _match_best(texto, art_index, max_items=1)
     if articulos:
-        return {
-            "tipo": "articulo",
-            "valores": articulos,
-        }
+        return {"tipo": "articulo", "valores": articulos}
 
-    return {
-        "tipo": "ninguno",
-        "valores": [],
-    }
-
+    return {"tipo": "ninguno", "valores": []}
 
 # =====================================================================
 # PARSEO TIEMPO
 # =====================================================================
 def _extraer_anios(texto: str) -> List[int]:
     anios = re.findall(r"(2023|2024|2025|2026)", texto)
-    out = []
+    out: List[int] = []
     for a in anios:
         try:
             out.append(int(a))
         except Exception:
             pass
-    # unique orden
+
     seen = set()
-    out2 = []
+    out2: List[int] = []
     for x in out:
         if x not in seen:
             seen.add(x)
@@ -327,7 +306,7 @@ def _extraer_anios(texto: str) -> List[int]:
 def _extraer_meses_nombre(texto: str) -> List[str]:
     ms = [m for m in MESES.keys() if m in texto.lower()]
     seen = set()
-    out = []
+    out: List[str] = []
     for m in ms:
         if m not in seen:
             seen.add(m)
@@ -335,11 +314,10 @@ def _extraer_meses_nombre(texto: str) -> List[str]:
     return out[:MAX_MESES]
 
 def _extraer_meses_yyyymm(texto: str) -> List[str]:
-    # acepta 2025-06 o 2025/06
     ms = re.findall(r"(2023|2024|2025|2026)[-/](0[1-9]|1[0-2])", texto)
     out = [f"{a}-{m}" for a, m in ms]
     seen = set()
-    out2 = []
+    out2: List[str] = []
     for x in out:
         if x not in seen:
             seen.add(x)
@@ -372,6 +350,45 @@ FECHA: {hoy.strftime("%Y-%m-%d")} (mes actual {mes_actual}, año {anio_actual})
 """.strip()
 
 # =====================================================================
+# OPENAI (opcional) - SOLO COMO FALLBACK, DENTRO DE FUNCIÓN (CORRECTO)
+# =====================================================================
+def _interpretar_con_openai(pregunta: str) -> Optional[Dict]:
+    if not (client and USAR_OPENAI_PARA_DATOS):
+        return None
+
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": _get_system_prompt()},
+                {"role": "user", "content": pregunta},
+            ],
+            temperature=0.1,
+            max_tokens=500,
+        )
+        content = response.choices[0].message.content.strip()
+        content = re.sub(r"```json\s*", "", content)
+        content = re.sub(r"```\s*", "", content).strip()
+        out = json.loads(content)
+
+        if "tipo" not in out:
+            out["tipo"] = "no_entendido"
+        if "parametros" not in out:
+            out["parametros"] = {}
+        if "debug" not in out:
+            out["debug"] = "openai"
+
+        return out
+
+    except Exception:
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
+            "debug": "openai error",
+        }
+
+# =====================================================================
 # INTERPRETADOR PRINCIPAL
 # =====================================================================
 def interpretar_pregunta(pregunta: str) -> Dict:
@@ -398,13 +415,11 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # COMPRAS (CANÓNICO): proveedor+mes | proveedor+año | mes | año
     # ==========================================================
     if ("compra" in texto_lower) and ("comparar" not in texto_lower):
-        # ---------- fallback proveedor libre si lista está vacía ----------
         proveedor_libre = None
         if not provs:
             tmp = texto_lower
             tmp = re.sub(r"\bcompras?\b", "", tmp).strip()
 
-            # si viene con mes nombre + año -> "roche noviembre 2025"
             tmp2 = re.sub(
                 r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b",
                 "",
@@ -412,13 +427,12 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             )
             tmp2 = re.sub(r"\b(2023|2024|2025|2026)\b", "", tmp2).strip()
 
-            # si viene "roche 2025" -> tmp2 queda "roche"
             if tmp2 and len(tmp2) >= 3:
                 proveedor_libre = tmp2
 
         proveedor_final = provs[0] if provs else proveedor_libre
 
-        # ---------- compras proveedor + mes ----------
+        # compras proveedor + mes
         if proveedor_final:
             if len(meses_yyyymm) >= 1:
                 return {
@@ -435,7 +449,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                     "debug": "compras proveedor mes (nombre+anio)",
                 }
 
-            # ---------- compras proveedor + año ----------
+            # compras proveedor + año
             if len(anios) >= 1:
                 return {
                     "tipo": "compras_proveedor_anio",
@@ -443,7 +457,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                     "debug": "compras proveedor año",
                 }
 
-        # ---------- compras (sin proveedor) + mes ----------
+        # compras (sin proveedor) + mes
         if len(meses_yyyymm) >= 1:
             return {
                 "tipo": "compras_mes",
@@ -459,7 +473,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "compras mes (nombre+anio)",
             }
 
-        # ---------- compras (sin proveedor) + año ----------
+        # compras (sin proveedor) + año
         if len(anios) >= 1:
             return {
                 "tipo": "compras_anio",
@@ -468,20 +482,22 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             }
 
     # ==========================================================
-    # COMPARAR COMPRAS PROVEEDOR MES VS MES
+    # COMPARAR COMPRAS PROVEEDOR MES VS MES / AÑO VS AÑO
     # ==========================================================
     if "comparar" in texto_lower and "compra" in texto_lower:
         proveedor = provs[0] if provs else None
 
-        # Identificar proveedor libre si no se halló en la lista
         if not proveedor:
             tmp = re.sub(r"(comparar|compras?)", "", texto_lower)
-            tmp = re.sub(r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)", "", tmp)  # Continúa con meses
+            tmp = re.sub(
+                r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+                "",
+                tmp
+            )
             tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp).strip()
             if len(tmp) >= 2:
                 proveedor = tmp
 
-        # Si no se puede identificar proveedor, retorna error
         if not proveedor:
             return {
                 "tipo": "no_entendido",
@@ -490,7 +506,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": f"Proveedor='{proveedor}', texto={texto_lower}",
             }
 
-        # Caso 1: Comparar entre dos meses identificados como YYYY-MM
+        # Caso 1: meses YYYY-MM
         if len(meses_yyyymm) >= 2:
             mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
             return {
@@ -505,7 +521,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "Comparando meses en formato YYYY-MM.",
             }
 
-        # Caso 2: Comparar entre meses en nombre y un año específico
+        # Caso 2: meses por nombre + año
         if len(meses_nombre) >= 2 and len(anios) >= 1:
             anio = anios[0]
             mes1 = _to_yyyymm(anio, meses_nombre[0])
@@ -522,22 +538,24 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "Comparando meses por nombre y año explícito.",
             }
 
-        # Caso 3: Comparar entre múltiples años
+        # Caso 3: años
         if len(anios) >= 2:
+            a1, a2 = anios[0], anios[1]
             return {
                 "tipo": "comparar_proveedor_anios",
                 "parametros": {
                     "proveedor": proveedor,
-                    "anios": [anios[0], anios[1]],
+                    "anios": [a1, a2],
+                    "label1": str(a1),
+                    "label2": str(a2),
                 },
                 "debug": "Comparando diferentes años.",
             }
 
-        # Si no se puede procesar, retorna "no entendido"
         return {
             "tipo": "no_entendido",
             "parametros": {},
-            "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar años.",
+            "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar compras roche 2024 2025.",
             "debug": f"Condiciones insuficientes: años={anios}, meses={meses_nombre}",
         }
 
@@ -558,50 +576,11 @@ def interpretar_pregunta(pregunta: str) -> Dict:
         }
 
     # ==========================================================
-    # DEFAULT
+    # DEFAULT (si está habilitado OpenAI, intenta fallback; si no, no_entendido)
     # ==========================================================
-    return {
-        "tipo": "no_entendido",
-        "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025",
-        "debug": "no match",
-    }
-
-# ==========================================================
-# OPENAI (opcional)
-# ==========================================================
-if client and USAR_OPENAI_PARA_DATOS:
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": _get_system_prompt()},
-                {"role": "user", "content": pregunta},
-            ],
-            temperature=0.1,
-            max_tokens=500,
-            timeout=15,
-        )
-        content = response.choices[0].message.content.strip()
-        content = re.sub(r"```json\s*", "", content)
-        content = re.sub(r"```\s*", "", content).strip()
-        out = json.loads(content)
-
-        if "tipo" not in out:
-            out["tipo"] = "no_entendido"
-        if "parametros" not in out:
-            out["parametros"] = {}
-        if "debug" not in out:
-            out["debug"] = "openai"
-        return out
-
-    except Exception as e:
-        return {
-            "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
-            "debug": f"openai error: {str(e)[:80]}",
-        }
+    out_ai = _interpretar_con_openai(pregunta)
+    if out_ai:
+        return out_ai
 
     return {
         "tipo": "no_entendido",
