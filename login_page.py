@@ -11,6 +11,22 @@ from auth import login_user, change_password, init_db
 init_db()
 
 # =====================================================================
+# KEEPALIVE (OPCIONAL)
+# =====================================================================
+
+def _enable_keepalive_if_available():
+    """
+    Mantiene viva la sesión para evitar cortes cada ~2 min por idle timeout.
+    No rompe nada: si no existe streamlit_autorefresh, simplemente no hace nada.
+    Se activa SOLO si hay usuario logueado.
+    """
+    try:
+        from streamlit_autorefresh import st_autorefresh  # pip install streamlit-autorefresh
+        st_autorefresh(interval=90_000, key="fc_keepalive")  # 90s < 2 min
+    except Exception:
+        pass
+
+# =====================================================================
 # UI COMPONENTS
 # =====================================================================
 
@@ -152,10 +168,16 @@ def logout():
 
 
 def require_auth():
-    """Requiere autenticación - muestra login si no hay sesión"""
+    """
+    Requiere autenticación - muestra login si no hay sesión.
+    Si hay usuario, activa keepalive opcional para evitar cortes por inactividad.
+    """
     if "user" not in st.session_state or st.session_state["user"] is None:
         show_login_page()
         st.stop()
+
+    # SOLO si hay usuario logueado
+    _enable_keepalive_if_available()
 
 # =====================================================================
 # SIDEBAR INFO
