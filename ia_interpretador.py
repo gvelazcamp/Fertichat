@@ -166,23 +166,26 @@ def _tokens(texto: str) -> List[str]:
 
 def normalizar_texto(texto: str) -> str:
     """
-    Normaliza un texto quitando acentos, espacios extra y caracteres no permitidos.
+    Normaliza un texto quitando acentos, ruido y palabras no relevantes.
     """
-    if not texto:  # Manejo si el texto está vacío
+    if not texto:  # Si el texto es vacío, retornar vacío
         return ""
-    
-    # Quita espacios extra y convierte a minúsculas
-    texto = texto.strip().lower()
-    
-    # Normaliza el texto (elimina acentos)
+
+    # Sustituye palabras irrelevantes (como nombres o frases sociales)
+    ruido = ["gonzalo", "quiero", "por favor", "las", "los", "una", "un"]
+    texto = texto.lower().strip()
+    for r in ruido:
+        texto = re.sub(fr"\b{r}\b", "", texto)  # Reemplazar las palabras completas
+
+    # Quita acentos, caracteres especiales y espacios redundantes
     texto = "".join(
-        c for c in unicodedata.normalize("NFD", texto)
+        c
+        for c in unicodedata.normalize("NFD", texto)
         if unicodedata.category(c) != "Mn"
     )
-    
-    # Quita caracteres especiales
-    texto = re.sub(r"[^a-z0-9\s]", "", texto)
-    
+    texto = re.sub(r"[^\w\s]", "", texto)  # Elimina caracteres no alfanuméricos
+    texto = re.sub(r"\s+", " ", texto).strip()  # Simplifica espacios extra
+
     return texto
 # =====================================================================
 # CARGA LISTAS DESDE SUPABASE (cache)
@@ -472,33 +475,29 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # ==========================================================
     # COMPARAR COMPRAS PROVEEDOR MES VS MES
     # ==========================================================
-    if "comparar" in texto_lower and "compra" in texto_lower:
-        proveedor = provs[0] if provs else None
+if "comparar" in texto_lower and "compra" in texto_lower:
+    proveedor = provs[0] if provs else None
 
-        proveedor_libre = None
-        if not proveedor:
-            tmp = texto_lower
-            tmp = re.sub(r"(comparar|compras?)", "", tmp)
-            tmp = re.sub(
-                r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)",
-                "",
-                tmp
-            )
-            tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp)
-            tmp = tmp.strip()
-            if tmp and len(tmp) >= 3:
-                proveedor_libre = tmp
+    # Analizar si podemos inferir proveedor libre del texto
+    proveedor_libre = None
+    if not proveedor:
+        tmp = texto_lower
+        tmp = re.sub(r"(comparar|compras?)", "", tmp)
+        tmp = re.sub(r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)", "", tmp)
+        tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp).strip()
+        if tmp and len(tmp) >= 2:  # Aceptar proveedor libre si tiene 2+ caracteres
+            proveedor_libre = tmp
 
-        proveedor_final = proveedor or proveedor_libre
+    proveedor_final = proveedor or proveedor_libre
 
-        if not proveedor_final:
-            return {
-                "tipo": "no_entendido",
-                "parametros": {},
-                "sugerencia": "No reconocí el proveedor. Probá: comparar compras roche junio julio 2025",
-                "debug": "comparar: proveedor no reconocido",
-            }
-
+    if not proveedor_final:
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "No reconocí el proveedor. Probá: comparar compras roche junio julio 2025",
+            "debug": f"comparar: proveedor no reconocido => Texto: '{texto_lower}'",
+        }
+        
         if len(meses_yyyymm) >= 2:
             mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
             return {
@@ -545,7 +544,6 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             "sugerencia": "Probá: comparar compras roche junio julio 2025",
             "debug": "comparar: faltan meses/año",
         }
-
     # ==========================================================
     # STOCK
     # ==========================================================
