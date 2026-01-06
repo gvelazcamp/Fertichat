@@ -463,25 +463,24 @@ def interpretar_pregunta(pregunta: str) -> Dict:
                 "debug": "compras mes (nombre+anio)",
             }
 
-        # ---------- compras (sin proveedor) + año ----------
-        if len(anios) >= 1:
-            return {
-                "tipo": "compras_anio",
-                "parametros": {"anio": anios[0]},
-                "debug": "compras año",
-            }
+# ---------- compras (sin proveedor) + año ----------
+if len(anios) >= 1:
+    return {
+        "tipo": "compras_anio",
+        "parametros": {"anio": anios[0]},
+        "debug": "compras año",
+    }
 
-
-    # ==========================================================
-    # COMPARAR COMPRAS PROVEEDOR MES VS MES
-    # ==========================================================
+# ==========================================================
+# COMPARAR COMPRAS PROVEEDOR MES VS MES
+# ==========================================================
 if "comparar" in texto_lower and "compra" in texto_lower:
     proveedor = provs[0] if provs else None
 
     # Identificar proveedor libre si no se halló en la lista
     if not proveedor:
         tmp = re.sub(r"(comparar|compras?)", "", texto_lower)
-        tmp = re.sub(r"(enero|febrero|marzo|...)", "", tmp)  # Continúa con meses
+        tmp = re.sub(r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)", "", tmp)  # Continúa con meses
         tmp = re.sub(r"(2023|2024|2025|2026)", "", tmp).strip()
         if len(tmp) >= 2:
             proveedor = tmp
@@ -492,7 +491,7 @@ if "comparar" in texto_lower and "compra" in texto_lower:
             "tipo": "no_entendido",
             "parametros": {},
             "sugerencia": "No encontré al proveedor, intentá: comparar compras roche junio julio 2025.",
-            "debug": f"Proveedor=''{proveedor}'', texto={texto_lower}",
+            "debug": f"Proveedor='{proveedor}', texto={texto_lower}",
         }
 
     # Caso 1: Comparar entre dos meses identificados como YYYY-MM
@@ -545,59 +544,68 @@ if "comparar" in texto_lower and "compra" in texto_lower:
         "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar años.",
         "debug": f"Condiciones insuficientes: años={anios}, meses={meses_nombre}",
     }
-    
-    # ==========================================================
-    # STOCK
-    # ==========================================================
-    if "stock" in texto_lower:
-        if arts:
-            return {"tipo": "stock_articulo", "parametros": {"articulo": arts[0]}, "debug": "stock articulo"}
-        return {"tipo": "stock_total", "parametros": {}, "debug": "stock total"}
 
-    # ==========================================================
-    # DEFAULT
-    # ==========================================================
+# ==========================================================
+# STOCK
+# ==========================================================
+if "stock" in texto_lower:
+    if arts:
+        return {
+            "tipo": "stock_articulo",
+            "parametros": {"articulo": arts[0]},
+            "debug": "stock articulo",
+        }
     return {
-        "tipo": "no_entendido",
+        "tipo": "stock_total",
         "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025",
-        "debug": "no match",
+        "debug": "stock total",
     }
 
+# ==========================================================
+# DEFAULT
+# ==========================================================
+return {
+    "tipo": "no_entendido",
+    "parametros": {},
+    "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025",
+    "debug": "no match",
+}
 
-    # ==========================================================
-    # OPENAI (opcional)
-    # ==========================================================
-    if client and USAR_OPENAI_PARA_DATOS:
-        try:
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": _get_system_prompt()},
-                    {"role": "user", "content": pregunta},
-                ],
-                temperature=0.1,
-                max_tokens=500,
-                timeout=15,
-            )
-            content = response.choices[0].message.content.strip()
-            content = re.sub(r"```json\s*", "", content)
-            content = re.sub(r"```\s*", "", content).strip()
-            out = json.loads(content)
-            if "tipo" not in out:
-                out["tipo"] = "no_entendido"
-            if "parametros" not in out:
-                out["parametros"] = {}
-            if "debug" not in out:
-                out["debug"] = "openai"
-            return out
-        except Exception as e:
-            return {
-                "tipo": "no_entendido",
-                "parametros": {},
-                "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
-                "debug": f"openai error: {str(e)[:80]}",
-            }
+# ==========================================================
+# OPENAI (opcional)
+# ==========================================================
+if client and USAR_OPENAI_PARA_DATOS:
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": _get_system_prompt()},
+                {"role": "user", "content": pregunta},
+            ],
+            temperature=0.1,
+            max_tokens=500,
+            timeout=15,
+        )
+        content = response.choices[0].message.content.strip()
+        content = re.sub(r"```json\s*", "", content)
+        content = re.sub(r"```\s*", "", content).strip()
+        out = json.loads(content)
+
+        if "tipo" not in out:
+            out["tipo"] = "no_entendido"
+        if "parametros" not in out:
+            out["parametros"] = {}
+        if "debug" not in out:
+            out["debug"] = "openai"
+        return out
+
+    except Exception as e:
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
+            "debug": f"openai error: {str(e)[:80]}",
+        }
 
     return {
         "tipo": "no_entendido",
