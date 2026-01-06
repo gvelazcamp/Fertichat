@@ -229,6 +229,105 @@ def get_lista_familias_stock() -> list:
         return ["Todos"]
     return ["Todos"] + df['familia'].tolist()
 
+def get_stock_total() -> pd.DataFrame:
+    sql = """
+        SELECT SUM(CAST(NULLIF(TRIM("STOCK"), '') AS NUMERIC)) AS total_stock
+        FROM stock_raw
+    """
+    df = ejecutar_consulta(sql)
+    return df
+
+def get_stock_por_familia() -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Familia") AS familia, SUM(CAST(NULLIF(TRIM("STOCK"), '') AS NUMERIC)) AS total
+        FROM stock_raw
+        GROUP BY TRIM("Familia")
+        ORDER BY familia
+    """
+    df = ejecutar_consulta(sql)
+    return df
+
+def get_stock_por_deposito() -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Deposito") AS deposito, SUM(CAST(NULLIF(TRIM("STOCK"), '') AS NUMERIC)) AS total
+        FROM stock_raw
+        GROUP BY TRIM("Deposito")
+        ORDER BY deposito
+    """
+    df = ejecutar_consulta(sql)
+    return df
+
+def get_stock_articulo(articulo: str) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Familia") AS familia, TRIM("Deposito") AS deposito, TRIM("STOCK") AS stock
+        FROM stock_raw
+        WHERE LOWER(TRIM("Articulo")) LIKE %s
+        ORDER BY TRIM("Articulo")
+    """
+    df = ejecutar_consulta(sql, (f"%{articulo.lower()}%",))
+    return df
+
+def get_stock_familia(familia: str) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Deposito") AS deposito, TRIM("STOCK") AS stock
+        FROM stock_raw
+        WHERE LOWER(TRIM("Familia")) = %s
+        ORDER BY TRIM("Articulo")
+    """
+    df = ejecutar_consulta(sql, (familia.lower(),))
+    return df
+
+def get_lotes_por_vencer(dias: int) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Lote") AS lote, TRIM("Vencimiento") AS vencimiento, TRIM("STOCK") AS stock,
+               DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) AS dias_restantes
+        FROM stock_raw
+        WHERE DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) <= %s
+        ORDER BY dias_restantes
+    """
+    df = ejecutar_consulta(sql, (dias,))
+    return df
+
+def get_lotes_vencidos() -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Lote") AS lote, TRIM("Vencimiento") AS vencimiento, TRIM("STOCK") AS stock
+        FROM stock_raw
+        WHERE TRIM("Vencimiento")::date < NOW()::date
+        ORDER BY TRIM("Vencimiento")
+    """
+    df = ejecutar_consulta(sql)
+    return df
+
+def get_stock_bajo(umbral: int) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Deposito") AS deposito, TRIM("STOCK") AS stock
+        FROM stock_raw
+        WHERE CAST(NULLIF(TRIM("STOCK"), '') AS NUMERIC) <= %s
+        ORDER BY CAST(NULLIF(TRIM("STOCK"), '') AS NUMERIC)
+    """
+    df = ejecutar_consulta(sql, (umbral,))
+    return df
+
+def get_stock_lote_especifico(lote: str) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Deposito") AS deposito, TRIM("STOCK") AS stock
+        FROM stock_raw
+        WHERE LOWER(TRIM("Lote")) = %s
+    """
+    df = ejecutar_consulta(sql, (lote.lower(),))
+    return df
+
+def get_alertas_vencimiento_multiple(dias_umbral: int) -> pd.DataFrame:
+    sql = """
+        SELECT TRIM("Articulo") AS articulo, TRIM("Lote") AS lote, TRIM("Vencimiento") AS vencimiento, TRIM("STOCK") AS stock,
+               DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) AS dias_restantes
+        FROM stock_raw
+        WHERE DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) <= %s
+        ORDER BY dias_restantes
+    """
+    df = ejecutar_consulta(sql, (dias_umbral,))
+    return df
+
 def get_lista_depositos_stock() -> list:
     sql = """
         SELECT DISTINCT TRIM("Deposito") AS deposito
