@@ -118,7 +118,7 @@ TABLA_CANONICA_50 = r"""
 | 29 | compras | (ninguno) | mes (YYYY-MM) | no | compras_mes | mes |
 | 30 | comparar compras | proveedor | mes(YYYY-MM)+mes(YYYY-MM) | no | comparar_proveedor_meses | proveedor, mes1, mes2 |
 | 31 | comparar compras | proveedor | anio+anio | no | comparar_proveedor_anios | proveedor, anios |
-| 32 | compras | proveedor | "noviembre 2025" | no | compras_proveedor_mes | proveedor, 2025-11 |
+| 32 | compras | proveedor | "noviembre 2025" | contiene | compras_proveedor_mes | proveedor, 2025-11 |
 | 33 | compras | (ninguno) | "noviembre 2025" | no | compras_mes | 2025-11 |
 | 34 | comparar compras | proveedor | "junio julio 2025" | no | comparar_proveedor_meses | proveedor, 2025-06, 2025-07 |
 | 35 | comparar compras | proveedor | "noviembre diciembre 2025" | no | comparar_proveedor_meses | proveedor, 2025-11, 2025-12 |
@@ -233,21 +233,31 @@ def contiene_comparar(texto: str) -> bool:
     t = texto.lower()
     return bool(re.search(r"\b(comparar|comparame|compara)\b", t))
 
+# =====================================================================
+# FACTURAS (NUEVO - SIN FORZAR 'A' + zfill)
+# =====================================================================
 def contiene_factura(texto: str) -> bool:
     if not texto:
         return False
     t = texto.lower()
-    return bool(re.search(r"\b(detalle\s+)?factura(s)?\b|\bnro\.?\s*comprobante\b|\bnro\.?\s*factura\b|\bcomprobante\b", t))
+    return bool(
+        re.search(
+            r"\b(detalle\s+)?factura(s)?\b"
+            r"|\bnro\.?\s*(comprobante|factura)\b"
+            r"|\bnro\.?\s*comprobante\b"
+            r"|\bcomprobante\b",
+            t,
+            flags=re.IGNORECASE
+        )
+    )
 
-# =====================================================================
-# FACTURAS: normalización + extracción
-# =====================================================================
 def _normalizar_nro_factura(nro: str) -> str:
+    """
+    Normaliza SIN cambiar el formato base.
+    - "275015" => "275015"
+    - "A00275015" => "A00275015"
+    """
     nro = (nro or "").strip().upper()
-    if not nro:
-        return ""
-    if nro.isdigit() and len(nro) <= 8:
-        return "A" + nro.zfill(8)
     return nro
 
 def _extraer_nro_factura(texto: str) -> Optional[str]:
@@ -267,13 +277,10 @@ def _extraer_nro_factura(texto: str) -> Optional[str]:
         nro = _normalizar_nro_factura(raw)
         return nro or None
 
-    # solo "A00273279"
-    if re.fullmatch(r"[A-Za-z]\d{5,}", t):
-        return _normalizar_nro_factura(t)
-
-    # solo número (>=5) => tratamos como factura
-    if re.fullmatch(r"\d{5,}", t):
-        return _normalizar_nro_factura(t)
+    # solo "A00273279" o "275015"
+    if re.fullmatch(r"[A-Za-z]?\d{3,}", t):
+        nro = _normalizar_nro_factura(t)
+        return nro or None
 
     return None
 
@@ -770,7 +777,7 @@ MAPEO_FUNCIONES = {
     # =========================
     "comparar_proveedor_meses": {
         "funcion": "get_comparacion_proveedor_meses",
-        "params": ["proveedor", "mes1", "mes2", "label1", "label2"]
+        "params": ["proveedor", "mes1", "mes2, "label1", "label2"]
     },
 
     "comparar_proveedor_anios": {
