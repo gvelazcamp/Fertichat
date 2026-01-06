@@ -48,6 +48,18 @@ MAX_MESES = 6
 MAX_ANIOS = 4
 
 # =====================================================================
+# NUEVO: EXCLUSIÓN DE NOMBRES PERSONALES (AGREGADO)
+# - Evita que "gonzalo ..." se tome como proveedor
+# =====================================================================
+NOMBRES_PERSONALES_EXCLUIR = [
+    "gonzalo",
+    "daniela",
+    "andres",
+    "sndres",   # por si lo escriben mal
+    "juan",
+]
+
+# =====================================================================
 # EJEMPLOS DE PROVEEDORES (CANÓNICOS OBLIGATORIOS)
 # - ROCHE: roche, roche laboratorio, roche diagnostics,
 #          roche international, roche international ltd
@@ -152,12 +164,20 @@ def _key(s: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s
 
+# =====================================================================
+# NUEVO: set de keys de nombres personales (AGREGADO)
+# =====================================================================
+_NOMBRES_PERSONALES_KEYS = set(_key(n) for n in (NOMBRES_PERSONALES_EXCLUIR or []) if n)
+
 def _tokens(texto: str) -> List[str]:
     raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", texto.lower())
     out: List[str] = []
     for t in raw:
         k = _key(t)
         if len(k) >= 3:
+            # ✅ NUEVO: ignorar nombres personales para evitar match como proveedor
+            if k in _NOMBRES_PERSONALES_KEYS:
+                continue
             out.append(k)
     return out
 
@@ -168,10 +188,10 @@ def normalizar_texto(texto: str) -> str:
     if not texto:
         return ""
 
-    ruido = ["gonzalo", "quiero", "por favor", "las", "los", "una", "un"]
+    ruido = ["gonzalo", "daniela", "andres", "sndres", "juan", "quiero", "por favor", "las", "los", "una", "un"]
     texto = texto.lower().strip()
     for r in ruido:
-        texto = re.sub(fr"\b{r}\b", "", texto)
+        texto = re.sub(fr"\b{re.escape(r)}\b", "", texto)
 
     texto = "".join(
         c
@@ -197,13 +217,17 @@ def limpiar_consulta(texto: str) -> str:
     texto = texto.lower().strip()
     texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("utf-8")
 
+    # ✅ NUEVO: quitar nombres personales ANTES de matchear proveedor
+    for nombre in NOMBRES_PERSONALES_EXCLUIR:
+        texto = re.sub(rf"\b{re.escape(nombre)}\b", " ", texto)
+
     # Palabras irrelevantes (ruido)
     ruido = [
         "quiero", "por favor", "las", "los", "un", "una", "a", "de", "en", "para",
         "cuáles fueron", "cuales fueron", "dame", "analisis", "realizadas", "durante"
     ]
     for palabra in ruido:
-        texto = re.sub(rf"\b{re.escape(palabra)}\b", "", texto)
+        texto = re.sub(rf"\b{re.escape(palabra)}\b", " ", texto)
 
     # Ajustar espacios y conectores
     texto = re.sub(r"\s{2,}", " ", texto).strip()
