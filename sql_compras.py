@@ -4,7 +4,7 @@
 
 import pandas as pd
 from typing import List, Optional
-from .sql_core import (
+from sql_core import (
     ejecutar_consulta,
     _sql_total_num_expr,
     _sql_total_num_expr_usd,
