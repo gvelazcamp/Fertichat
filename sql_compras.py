@@ -267,8 +267,52 @@ def get_total_compras_articulo_anio(articulo_like: str, anio: int) -> dict:
 # FACTURAS
 # =====================================================================
 
+def _factura_variantes(nro_factura: str) -> List[str]:
+    """
+    Genera variantes sin romper nada:
+    - "275015" -> ["275015", "A00275015", "00275015"]
+    - "A00275015" -> ["A00275015", "00275015", "275015"]
+    """
+    s = (nro_factura or "").strip().upper()
+    if not s:
+        return []
+
+    variantes = [s]
+
+    if s.isdigit():
+        # A + zfill(8)
+        if len(s) <= 8:
+            variantes.append("A" + s.zfill(8))
+        # zfill(8) sin A (por si la DB guarda 8 dígitos)
+        if len(s) < 8:
+            variantes.append(s.zfill(8))
+
+    else:
+        # separar prefijo letras + parte numérica
+        i = 0
+        while i < len(s) and s[i].isalpha():
+            i += 1
+        pref = s[:i]
+        dig = s[i:]
+
+        if dig.isdigit() and dig:
+            variantes.append(dig)  # "00275015"
+            variantes.append(dig.lstrip("0") or dig)  # "275015"
+            if pref and len(dig) < 8:
+                variantes.append(pref + dig.zfill(8))
+
+    # dedup preservando orden
+    out: List[str] = []
+    seen = set()
+    for v in variantes:
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
 def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
-    """Detalle de una factura por número."""
+    """Detalle de una factura por número (con fallback de variantes)."""
     total_expr = _sql_total_num_expr_general()
     sql = f"""
         SELECT
@@ -284,18 +328,52 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         ORDER BY TRIM("Articulo")
     """
-    return ejecutar_consulta(sql, (nro_factura,))
+
+    variantes = _factura_variantes(nro_factura)
+    if not variantes:
+        return ejecutar_consulta(sql, ("",))
+
+    # 1) intento exacto
+    df = ejecutar_consulta(sql, (variantes[0],))
+    if df is not None and not df.empty:
+        return df
+
+    # 2) fallback por variantes
+    for alt in variantes[1:]:
+        df2 = ejecutar_consulta(sql, (alt,))
+        if df2 is not None and not df2.empty:
+            df2.attrs["nro_factura_fallback"] = alt
+            return df2
+
+    return df
 
 
 def get_total_factura_por_numero(nro_factura: str) -> pd.DataFrame:
-    """Total de una factura."""
+    """Total de una factura (con fallback de variantes)."""
     total_expr = _sql_total_num_expr_general()
     sql = f"""
         SELECT COALESCE(SUM({total_expr}), 0) AS total_factura
         FROM chatbot_raw
         WHERE TRIM("Nro. Comprobante") = %s
     """
-    return ejecutar_consulta(sql, (nro_factura,))
+
+    variantes = _factura_variantes(nro_factura)
+    if not variantes:
+        return ejecutar_consulta(sql, ("",))
+
+    df = ejecutar_consulta(sql, (variantes[0],))
+    # Si no hay filas “visibles” igualmente SUM devuelve algo, pero si tu ejecutar_consulta
+    # retorna vacío, hacemos fallback igual.
+    if df is not None and not df.empty:
+        return df
+
+    for alt in variantes[1:]:
+        df2 = ejecutar_consulta(sql, (alt,))
+        if df2 is not None and not df2.empty:
+            df2.attrs["nro_factura_fallback"] = alt
+            return df2
+
+    return df
 
 
 def get_ultima_factura_de_articulo(patron_articulo: str) -> pd.DataFrame:
