@@ -343,11 +343,82 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
             label1,
             label2,
             [articulo] if articulo else None,
+# =========================
+# ROUTER SQL
+# =========================
+def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
+
+    if tipo == "compras_anio":
+        return sqlq_compras.get_compras_anio(parametros["anio"])
+
+    elif tipo == "compras_proveedor_mes":
+        return sqlq_compras.get_detalle_compras_proveedor_mes(parametros["proveedor"], parametros["mes"])
+
+    elif tipo == "compras_proveedor_anio":
+        return sqlq_compras.get_detalle_compras_proveedor_anio(parametros["proveedor"], parametros["anio"])
+
+    elif tipo == "compras_articulo_mes":
+        return sqlq_compras.get_detalle_compras_articulo_mes(parametros["articulo"], parametros["mes"])
+
+    elif tipo == "compras_articulo_anio":
+        return sqlq_compras.get_detalle_compras_articulo_anio(parametros["articulo"], parametros["anio"])
+
+    elif tipo == "compras_mes":
+        return sqlq_compras.get_compras_por_mes_excel(parametros["mes"])
+
+    elif tipo == "ultima_factura":
+        return sqlq_compras.get_ultima_factura_inteligente(parametros["patron"])
+
+    elif tipo == "facturas_articulo":
+        return sqlq_compras.get_facturas_de_articulo(parametros["articulo"])
+
+    # =========================
+    # FACTURAS
+    # =========================
+    elif tipo in ("detalle_factura", "detalle_factura_numero"):
+        return sqlq_compras.get_detalle_factura_por_numero(parametros["nro_factura"])
+
+    # =========================
+    # COMPARATIVAS
+    # =========================
+    elif tipo == "comparar_proveedor_meses":
+        proveedor = parametros.get("proveedor")
+        mes1 = parametros.get("mes1")
+        mes2 = parametros.get("mes2")
+        label1 = parametros.get("label1", mes1)
+        label2 = parametros.get("label2", mes2)
+
+        return sqlq_comparativas.get_comparacion_proveedor_meses(
+            proveedor,
+            mes1,
+            mes2,
+            label1,
+            label2,
+        )
+
+    elif tipo == "comparar_proveedor_anios":
+        proveedor = parametros.get("proveedor")
+        anios = parametros.get("anios", [])
+        return sqlq_comparativas.get_comparacion_proveedor_anios_like(proveedor, anios)
+
+    elif tipo == "comparar_articulo_meses":
+        articulo = parametros.get("articulo")
+        mes1 = parametros.get("mes1")
+        mes2 = parametros.get("mes2")
+        label1 = parametros.get("label1", mes1)
+        label2 = parametros.get("label2", mes2)
+
+        return sqlq_comparativas.get_comparacion_articulo_meses(
+            mes1,
+            mes2,
+            label1,
+            label2,
+            [articulo] if articulo else None,
         )
 
     elif tipo == "comparar_articulo_anios":
         return sqlq_comparativas.get_comparacion_articulo_anios(
-            parametros["anios"], 
+            parametros["anios"],
             parametros["articulo"]
         )
 
@@ -425,7 +496,6 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 
     else:
         raise ValueError(f"Tipo '{tipo}' no implementado")
-
 # =========================
 # UI PRINCIPAL
 # =========================
