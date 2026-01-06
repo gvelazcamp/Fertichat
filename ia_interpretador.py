@@ -411,6 +411,94 @@ def detectar_proveedor_o_articulo(texto: str) -> Dict[str, List[str]]:
 
     return {"tipo": "ninguno", "valores": []}
 
+# =========================
+# IA_INTERPRETADOR.PY - PATCH (AGREGAR MULTI-PROVEEDOR EN COMPARATIVAS)
+# =========================
+# SOLO AGREGAR: detección de múltiples proveedores para comparar compras
+# NO TOCA la lógica existente de comparar_proveedor_meses/anios (1 proveedor)
+
+import re
+from typing import List, Dict, Optional
+
+# ---------------------------------------------------------------------
+# Helper: extraer proveedores desde texto usando tu índice existente
+# (asume que ya tenés provs = _match_best(..., max_items=MAX_PROVEEDORES))
+# ---------------------------------------------------------------------
+
+def _extraer_lista_proveedores_desde_texto(texto_lower: str, provs_detectados: List[str]) -> List[str]:
+    """
+    Devuelve lista de proveedores detectados (máximo MAX_PROVEEDORES),
+    preservando el orden y evitando duplicados.
+    """
+    out: List[str] = []
+    seen = set()
+    for p in (provs_detectados or []):
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+# =========================
+# DENTRO DE interpretar_pregunta() -> BLOQUE:
+# "COMPARAR COMPRAS PROVEEDOR MES VS MES / AÑO VS AÑO"
+# =========================
+# Pegá ESTE BLOQUE dentro del:
+# if flag_comparar and flag_compras:
+# ... DESPUÉS de calcular `provs`, `anios`, `meses_nombre`, `meses_yyyymm`
+# y ANTES de la lógica de 1 proveedor (para darle prioridad al multi).
+# -------------------------
+
+# >>>>> INICIO BLOQUE AGREGADO: MULTI PROVEEDOR <<<<<
+proveedores_lista = _extraer_lista_proveedores_desde_texto(texto_lower, provs)
+
+# MULTI PROVEEDOR + MESES (2 meses)
+if len(proveedores_lista) >= 2:
+    # Caso meses YYYY-MM (ej: 2025-06 2025-07)
+    if len(meses_yyyymm) >= 2:
+        mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
+        return {
+            "tipo": "comparar_proveedores_meses",
+            "parametros": {
+                "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                "mes1": mes1,
+                "mes2": mes2,
+                "label1": mes1,
+                "label2": mes2,
+            },
+            "debug": "Comparativa multi-proveedor (mes vs mes) YYYY-MM",
+        }
+
+    # Caso meses por nombre + año (ej: junio julio 2025)
+    if len(meses_nombre) >= 2 and len(anios) >= 1:
+        anio = anios[0]
+        mes1 = _to_yyyymm(anio, meses_nombre[0])
+        mes2 = _to_yyyymm(anio, meses_nombre[1])
+        return {
+            "tipo": "comparar_proveedores_meses",
+            "parametros": {
+                "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                "mes1": mes1,
+                "mes2": mes2,
+                "label1": f"{meses_nombre[0]} {anio}",
+                "label2": f"{meses_nombre[1]} {anio}",
+            },
+            "debug": "Comparativa multi-proveedor (mes vs mes) nombre+anio",
+        }
+
+    # MULTI PROVEEDOR + AÑOS (2 años)
+    if len(anios) >= 2:
+        a1, a2 = anios[0], anios[1]
+        return {
+            "tipo": "comparar_proveedores_anios",
+            "parametros": {
+                "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                "anios": [a1, a2],
+                "label1": str(a1),
+                "label2": str(a2),
+            },
+            "debug": "Comparativa multi-proveedor (año vs año)",
+        }
+# >>>>> FIN BLOQUE AGREGADO: MULTI PROVEEDOR <<<<<
 # =====================================================================
 # PARSEO TIEMPO
 # =====================================================================
