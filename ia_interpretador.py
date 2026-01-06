@@ -80,7 +80,7 @@ TABLA_TIPOS = """
 | compras_proveedor_mes | Compras de un proveedor en un mes | proveedor, mes (YYYY-MM) | "compras roche noviembre 2025" |
 | comparar_proveedor_meses | Comparar proveedor mes vs mes | proveedor, mes1, mes2, label1, label2 | "comparar compras roche junio julio 2025" |
 | comparar_proveedor_anios | Comparar proveedor año vs año | proveedor, anios | "comparar compras roche 2024 2025" |
-| detalle_factura_numero | Detalle de una factura por número | nro_factura | "detalle factura 27379", "factura 27379" |
+| detalle_factura_numero | Detalle de factura por número | nro_factura | "detalle factura A00273279" / "factura 27379" |
 | ultima_factura | Última factura de un artículo/proveedor | patron | "ultima factura vitek" |
 | facturas_articulo | Todas las facturas de un artículo | articulo | "cuando vino vitek" |
 | stock_total | Resumen total de stock | (ninguno) | "stock total" |
@@ -189,10 +189,7 @@ def normalizar_texto(texto: str) -> str:
     if not texto:
         return ""
 
-    ruido = [
-        "gonzalo", "daniela", "andres", "sndres", "juan",
-        "quiero", "por favor", "las", "los", "una", "un"
-    ]
+    ruido = ["gonzalo", "daniela", "andres", "sndres", "juan", "quiero", "por favor", "las", "los", "una", "un"]
     texto = texto.lower().strip()
     for r in ruido:
         texto = re.sub(fr"\b{re.escape(r)}\b", "", texto)
@@ -228,7 +225,7 @@ def limpiar_consulta(texto: str) -> str:
     # Palabras irrelevantes (ruido)
     ruido = [
         "quiero", "por favor", "las", "los", "un", "una", "a", "de", "en", "para",
-        "cuales fueron", "cuáles fueron", "dame", "analisis", "realizadas", "durante"
+        "cuáles fueron", "cuales fueron", "dame", "analisis", "realizadas", "durante"
     ]
     for palabra in ruido:
         texto = re.sub(rf"\b{re.escape(palabra)}\b", " ", texto)
@@ -270,7 +267,11 @@ def extraer_parametros(texto: str) -> Dict:
         "noviembre": "11", "diciembre": "12"
     }
 
-    parametros = {"proveedor": None, "mes": None, "anio": None}
+    parametros = {
+        "proveedor": None,
+        "mes": None,
+        "anio": None
+    }
 
     anios = re.findall(r"(2023|2024|2025|2026)", texto)
     if anios:
@@ -433,6 +434,27 @@ def _to_yyyymm(anio: int, mes_nombre: str) -> str:
     return f"{anio}-{MESES[mes_nombre]}"
 
 # =====================================================================
+# NUEVO: EXTRACTOR NRO FACTURA (AGREGADO)
+# - Soporta: "detalle factura A00273279", "factura 27379", "A00273279"
+# =====================================================================
+def _extraer_nro_factura(texto: str) -> Optional[str]:
+    if not texto:
+        return None
+
+    t = str(texto).strip()
+
+    # "detalle factura A00273279" / "factura: 27379" / "factura A00273279"
+    m = re.search(r"\b(detalle\s+)?factura\b\s*[:#-]?\s*([A-Za-z]?\d{3,})\b", t, flags=re.IGNORECASE)
+    if m:
+        return str(m.group(2)).strip().upper()
+
+    # Si escriben SOLO el número (A + dígitos o solo dígitos)
+    if re.fullmatch(r"[A-Za-z]?\d{3,}", t):
+        return t.upper()
+
+    return None
+
+# =====================================================================
 # PROMPT OpenAI (solo si lo habilitás)
 # =====================================================================
 def _get_system_prompt() -> str:
@@ -505,11 +527,24 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             "debug": "pregunta vacía",
         }
 
-    # NUEVO: aplicar limpieza canónica sin romper la lógica
     texto_original = pregunta.strip()
+    texto_lower_original = texto_original.lower().strip()
+
+    # ==========================================================
+    # NUEVO: DETALLE FACTURA (AGREGADO)
+    # - Esto arregla el caso de tu screenshot: "Detalle factura A00273279"
+    # ==========================================================
+    nro_fact = _extraer_nro_factura(texto_original)
+    if nro_fact:
+        return {
+            "tipo": "detalle_factura_numero",
+            "parametros": {"nro_factura": nro_fact},
+            "debug": "detalle factura por número",
+        }
+
+    # NUEVO: aplicar limpieza canónica sin romper la lógica
     texto_limpio = limpiar_consulta(texto_original)
 
-    texto_lower_original = texto_original.lower().strip()
     texto_lower = texto_limpio.lower().strip()
 
     # ✅ REGLA: si el original contiene "compras", debe entrar acá igual
@@ -523,19 +558,6 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     anios = _extraer_anios(texto_lower)
     meses_nombre = _extraer_meses_nombre(texto_lower)
     meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
-
-    # ==========================================================
-    # DETALLE FACTURA POR NÚMERO (AGREGADO)
-    # - "detalle factura 27379" / "factura 27379" / "ver factura 27379"
-    # ==========================================================
-    m_factura = re.search(r"\bfactura\s+(\d{3,})\b", texto_lower)
-    if m_factura:
-        nro = m_factura.group(1)
-        return {
-            "tipo": "detalle_factura_numero",
-            "parametros": {"nro_factura": nro},
-            "debug": "detalle factura por número",
-        }
 
     # ==========================================================
     # COMPRAS (CANÓNICO): proveedor+mes | proveedor+año | mes | año
@@ -711,7 +733,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     return {
         "tipo": "no_entendido",
         "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 27379",
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025",
         "debug": "no match",
     }
 
@@ -755,11 +777,12 @@ MAPEO_FUNCIONES = {
     },
 
     # =========================
-    # FACTURAS (AGREGADO)
+    # FACTURA (AGREGADO)
     # =========================
     "detalle_factura_numero": {
         "funcion": "get_detalle_factura_por_numero",
-        "params": ["nro_factura"]
+        "params": ["nro_factura"],
+        "resumen": "get_total_factura_por_numero"
     },
 
     # =========================
