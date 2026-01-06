@@ -211,6 +211,22 @@ def limpiar_consulta(texto: str) -> str:
     return texto
 
 # =====================================================================
+# NUEVO: HELPERS DE KEYWORDS (AGREGADO)
+# Útil para router: si contiene "compras", mandalo acá SIEMPRE.
+# =====================================================================
+def contiene_compras(texto: str) -> bool:
+    if not texto:
+        return False
+    t = texto.lower()
+    return bool(re.search(r"\bcompras?\b", t))
+
+def contiene_comparar(texto: str) -> bool:
+    if not texto:
+        return False
+    t = texto.lower()
+    return bool(re.search(r"\b(comparar|comparame|compara)\b", t))
+
+# =====================================================================
 # NUEVO: EXTRACCIÓN SIMPLE DE PARÁMETROS (AGREGADO)
 # (No reemplaza tu lógica actual; queda disponible por si lo querés usar)
 # =====================================================================
@@ -468,7 +484,13 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # NUEVO: aplicar limpieza canónica sin romper la lógica
     texto_original = pregunta.strip()
     texto_limpio = limpiar_consulta(texto_original)
+
+    texto_lower_original = texto_original.lower().strip()
     texto_lower = texto_limpio.lower().strip()
+
+    # ✅ REGLA: si el original contiene "compras", debe entrar acá igual
+    flag_compras = contiene_compras(texto_lower_original) or contiene_compras(texto_lower)
+    flag_comparar = contiene_comparar(texto_lower_original) or contiene_comparar(texto_lower)
 
     idx_prov, idx_art = _get_indices()
     provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
@@ -481,7 +503,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # ==========================================================
     # COMPRAS (CANÓNICO): proveedor+mes | proveedor+año | mes | año
     # ==========================================================
-    if ("compra" in texto_lower) and ("comparar" not in texto_lower):
+    if flag_compras and (not flag_comparar):
         proveedor_libre = None
         if not provs:
             tmp = texto_lower
@@ -551,11 +573,11 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # ==========================================================
     # COMPARAR COMPRAS PROVEEDOR MES VS MES / AÑO VS AÑO
     # ==========================================================
-    if "comparar" in texto_lower and "compra" in texto_lower:
+    if flag_comparar and flag_compras:
         proveedor = provs[0] if provs else None
 
         if not proveedor:
-            tmp = re.sub(r"(comparar|compras?)", "", texto_lower)
+            tmp = re.sub(r"(comparar|comparame|compara|compras?)", "", texto_lower)
             tmp = re.sub(
                 r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
                 "",
