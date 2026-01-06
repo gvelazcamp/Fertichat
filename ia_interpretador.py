@@ -154,7 +154,7 @@ def _key(s: str) -> str:
 
 def _tokens(texto: str) -> List[str]:
     raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", texto.lower())
-    out = []
+    out: List[str] = []
     for t in raw:
         k = _key(t)
         if len(k) >= 3:
@@ -181,6 +181,73 @@ def normalizar_texto(texto: str) -> str:
     texto = re.sub(r"[^\w\s]", "", texto)
     texto = re.sub(r"\s+", " ", texto).strip()
     return texto
+
+# =====================================================================
+# NUEVO: LIMPIEZA CANÓNICA (AGREGADO)
+# =====================================================================
+def limpiar_consulta(texto: str) -> str:
+    """
+    Esta función limpia el texto de entrada quitando palabras irrelevantes (ruido)
+    y normaliza para que todo sea compatible con la tabla canónica.
+    """
+    if not texto:
+        return ""
+
+    # Convertir a minúsculas y eliminar tildes
+    texto = texto.lower().strip()
+    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("utf-8")
+
+    # Palabras irrelevantes (ruido)
+    ruido = [
+        "quiero", "por favor", "las", "los", "un", "una", "a", "de", "en", "para",
+        "cuáles fueron", "cuales fueron", "dame", "analisis", "realizadas", "durante"
+    ]
+    for palabra in ruido:
+        texto = re.sub(rf"\b{re.escape(palabra)}\b", "", texto)
+
+    # Ajustar espacios y conectores
+    texto = re.sub(r"\s{2,}", " ", texto).strip()
+
+    return texto
+
+# =====================================================================
+# NUEVO: EXTRACCIÓN SIMPLE DE PARÁMETROS (AGREGADO)
+# (No reemplaza tu lógica actual; queda disponible por si lo querés usar)
+# =====================================================================
+def extraer_parametros(texto: str) -> Dict:
+    """
+    Extrae los parámetros relevantes de una consulta limpia según los tipos definidos
+    en la tabla canónica.
+    """
+    MESES_LOCAL = {
+        "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+        "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+        "septiembre": "09", "setiembre": "09", "octubre": "10",
+        "noviembre": "11", "diciembre": "12"
+    }
+
+    parametros = {
+        "proveedor": None,
+        "mes": None,
+        "anio": None
+    }
+
+    anios = re.findall(r"(2023|2024|2025|2026)", texto)
+    if anios:
+        parametros["anio"] = int(anios[0])
+
+    for mes_nombre, mes_num in MESES_LOCAL.items():
+        if mes_nombre in texto:
+            parametros["mes"] = mes_num
+            break
+
+    PROVEEDORES = ["roche", "biodiagnostico", "tresul"]
+    for proveedor in PROVEEDORES:
+        if proveedor in texto:
+            parametros["proveedor"] = proveedor
+            break
+
+    return parametros
 
 # =====================================================================
 # CARGA LISTAS DESDE SUPABASE (cache)
@@ -225,13 +292,11 @@ def _cargar_listas_supabase() -> Dict[str, List[str]]:
 
     return {"proveedores": proveedores, "articulos": articulos}
 
-
 def _get_indices() -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
     listas = _cargar_listas_supabase()
     prov = [(p, _key(p)) for p in (listas.get("proveedores") or []) if p]
     art = [(a, _key(a)) for a in (listas.get("articulos") or []) if a]
     return prov, art
-
 
 def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) -> List[str]:
     toks = _tokens(texto)
@@ -256,7 +321,7 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
         return []
 
     candidatos.sort(key=lambda x: (-x[0], x[1]))
-    out = []
+    out: List[str] = []
     seen = set()
     for _, orig in candidatos:
         if orig not in seen:
@@ -350,7 +415,7 @@ FECHA: {hoy.strftime("%Y-%m-%d")} (mes actual {mes_actual}, año {anio_actual})
 """.strip()
 
 # =====================================================================
-# OPENAI (opcional) - SOLO COMO FALLBACK, DENTRO DE FUNCIÓN (CORRECTO)
+# OPENAI (opcional) - SOLO COMO FALLBACK (CORRECTO)
 # =====================================================================
 def _interpretar_con_openai(pregunta: str) -> Optional[Dict]:
     if not (client and USAR_OPENAI_PARA_DATOS):
@@ -400,8 +465,10 @@ def interpretar_pregunta(pregunta: str) -> Dict:
             "debug": "pregunta vacía",
         }
 
-    texto = pregunta.strip()
-    texto_lower = texto.lower().strip()
+    # NUEVO: aplicar limpieza canónica sin romper la lógica
+    texto_original = pregunta.strip()
+    texto_limpio = limpiar_consulta(texto_original)
+    texto_lower = texto_limpio.lower().strip()
 
     idx_prov, idx_art = _get_indices()
     provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
@@ -578,7 +645,7 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     # ==========================================================
     # DEFAULT (si está habilitado OpenAI, intenta fallback; si no, no_entendido)
     # ==========================================================
-    out_ai = _interpretar_con_openai(pregunta)
+    out_ai = _interpretar_con_openai(texto_original)
     if out_ai:
         return out_ai
 
