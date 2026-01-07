@@ -14,6 +14,7 @@ import streamlit as st
 from openai import OpenAI
 from config import OPENAI_MODEL
 from ia_interpretador import limpiar_consulta
+from orquestador import procesar_pregunta_router
 
 # =====================================================================
 # CONFIGURACIÓN OPENAI (opcional)
