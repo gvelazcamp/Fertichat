@@ -21,9 +21,12 @@ from datetime import datetime
 # Importar el interpretador
 from ia_interpretador import interpretar_pregunta, obtener_info_tipo, es_tipo_valido
 
-# Importar funciones SQL
-from sql_queries import (
-    # Compras
+# =========================
+# IMPORTAR FUNCIONES SQL
+# =========================
+
+# --- COMPRAS / FACTURAS ---
+from sql_compras import (
     get_compras_anio,
     get_total_compras_anio,
     get_detalle_compras_proveedor_mes,
@@ -40,14 +43,6 @@ from sql_queries import (
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
 
-    # Comparaciones
-    get_comparacion_proveedor_meses,
-    get_comparacion_proveedor_anios_monedas,
-    get_comparacion_articulo_meses,
-    get_comparacion_articulo_anios,
-    get_comparacion_familia_meses_moneda,
-    get_comparacion_familia_anios_monedas,
-
     # Gastos
     get_gastos_todas_familias_mes,
     get_gastos_todas_familias_anio,
@@ -55,8 +50,20 @@ from sql_queries import (
 
     # Top
     get_top_10_proveedores_chatbot,
+)
 
-    # Stock
+# --- COMPARATIVAS ---
+from sql_comparativas import (
+    get_comparacion_proveedor_meses,
+    get_comparacion_proveedor_anios_monedas,
+    get_comparacion_articulo_meses,
+    get_comparacion_articulo_anios,
+    get_comparacion_familia_meses_moneda,
+    get_comparacion_familia_anios_monedas,
+)
+
+# --- STOCK ---
+from sql_stock import (
     get_stock_total,
     get_stock_articulo,
     get_stock_familia,
