@@ -37,9 +37,6 @@ from sql_queries import (
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
 
-    # ✅ NUEVO: TODAS LAS FACTURAS POR PROVEEDOR (DETALLE)
-    get_facturas_proveedor_detalle,
-
     # Comparaciones
     get_comparacion_proveedor_meses,
     get_comparacion_proveedor_anios_monedas,
@@ -67,6 +64,13 @@ from sql_queries import (
     get_stock_bajo,
     get_stock_lote_especifico,
 )
+
+# Facturas por proveedor (detalle) - puede vivir en sql_compras.py o sql_queries.py
+try:
+    from sql_queries import get_facturas_proveedor_detalle  # si existe acá
+except Exception:
+    from sql_compras import get_facturas_proveedor_detalle  # fallback
+
 
 # Importar utilidades
 from utils_format import formatear_dataframe
@@ -372,65 +376,6 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             return f"🧾 Facturas de **{articulo.upper()}** ({len(df)} registros):", formatear_dataframe(df), None
 
 
-        # ✅ NUEVO: FACTURAS POR PROVEEDOR (DETALLE)
-        # Soporta tipo canónico "facturas_proveedor"
-        # y también el tipo viejo que tenías en el interpretador.
-        if tipo in ("facturas_proveedor", "compras_Todas las facturas de un Proveedor"):
-            proveedores = params.get("proveedores") or []
-            if isinstance(proveedores, str) and proveedores.strip():
-                proveedores = [proveedores.strip()]
-
-            # compat: por si viene "proveedor" singular
-            prov_singular = params.get("proveedor")
-            if (not proveedores) and prov_singular:
-                proveedores = [str(prov_singular).strip()]
-
-            meses = params.get("meses")
-            anios = params.get("anios")
-            desde = params.get("desde")
-            hasta = params.get("hasta")
-            articulo = params.get("articulo")
-            moneda = params.get("moneda")
-            limite = params.get("limite", 5000)
-
-            if not proveedores:
-                return "❌ Falta proveedor para listar facturas. Ej: todas las facturas roche 2025", None, None
-
-            df = get_facturas_proveedor_detalle(
-                proveedores=proveedores,
-                meses=meses,
-                anios=anios,
-                desde=desde,
-                hasta=hasta,
-                articulo=articulo,
-                moneda=moneda,
-                limite=limite,
-            )
-
-            if df is None or df.empty:
-                prov_txt = ", ".join([p.upper() for p in proveedores[:3]])
-                return f"No encontré facturas de {prov_txt} para ese período.", None, None
-
-            total = df["Total"].sum() if "Total" in df.columns else 0
-            total_fmt = f"${total:,.0f}".replace(",", ".")
-            prov_txt = ", ".join([p.upper() for p in proveedores[:3]])
-
-            # título “humano” según tiempo
-            tiempo_txt = ""
-            if meses and isinstance(meses, list) and meses:
-                tiempo_txt = f" en {meses[0]}"
-            elif anios and isinstance(anios, list) and anios:
-                tiempo_txt = f" en {anios[0]}"
-            elif desde and hasta:
-                tiempo_txt = f" del {desde} al {hasta}"
-
-            return (
-                f"🧾 Facturas de **{prov_txt}**{tiempo_txt} | 💰 **{total_fmt}** | {len(df)} registros:",
-                formatear_dataframe(df),
-                None
-            )
-
-
         # ✅ SOPORTE NUEVO (AGREGADO): detalle_factura_numero
         if tipo in ("detalle_factura", "detalle_factura_numero"):
             nro = params.get("nro_factura") or params.get("nro")
@@ -449,6 +394,72 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
 
             return f"🧾 Detalle de factura {nro_clean}:", formatear_dataframe(df), None
 
+
+        # ✅ NUEVO: facturas por proveedor (DETALLE) - NO interfiere con compras/comparativas
+        if tipo in (
+            "facturas_proveedor",
+            "facturas_proveedor_detalle",
+            "compras_Todas las facturas de un Proveedor",
+        ):
+            proveedores = params.get("proveedores")
+            if not proveedores:
+                # compat: a veces viene como string "proveedor"
+                p = params.get("proveedor")
+                if p:
+                    proveedores = [p]
+            if isinstance(proveedores, str):
+                proveedores = [proveedores]
+
+            if not proveedores:
+                return "❌ Indicá el proveedor. Ej: todas las facturas roche 2025", None, None
+
+            # tiempo
+            meses = params.get("meses")
+            anios = params.get("anios")
+
+            # compat: si viene mes/anio suelto
+            if not meses:
+                mes = params.get("mes")
+                if mes:
+                    meses = [mes] if isinstance(mes, str) else mes
+
+            if not anios:
+                anio = params.get("anio")
+                if anio:
+                    anios = [anio] if isinstance(anio, int) else anio
+
+            desde = params.get("desde")
+            hasta = params.get("hasta")
+            articulo = params.get("articulo")
+            moneda = params.get("moneda")
+            limite = params.get("limite", 5000)
+
+            df = get_facturas_proveedor_detalle(
+                proveedores=proveedores,
+                meses=meses,
+                anios=anios,
+                desde=desde,
+                hasta=hasta,
+                articulo=articulo,
+                moneda=moneda,
+                limite=limite,
+            )
+
+            if df is None or df.empty:
+                # etiqueta de tiempo
+                tiempo_lbl = ""
+                if desde and hasta:
+                    tiempo_lbl = f" ({desde} a {hasta})"
+                elif meses:
+                    tiempo_lbl = f" ({', '.join(meses)})"
+                elif anios:
+                    tiempo_lbl = f" ({', '.join(str(a) for a in anios)})"
+
+                prov_lbl = ", ".join([str(p).upper() for p in proveedores[:3]])
+                return f"No encontré facturas de **{prov_lbl}**{tiempo_lbl}.", None, None
+
+            prov_lbl = ", ".join([str(p).upper() for p in proveedores[:3]])
+            return f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):", formatear_dataframe(df), None
 
         # =========================================================
         # COMPARACIONES
@@ -852,8 +863,6 @@ if __name__ == "__main__":
         "cuanto gastamos",
         "detalle factura 273279",
         "detalle factura A00273279",
-        "todas las facturas roche 2025",
-        "todas las facturas roche noviembre 2025",
     ]
 
     print("=" * 60)
