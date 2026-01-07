@@ -67,7 +67,6 @@ NOMBRES_PERSONALES_EXCLUIR = [
 ALIAS_PROVEEDOR = {
     "roche": "roche",
     "rocheinternational": "roche",
-    "rocheinternational": "roche",
     "laboratoriotresul": "tresul",
     "tresul": "tresul",
     "tesul": "tresul",
