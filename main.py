@@ -1,7 +1,5 @@
 import streamlit as st
 
-st.session_state["DEBUG_SQL"] = st.sidebar.checkbox("Debug SQL", value=False)
-
 st.set_page_config(
     page_title="FertiChat",
     page_icon="🦋",
@@ -220,6 +218,13 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
+
+    # =========================
+    # DEBUG SQL (checkbox)
+    # =========================
+    st.session_state["DEBUG_SQL"] = st.checkbox("Debug SQL", value=False, key="debug_sql")
+
+    st.markdown("---")
     st.markdown("## 📌 Menú")
 
     st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
@@ -238,6 +243,23 @@ elif "Chat (Chainlit)" in menu_actual:
 elif menu_actual == "🛒 Compras IA":
     mostrar_resumen_compras_rotativo()
     Compras_IA()
+
+    # =========================
+    # DEBUG (última consulta)
+    # =========================
+    if st.session_state.get("DEBUG_SQL", False):
+        with st.expander("🛠 Debug (última consulta)", expanded=True):
+            st.subheader("Interpretación")
+            st.json(st.session_state.get("DBG_INT_LAST", {}))
+
+            st.subheader("SQL ejecutado")
+            st.write("Origen:", st.session_state.get("DBG_SQL_LAST_TAG"))
+            st.code(st.session_state.get("DBG_SQL_LAST_QUERY", ""), language="sql")
+            st.write("Params:", st.session_state.get("DBG_SQL_LAST_PARAMS", []))
+
+            st.subheader("Resultado")
+            st.write("Filas:", st.session_state.get("DBG_SQL_ROWS"))
+            st.write("Columnas:", st.session_state.get("DBG_SQL_COLS", []))
 
 elif menu_actual == "📦 Stock IA":
     mostrar_resumen_stock_rotativo()
