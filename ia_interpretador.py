@@ -592,6 +592,14 @@ MAPEO_FUNCIONES = {
         "funcion": "get_stock_articulo",
         "params": ["articulo"]
     },
+
+    # =========================
+    # NUEVO: TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE)
+    # =========================
+    "compras_Todoas las facturas de un Proveedor_________": {
+        "funcion": "get_facturas_proveedor_detalle",
+        "params": ["proveedores", "meses", "anios", "desde", "hasta", "articulo", "moneda", "limite"]
+    },
 }
 
 def obtener_info_tipo(tipo: str) -> Optional[Dict]:
@@ -607,10 +615,8 @@ def es_tipo_valido(tipo: str) -> bool:
         "comparar_proveedores_meses",
         "comparar_proveedores_anios",
     ]
-    return tipo in MAPEO_FUNCIONES or tipo in tipos_especialesros": {},
-            "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
-            "debug": "openai error",
-        }
+    return tipo in MAPEO_FUNCIONES or tipo in tipos_especiales
+
 
 # =====================================================================
 # INTERPRETADOR PRINCIPAL
