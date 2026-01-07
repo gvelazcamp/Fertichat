@@ -8,10 +8,10 @@ import plotly.express as px
 from datetime import datetime
 
 # IMPORTS
-from ia_router import interpretar_pregunta, obtener_info_tipo
+from ia_router import interpretar_pregunta, obtener_info_tipo  # obtener_info_tipo queda por compat
 from utils_openai import responder_con_openai
 
-# IMPORTS DE SQL (evita ImportError por funciones no existentes)
+# IMPORTS DE SQL
 import sql_compras as sqlq_compras
 import sql_comparativas as sqlq_comparativas
 
@@ -109,9 +109,18 @@ def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
             elif usd > 0:
                 explicacion.append(f"El gasto total fue de **${usd:,.2f} dólares**.\n")
 
+        # Detectar columna proveedor/articulo (case-insensitive)
+        col_prov = None
+        col_art = None
+        for c in df.columns:
+            if c.lower() == "proveedor":
+                col_prov = c
+            if c.lower() == "articulo":
+                col_art = c
+
         # Top proveedores (si existe columna proveedor)
-        if "proveedor" in df.columns:
-            top_proveedores = df.groupby("proveedor").size().sort_values(ascending=False).head(3)
+        if col_prov:
+            top_proveedores = df.groupby(col_prov).size().sort_values(ascending=False).head(3)
 
             explicacion.append("\n#### 🏢 Proveedores principales\n")
             explicacion.append("Los proveedores con más movimientos fueron:\n")
@@ -125,7 +134,7 @@ def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
 
             for i, (prov, cant) in enumerate(top_proveedores.items(), 1):
                 if col_total:
-                    df_prov = df[df["proveedor"] == prov].copy()
+                    df_prov = df[df[col_prov] == prov].copy()
                     df_prov[col_total] = (
                         df_prov[col_total]
                         .astype(str)
@@ -141,8 +150,8 @@ def generar_explicacion_ia(df: pd.DataFrame, pregunta: str, tipo: str) -> str:
                     explicacion.append(f"{i}. **{prov}**: {cant} registros\n")
 
         # Top artículos
-        elif "articulo" in df.columns:
-            top_articulos = df.groupby("articulo").size().sort_values(ascending=False).head(3)
+        elif col_art:
+            top_articulos = df.groupby(col_art).size().sort_values(ascending=False).head(3)
 
             explicacion.append("\n#### 📦 Artículos principales\n")
             explicacion.append("Los artículos más comprados fueron:\n")
@@ -205,9 +214,18 @@ def generar_grafico(df: pd.DataFrame, tipo: str):
             )
             df_clean[col_total] = pd.to_numeric(df_clean[col_total], errors="coerce").fillna(0)
 
+        # Detectar columnas proveedor/articulo (case-insensitive)
+        col_prov = None
+        col_art = None
+        for c in df_clean.columns:
+            if c.lower() == "proveedor":
+                col_prov = c
+            if c.lower() == "articulo":
+                col_art = c
+
         # Top 10 proveedores por total
-        if "proveedor" in df_clean.columns and col_total:
-            df_grouped = df_clean.groupby("proveedor")[col_total].sum().sort_values(ascending=False).head(10)
+        if col_prov and col_total:
+            df_grouped = df_clean.groupby(col_prov)[col_total].sum().sort_values(ascending=False).head(10)
 
             fig = px.bar(
                 x=df_grouped.values,
@@ -229,8 +247,8 @@ def generar_grafico(df: pd.DataFrame, tipo: str):
             return fig
 
         # Top 10 artículos por total
-        if "articulo" in df_clean.columns and col_total:
-            df_grouped = df_clean.groupby("articulo")[col_total].sum().sort_values(ascending=False).head(10)
+        if col_art and col_total:
+            df_grouped = df_clean.groupby(col_art)[col_total].sum().sort_values(ascending=False).head(10)
 
             fig = px.bar(
                 x=df_grouped.values,
@@ -335,42 +353,10 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         anios = parametros.get("anios", [])
         return sqlq_comparativas.get_comparacion_proveedor_anios_like(proveedor, anios)
 
-    elif tipo == "comparar_articulo_meses":
-        articulo = parametros.get("articulo")
-        mes1 = parametros.get("mes1")
-        mes2 = parametros.get("mes2")
-        label1 = parametros.get("label1", mes1)
-        label2 = parametros.get("label2", mes2)
-
-        return sqlq_comparativas.get_comparacion_articulo_meses(
-            mes1,
-            mes2,
-            label1,
-            label2,
-            [articulo] if articulo else None,
-        )
-
     elif tipo == "comparar_articulo_anios":
         return sqlq_comparativas.get_comparacion_articulo_anios(
             parametros["anios"],
             parametros["articulo"]
-        )
-
-    elif tipo == "comparar_familia_meses":
-        mes1 = parametros.get("mes1")
-        mes2 = parametros.get("mes2")
-        label1 = parametros.get("label1", mes1)
-        label2 = parametros.get("label2", mes2)
-        moneda = parametros.get("moneda", "$")
-        familias = parametros.get("familias")
-
-        return sqlq_comparativas.get_comparacion_familia_meses_moneda(
-            mes1,
-            mes2,
-            label1,
-            label2,
-            moneda,
-            familias,
         )
 
     elif tipo == "comparar_familia_anios":
@@ -379,34 +365,38 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         )
 
     # =========================
-    # COMPARATIVAS (MULTI-PROVEEDOR)
+    # COMPARATIVAS (MULTI-PROVEEDOR) - FIX + COMPAT
     # =========================
-    elif tipo == "comparar_proveedores_meses":
+    elif tipo in ("comparar_proveedores_meses", "comparar_proveedores_meses_multi"):
         proveedores = parametros.get("proveedores", [])
-        mes1 = parametros.get("mes1")
-        mes2 = parametros.get("mes2")
-        label1 = parametros.get("label1", mes1)
-        label2 = parametros.get("label2", mes2)
+        # compat si viene "proveedor" singular
+        if (not proveedores) and parametros.get("proveedor"):
+            proveedores = [parametros.get("proveedor")]
 
-        return sqlq_comparativas.get_comparacion_proveedores_meses(
+        meses = parametros.get("meses")
+        if not meses:
+            mes1 = parametros.get("mes1")
+            mes2 = parametros.get("mes2")
+            if mes1 and mes2:
+                meses = [mes1, mes2]
+            elif mes1:
+                meses = [mes1]
+
+        return sqlq_comparativas.get_comparacion_proveedores_meses_multi(
             proveedores,
-            mes1,
-            mes2,
-            label1,
-            label2,
+            meses or []
         )
 
-    elif tipo == "comparar_proveedores_anios":
+    elif tipo in ("comparar_proveedores_anios", "comparar_proveedores_anios_multi"):
         proveedores = parametros.get("proveedores", [])
-        anios = parametros.get("anios", [])
-        label1 = parametros.get("label1", str(anios[0]) if len(anios) > 0 else "")
-        label2 = parametros.get("label2", str(anios[1]) if len(anios) > 1 else "")
+        # compat si viene "proveedor" singular
+        if (not proveedores) and parametros.get("proveedor"):
+            proveedores = [parametros.get("proveedor")]
 
-        return sqlq_comparativas.get_comparacion_proveedores_anios(
+        anios = parametros.get("anios", [])
+        return sqlq_comparativas.get_comparacion_proveedores_anios_multi(
             proveedores,
-            anios,
-            label1,
-            label2,
+            anios
         )
 
     # =========================
@@ -591,3 +581,4 @@ def Compras_IA():
         )
 
         st.rerun()
+```0
