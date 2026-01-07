@@ -164,13 +164,7 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
     if not toks or not index:
         return []
 
-    # 1) EXACT token match
-    toks_set = set(toks)
-    for orig, norm in index:
-        if norm in toks_set:
-            return [orig]
-
-    # 2) substring + score
+    # 1) substring + score (robusto)
     candidatos = []
     for orig, norm in index:
         for tk in toks:
@@ -211,6 +205,28 @@ def _resolver_proveedor_alias(texto_lower: str, idx_prov: List[Tuple[str, str]])
             hit = a
             break
 
+    if not hit:
+        return None
+
+    best_orig = None
+    best_score = None
+
+    for orig, norm in idx_prov:
+        if hit in norm:
+            score = 1000
+            if "laboratorio" in norm:
+                score += 200
+            score -= int(len(norm) / 10)
+
+            if best_score is None or score > best_score:
+                best_score = score
+                best_orig = orig
+
+    return best_orig
+
+def _resolver_proveedor_alias_por_hit(hit: str, idx_prov: List[Tuple[str, str]]) -> Optional[str]:
+    """Igual que _resolver_proveedor_alias pero recibiendo el hit ya detectado."""
+    hit = (hit or "").strip().lower()
     if not hit:
         return None
 
@@ -278,10 +294,9 @@ def _to_yyyymm(anio: int, mes_nombre: str) -> str:
 def _extraer_proveedor_libre(texto_lower: str) -> Optional[str]:
     """
     Extrae el proveedor limpiando keywords y fechas.
-    ✅ MEJORADO: más robusto
     """
     tmp = texto_lower
-    
+
     # Sacar keywords de comparar (por palabra completa)
     tmp = re.sub(
         r"\b(comparar|comparame|compara|comparativa|comparativas|comparativo|comparativos)\b",
@@ -289,10 +304,10 @@ def _extraer_proveedor_libre(texto_lower: str) -> Optional[str]:
         tmp,
         flags=re.IGNORECASE,
     )
-    
+
     # Sacar compras
     tmp = re.sub(r"\bcompras?\b", " ", tmp, flags=re.IGNORECASE)
-    
+
     # Sacar meses
     tmp = re.sub(
         r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b",
@@ -300,28 +315,89 @@ def _extraer_proveedor_libre(texto_lower: str) -> Optional[str]:
         tmp,
         flags=re.IGNORECASE,
     )
-    
+
     # Sacar años
     tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
-    
+
     # Limpiar espacios múltiples
     tmp = re.sub(r"\s+", " ", tmp).strip()
-    
+
     # Validar que quede algo útil
     if tmp and len(tmp) >= 3:
-        # Filtrar stopwords comunes
         if tmp not in PROVEEDORES_INVALIDOS:
             return tmp
-    
+
     return None
+
+# =====================================================================
+# DETECTAR MULTI-PROVEEDOR (para "roche tresul 2024 2025", "roche, tresul", "roche y tresul")
+# =====================================================================
+def _detectar_proveedores_multi(texto_lower: str, idx_prov: List[Tuple[str, str]]) -> List[str]:
+    """
+    Devuelve lista de proveedores (<= MAX_PROVEEDORES) cuando el usuario menciona más de 1.
+    No rompe el caso proveedor compuesto (ej: "laboratorio tresul") porque se activa con:
+      - 2+ alias conocidos (roche/tresul/biodiagnostico/cabinsur)
+      - o separadores explícitos (coma / ' y ' / ' e ')
+    """
+    tlk = _key(texto_lower)
+
+    alias_terms = ["tresul", "biodiagnostico", "cabinsur", "roche"]
+    alias_hits = [a for a in alias_terms if a in tlk]
+
+    out: List[str] = []
+    seen = set()
+
+    # 1) Multi por alias (sin separadores)
+    if len(alias_hits) >= 2:
+        for hit in alias_hits:
+            prov = _resolver_proveedor_alias_por_hit(hit, idx_prov)
+            if prov and prov not in seen:
+                seen.add(prov)
+                out.append(prov)
+            if len(out) >= MAX_PROVEEDORES:
+                break
+        if len(out) >= 2:
+            return out
+
+    # 2) Multi por separadores (coma / y / e)
+    if ("," in texto_lower) or (" y " in f" {texto_lower} ") or (" e " in f" {texto_lower} "):
+        partes = re.split(r"\s*(?:,| y | e )\s*", texto_lower)
+        for part in partes:
+            part = (part or "").strip()
+            if not part:
+                continue
+
+            # primero alias si aplica
+            prov_alias = _resolver_proveedor_alias(part, idx_prov)
+            if prov_alias and prov_alias not in seen:
+                seen.add(prov_alias)
+                out.append(prov_alias)
+            else:
+                # match por lista (1 por parte)
+                prov_list = _match_best(part, idx_prov, max_items=1)
+                if prov_list:
+                    p0 = prov_list[0]
+                    if p0 and p0 not in seen:
+                        seen.add(p0)
+                        out.append(p0)
+
+            if len(out) >= MAX_PROVEEDORES:
+                break
+
+        if len(out) >= 2:
+            return out
+
+    return []
 
 # =====================================================================
 # INTÉRPRETE COMPARATIVAS (FUNCIÓN PRINCIPAL)
 # =====================================================================
 def interpretar_comparativas(pregunta: str) -> Dict:
     """
-    ✅ FUNCIÓN PRINCIPAL CORREGIDA
     Interpreta preguntas de comparativas y extrae parámetros.
+    Soporta:
+      - 1 proveedor: comparar compras X 2024 2025 / comparar compras X 2025-06 2025-07
+      - multi proveedor (<=5): comparar compras roche tresul 2024 2025 / roche, tresul 2024 2025
     """
     texto = (pregunta or "").strip()
     texto_lower = texto.lower().strip()
@@ -340,35 +416,8 @@ def interpretar_comparativas(pregunta: str) -> Dict:
 
     if es_comparativa:
         # =========================
-        # EXTRACCIÓN DE PROVEEDOR (3 estrategias)
+        # VALIDACIÓN "COMPRAS"
         # =========================
-        
-        # 1) Alias contra lista de proveedores
-        proveedor_alias = _resolver_proveedor_alias(texto_lower, idx_prov)
-        
-        # 2) Match por lista Supabase
-        proveedor_lista = provs[0] if provs else None
-        
-        # 3) Proveedor libre (texto crudo limpio)
-        proveedor_libre = _extraer_proveedor_libre(texto_lower)
-
-        # =========================
-        # ✅ PRIORIDAD CORRECTA
-        # =========================
-        proveedor_final = None
-        
-        if proveedor_alias:
-            proveedor_final = proveedor_alias
-        elif proveedor_libre and proveedor_libre not in PROVEEDORES_INVALIDOS:
-            proveedor_final = proveedor_libre
-        elif proveedor_lista:
-            proveedor_final = proveedor_lista
-
-        # =========================
-        # VALIDACIONES
-        # =========================
-        
-        # Falta "compras"
         if not menciona_compras:
             if len(anios) == 1:
                 y = anios[0]
@@ -382,7 +431,79 @@ def interpretar_comparativas(pregunta: str) -> Dict:
                 "debug": "comparar: falta palabra 'compras'",
             }
 
-        # No hay proveedor
+        # =========================
+        # MULTI-PROVEEDOR (ANTES QUE TODO)
+        # =========================
+        proveedores_multi = _detectar_proveedores_multi(texto_lower, idx_prov)
+
+        # Si no entró por el detector pero _match_best devolvió 2+ y hay separador explícito, úsalo
+        if not proveedores_multi and (("," in texto_lower) or (" y " in f" {texto_lower} ") or (" e " in f" {texto_lower} ")):
+            if len(provs) >= 2:
+                proveedores_multi = provs[:MAX_PROVEEDORES]
+
+        if len(proveedores_multi) >= 2:
+            # A) Multi proveedor + años (2+)
+            if len(anios) >= 2:
+                y1, y2 = anios[0], anios[1]
+                return {
+                    "tipo": "comparar_proveedores_anios_multi",
+                    "parametros": {
+                        "proveedores": proveedores_multi,
+                        "anios": [y1, y2],
+                    },
+                    "debug": f"comparar multi proveedores años: {proveedores_multi} {y1}-{y2}",
+                }
+
+            # B) Multi proveedor + meses (YYYY-MM)
+            if len(meses_yyyymm) >= 2:
+                m1, m2 = meses_yyyymm[0], meses_yyyymm[1]
+                return {
+                    "tipo": "comparar_proveedores_meses_multi",
+                    "parametros": {
+                        "proveedores": proveedores_multi,
+                        "meses": [m1, m2],
+                    },
+                    "debug": f"comparar multi proveedores meses (YYYY-MM): {proveedores_multi} {m1}-{m2}",
+                }
+
+            # C) Multi proveedor + meses por nombre + año
+            if len(meses_nombre) >= 2 and len(anios) >= 1:
+                anio = anios[0]
+                m1 = _to_yyyymm(anio, meses_nombre[0])
+                m2 = _to_yyyymm(anio, meses_nombre[1])
+                return {
+                    "tipo": "comparar_proveedores_meses_multi",
+                    "parametros": {
+                        "proveedores": proveedores_multi,
+                        "meses": [m1, m2],
+                        "label1": f"{meses_nombre[0]} {anio}",
+                        "label2": f"{meses_nombre[1]} {anio}",
+                    },
+                    "debug": f"comparar multi proveedores meses (nombre+anio): {proveedores_multi} {m1}-{m2}",
+                }
+
+            return {
+                "tipo": "no_entendido",
+                "parametros": {},
+                "sugerencia": "En multi-proveedor necesito 2 años o 2 meses. Ej: comparar compras roche, tresul 2024 2025 | comparar compras roche, tresul 2025-06 2025-07",
+                "debug": "comparar: multi proveedor sin 2 años/2 meses",
+            }
+
+        # =========================
+        # SINGLE-PROVEEDOR (3 estrategias)
+        # =========================
+        proveedor_alias = _resolver_proveedor_alias(texto_lower, idx_prov)
+        proveedor_lista = provs[0] if provs else None
+        proveedor_libre = _extraer_proveedor_libre(texto_lower)
+
+        proveedor_final = None
+        if proveedor_alias:
+            proveedor_final = proveedor_alias
+        elif proveedor_libre and proveedor_libre not in PROVEEDORES_INVALIDOS:
+            proveedor_final = proveedor_libre
+        elif proveedor_lista:
+            proveedor_final = proveedor_lista
+
         if not proveedor_final:
             return {
                 "tipo": "no_entendido",
@@ -392,9 +513,9 @@ def interpretar_comparativas(pregunta: str) -> Dict:
             }
 
         # =========================
-        # CASOS DE COMPARACIÓN
+        # CASOS DE COMPARACIÓN (SINGLE)
         # =========================
-        
+
         # 1) mes vs mes (YYYY-MM)
         if len(meses_yyyymm) >= 2:
             mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
@@ -429,7 +550,7 @@ def interpretar_comparativas(pregunta: str) -> Dict:
                 "debug": "comparar proveedor meses (nombre+anio)",
             }
 
-        # 3) año vs año ← ✅ EL QUE TE IMPORTA
+        # 3) año vs año
         if len(anios) >= 2:
             return {
                 "tipo": "comparar_proveedor_anios",
@@ -441,7 +562,6 @@ def interpretar_comparativas(pregunta: str) -> Dict:
                 "debug": f"comparar proveedor años: {proveedor_final} {anios}",
             }
 
-        # Sugerencias cuando falta info
         if len(anios) == 1:
             y = anios[0]
             return {
@@ -471,24 +591,24 @@ def interpretar_comparativas(pregunta: str) -> Dict:
 # TEST / DEBUG
 # =====================================================================
 if __name__ == "__main__":
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🧪 PRUEBAS DE COMPARATIVAS")
-    print("="*60)
-    
+    print("=" * 60)
+
     pruebas = [
         "comparar compras tresul 2024 2025",
         "comparar compras biodiagnostico 2024 2025",
         "comparar compras roche 2024 2025",
         "comparar compras cabinsur enero febrero 2025",
+        "comparar compras roche tresul 2024 2025",
+        "comparar compras roche, tresul 2024 2025",
+        "comparar compras roche y tresul 2025-06 2025-07",
     ]
-    
+
     for p in pruebas:
         print(f"\n🔍 Pregunta: {p}")
         res = interpretar_comparativas(p)
         print(f"   Tipo: {res.get('tipo')}")
         print(f"   Params: {res.get('parametros')}")
         print(f"   Debug: {res.get('debug')}")
-        
-        if res.get('tipo') == 'comparar_proveedor_anios':
-            prov = res['parametros'].get('proveedor')
-            print(f"   ✅ Proveedor extraído: '{prov}'")
+```0
