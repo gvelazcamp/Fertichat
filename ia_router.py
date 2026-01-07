@@ -281,6 +281,10 @@ MAPEO_FUNCIONES = {
         "funcion": "get_stock_articulo",
         "params": ["articulo"],
     },
+    "compras_Todas las facturas de un Proveedor": {
+        "funcion": "get_facturas_proveedor_detalle",
+        "params": ["proveedores", "meses", "anios", "desde", "hasta", "articulo", "moneda"]
+    },
 }
 
 def obtener_info_tipo(tipo: str) -> Optional[Dict]:
