@@ -671,6 +671,25 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         )
 
     # =========================
+    # TODAS LAS FACTURAS DE PROVEEDOR (DETALLE)
+    # =========================
+    elif tipo == "compras_Todas las facturas de un Proveedor":
+        proveedores = parametros.get("proveedores", [])
+        # compat si viene singular
+        if (not proveedores) and parametros.get("proveedor"):
+            proveedores = [parametros.get("proveedor")]
+
+        return sqlq_compras.get_facturas_proveedor_detalle(
+            proveedores=proveedores or [],
+            meses=parametros.get("meses"),
+            anios=parametros.get("anios"),
+            desde=parametros.get("desde"),
+            hasta=parametros.get("hasta"),
+            articulo=parametros.get("articulo"),
+            moneda=parametros.get("moneda"),
+            limite=parametros.get("limite", 5000),
+        )
+    # =========================
     # COMPARATIVAS (MULTI-PROVEEDOR) - FIX + COMPAT
     # =========================
     elif tipo in ("comparar_proveedores_meses", "comparar_proveedores_meses_multi"):
