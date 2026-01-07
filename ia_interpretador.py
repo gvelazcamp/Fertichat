@@ -658,8 +658,8 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
 
         # fallback 1: match estándar
         if not proveedores_lista and provs:
-            proveedores_lista = (provs or [])[:MAX_PROVEEDORES]
-
+            proveedores_lista = provs
+            
         # fallback 2: proveedor libre
         if not proveedores_lista:
             tmp = texto_lower
@@ -714,7 +714,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
             },
             "debug": "facturas proveedor detalle",
         }
-
     # =========================
     # COMPRAS (no comparar)
     # =========================
