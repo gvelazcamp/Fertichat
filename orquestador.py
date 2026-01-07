@@ -71,6 +71,13 @@ from sql_stock import (
 )
 
 
+# --- GASTOS / STOCK ---
+from sql_stock import (
+    get_gastos_todas_familias_mes,
+    get_gastos_todas_familias_anio,
+    get_gastos_secciones_detalle_completo,
+)
+
 # Facturas por proveedor (detalle) - puede vivir en sql_compras.py o sql_queries.py
 try:
     from sql_queries import get_facturas_proveedor_detalle  # si existe acá
