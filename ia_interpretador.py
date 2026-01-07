@@ -73,6 +73,7 @@ TABLA_TIPOS = """
 | comparar_proveedor_meses | Comparar proveedor mes vs mes | proveedor, mes1, mes2, label1, label2 | "comparar compras roche junio julio 2025" |
 | comparar_proveedor_anios | Comparar proveedor año vs año | proveedor, anios | "comparar compras roche 2024 2025" |
 | detalle_factura_numero | Detalle por número de factura | nro_factura | "detalle factura 273279" / "detalle factura A00273279" |
+| facturas_proveedor | Listado/detalle de facturas de un proveedor (NO es compras) | proveedores, meses?, anios?, desde?, hasta?, articulo?, moneda?, limite? | "todas las facturas roche noviembre 2025" / "facturas de tresul 2024" |
 | ultima_factura | Última factura de un artículo/proveedor | patron | "ultima factura vitek" |
 | facturas_articulo | Todas las facturas de un artículo | articulo | "cuando vino vitek" |
 | stock_total | Resumen total de stock | (ninguno) | "stock total" |
@@ -92,6 +93,7 @@ TABLA_CANONICA_50 = r"""
 | 02 | compras | (ninguno) | mes | no | compras_mes | mes |
 | 03 | compras | proveedor | anio | no | compras_proveedor_anio | proveedor, anio |
 | 04 | compras | proveedor | mes | no | compras_proveedor_mes | proveedor, mes |
+| 05 | facturas | proveedor | (opcional) | no | facturas_proveedor | proveedores, meses?, anios?, desde?, hasta? |
 """
 
 # =====================================================================
@@ -188,7 +190,7 @@ def contiene_factura(texto: str) -> bool:
             r"\b(detalle\s+)?factura(s)?\b"
             r"|\bnro\.?\s*(comprobante|factura)\b"
             r"|\bnro\.?\s*comprobante\b"
-            r"|\bcomprobante\b",
+            r"|\bcomprobante(s)?\b",
             t,
             flags=re.IGNORECASE
         )
@@ -379,6 +381,20 @@ def _extraer_moneda(texto: str) -> Optional[str]:
         return "$"
     return None
 
+def _extraer_limite(texto: str) -> Optional[int]:
+    if not texto:
+        return None
+    t = texto.lower()
+    m = re.search(r"\b(top|limite|límite)\s*(\d{1,3})\b", t)
+    if m:
+        try:
+            n = int(m.group(2))
+            if 1 <= n <= 500:
+                return n
+        except Exception:
+            return None
+    return None
+
 # =====================================================================
 # PARSEO TIEMPO
 # =====================================================================
@@ -544,9 +560,9 @@ MAPEO_FUNCIONES = {
     },
 
     # =========================
-    # NUEVO: TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE)
+    # CANÓNICO: FACTURAS PROVEEDOR (DETALLE / LISTADO) - separado de "compras"
     # =========================
-    "compras_Todas las facturas de un Proveedor": {
+    "facturas_proveedor": {
         "funcion": "get_facturas_proveedor_detalle",
         "params": ["proveedores", "meses", "anios", "desde", "hasta", "articulo", "moneda", "limite"],
     },
@@ -576,148 +592,122 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     - Detecta intención y extrae parámetros sin inventar.
     - NO ejecuta SQL, solo devuelve {tipo, parametros}.
     """
-    if not pregunta or not pregunta.strip():
+    if not pregunta or not str(pregunta).strip():
         return {"tipo": "no_entendido", "parametros": {}, "debug": "pregunta vacía"}
 
-    texto_original = pregunta.strip()
+    texto_original = str(pregunta).strip()
     texto_lower_original = texto_original.lower()
 
-# =========================
-# FAST-PATH: detalle factura por número
-# =========================
-if contiene_factura(texto_lower_original):
-    nro = _extraer_nro_factura(texto_original)
-    if nro:
-        return {
-            "tipo": "detalle_factura_numero",
-            "parametros": {"nro_factura": nro},
-            "debug": f"factura nro={nro}",
-        }
+    # =========================
+    # FAST-PATH: detalle factura por número (NO mezclar con listado facturas)
+    # =========================
+    if contiene_factura(texto_lower_original):
+        nro = _extraer_nro_factura(texto_original)
+        if nro:
+            return {
+                "tipo": "detalle_factura_numero",
+                "parametros": {"nro_factura": nro},
+                "debug": f"factura nro={nro}",
+            }
 
-# =========================
-# Normalización base
-# =========================
-texto_limpio = limpiar_consulta(texto_original)
-texto_lower = texto_limpio.lower()
+    # =========================
+    # Normalización base
+    # =========================
+    texto_limpio = limpiar_consulta(texto_original)
+    texto_lower = texto_limpio.lower()
 
-# =========================
-# Índices (proveedores / artículos) desde BD
-# =========================
-idx_prov, idx_art = _get_indices()
-provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
-arts = _match_best(texto_lower, idx_art, max_items=MAX_ARTICULOS)
+    # =========================
+    # Índices (proveedores / artículos) desde BD
+    # =========================
+    idx_prov, idx_art = _get_indices()
+    provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
+    arts = _match_best(texto_lower, idx_art, max_items=MAX_ARTICULOS)
 
-# =========================
-# Tiempo: años y meses
-# =========================
-anios = _extraer_anios(texto_lower)
-meses_nombre = _extraer_meses_nombre(texto_lower)
-meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
+    # =========================
+    # Tiempo: años y meses
+    # =========================
+    anios = _extraer_anios(texto_lower)
+    meses_nombre = _extraer_meses_nombre(texto_lower)
+    meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
 
-# =================================================================
-# TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE) - sin nro
-# =================================================================
-if (
-    contiene_factura(texto_lower_original)
-    or (
+    # =================================================================
+    # FACTURAS PROVEEDOR (LISTADO/DETALLE) - sin nro
+    # - separado de "compras"
+    # =================================================================
+    dispara_facturas_listado = False
+    if contiene_factura(texto_lower_original):
+        # Si contiene "facturas"/"comprobantes" sin nro -> listado
+        if _extraer_nro_factura(texto_original) is None:
+            dispara_facturas_listado = True
+
+    # También soporta "todas las facturas ..." explícito
+    if (
         re.search(r"\b(todas|todoas)\b", texto_lower_original)
         and re.search(r"\b(facturas?|comprobantes?)\b", texto_lower_original)
-    )
-) and (not _extraer_nro_factura(texto_original)):
-    proveedores_lista: List[str] = []
-    seen_prov = set()
-    toks = _tokens(texto_lower)
+        and (_extraer_nro_factura(texto_original) is None)
+    ):
+        dispara_facturas_listado = True
 
-    # Palabras a ignorar
-    ignorar = set([
-        "todas", "todoas", "toda", "todaslas", "factura", "facturas", "comprobante", "comprobantes",
-        "compra", "compras", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
-        "septiembre", "setiembre", "octubre", "noviembre", "diciembre", "2023", "2024", "2025", "2026",
-    ])
+    if dispara_facturas_listado:
+        # Proveedor: CANÓNICO = 1 proveedor para evitar traer "todos"
+        proveedores_lista: List[str] = []
+        if provs:
+            proveedores_lista = [provs[0]]
 
-    # Buscar proveedores en el texto
-    for tk in toks:
-        if not tk or tk in ignorar:
-            continue
+        # Fallback (solo si no matcheó por lista BD)
+        if not proveedores_lista:
+            tmp = texto_lower
+            tmp = re.sub(r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
+            tmp = re.sub(r"\b(compras?|comparar|comparame|compara)\b", " ", tmp)
+            tmp = re.sub(r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b", " ", tmp)
+            tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
+            tmp = re.sub(r"\s+", " ", tmp).strip()
+            if tmp and len(tmp) >= 3:
+                proveedores_lista = [tmp]
 
-        best_orig, best_score = None, None
-        for orig, norm in idx_prov:
-            if tk in norm:
-                score = (len(tk) * 1000) - len(norm)
-                if best_score is None or score > best_score:
-                    best_score, best_orig = score, orig
+        if not proveedores_lista:
+            return {
+                "tipo": "no_entendido",
+                "parametros": {},
+                "sugerencia": "Indicá el proveedor. Ej: todas las facturas de Roche noviembre 2025.",
+                "debug": "facturas_proveedor: no encontré proveedor",
+            }
 
-        if best_orig and best_orig not in seen_prov:
-            seen_prov.add(best_orig)
-            proveedores_lista.append(best_orig)
-            if len(proveedores_lista) >= MAX_PROVEEDORES:
-                break
+        # Tiempo: meses/años o rango
+        desde, hasta = _extraer_rango_fechas(texto_original)
 
-    # Fallback 1: basado en texto procesado
-    if not proveedores_lista:
-        tmp = texto_lower
-        tmp = re.sub(r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
-        tmp = re.sub(r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b", " ", tmp)
-        tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
-        tmp = re.sub(r"\s+", " ", tmp).strip()
-        if tmp and len(tmp) >= 3:
-            proveedores_lista = [tmp]
-
-    # Fallback 2: proveedor libre
-    if not proveedores_lista:
-        tmp = texto_lower
-        tmp = re.sub(r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
-        tmp = re.sub(r"\b(compras?|comparar|comparame|compara)\b", " ", tmp)
-        tmp = re.sub(r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b", " ", tmp)
-        tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
-        tmp = re.sub(r"\s+", " ", tmp).strip()
-        if tmp and len(tmp) >= 3:
-            proveedores_lista = [tmp]
-
-    # Si no hay proveedores
-    if not proveedores_lista:
-        return {
-            "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "Indicá el proveedor. Ej: todas las facturas de Roche noviembre 2025.",
-            "debug": "facturas: no encontré proveedor",
-        }
-
-    # Extraer rango de fechas
-    desde, hasta = _extraer_rango_fechas(texto_original)
-
-    # Extraer meses
-    meses_out: List[str] = []
-    if meses_yyyymm:
-        meses_out = meses_yyyymm[:MAX_MESES]
-    else:
-        if meses_nombre and anios:
-            for a in anios:
-                for mn in meses_nombre:
-                    meses_out.append(_to_yyyymm(a, mn))
+        meses_out: List[str] = []
+        if meses_yyyymm:
+            meses_out = meses_yyyymm[:MAX_MESES]
+        else:
+            if meses_nombre and anios:
+                for a in anios:
+                    for mn in meses_nombre:
+                        meses_out.append(_to_yyyymm(a, mn))
+                        if len(meses_out) >= MAX_MESES:
+                            break
                     if len(meses_out) >= MAX_MESES:
                         break
-                if len(meses_out) >= MAX_MESES:
-                    break
 
-    # Extraer moneda y artículo
-    moneda = _extraer_moneda(texto_lower_original)
-    articulo = arts[0] if arts else None
+        moneda = _extraer_moneda(texto_lower_original)
+        articulo = arts[0] if arts else None
+        limite = _extraer_limite(texto_lower_original)
 
-    # Retornar respuesta final
-    return {
-        "tipo": "compras_Todas las facturas de un Proveedor",
-        "parametros": {
-            "proveedores": proveedores_lista,
-            "meses": meses_out or None,
-            "anios": anios or None,
-            "desde": desde,
-            "hasta": hasta,
-            "articulo": articulo,
-            "moneda": moneda,
-        },
-        "debug": "facturas proveedor detalle",
-    }
+        return {
+            "tipo": "facturas_proveedor",
+            "parametros": {
+                "proveedores": proveedores_lista,
+                "meses": meses_out or None,
+                "anios": anios or None,
+                "desde": desde,
+                "hasta": hasta,
+                "articulo": articulo,
+                "moneda": moneda,
+                "limite": limite,
+            },
+            "debug": "facturas proveedor (canónico)",
+        }
+
     # =========================
     # COMPRAS (no comparar)
     # =========================
@@ -844,6 +834,6 @@ if (
     return {
         "tipo": "no_entendido",
         "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279",
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279 | todas las facturas roche noviembre 2025",
         "debug": "no match",
     }
