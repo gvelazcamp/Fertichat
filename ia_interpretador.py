@@ -504,6 +504,110 @@ def _interpretar_con_openai(pregunta: str) -> Optional[Dict]:
         return {
             "tipo": "no_entendido",
             "parametros": {},
+            "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar compras roche 2024 2025.",
+            "debug": f"Condiciones insuficientes: años={anios}, meses={meses_nombre}",
+        }
+
+    # STOCK
+    if "stock" in texto_lower:
+        if arts:
+            return {
+                "tipo": "stock_articulo",
+                "parametros": {"articulo": arts[0]},
+                "debug": "stock articulo",
+            }
+        return {
+            "tipo": "stock_total",
+            "parametros": {},
+            "debug": "stock total",
+        }
+
+    # DEFAULT
+    out_ai = _interpretar_con_openai(texto_original)
+    if out_ai:
+        return out_ai
+
+    return {
+        "tipo": "no_entendido",
+        "parametros": {},
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279",
+        "debug": "no match",
+    }
+
+# =====================================================================
+# MAPEO TIPO → FUNCIÓN SQL
+# =====================================================================
+MAPEO_FUNCIONES = {
+    "compras_anio": {
+        "funcion": "get_compras_anio",
+        "params": ["anio"],
+        "resumen": "get_total_compras_anio"
+    },
+    "compras_proveedor_anio": {
+        "funcion": "get_detalle_compras_proveedor_anio",
+        "params": ["proveedor", "anio"],
+        "resumen": "get_total_compras_proveedor_anio"
+    },
+    "compras_proveedor_mes": {
+        "funcion": "get_detalle_compras_proveedor_mes",
+        "params": ["proveedor", "mes"]
+    },
+    "compras_mes": {
+        "funcion": "get_compras_por_mes_excel",
+        "params": ["mes"]
+    },
+    "detalle_factura_numero": {
+        "funcion": "get_detalle_factura_por_numero",
+        "params": ["nro_factura"]
+    },
+    "comparar_proveedor_meses": {
+        "funcion": "get_comparacion_proveedor_meses",
+        "params": ["proveedor", "mes1", "mes2", "label1", "label2"]
+    },
+    "comparar_proveedor_anios": {
+        "funcion": "get_comparacion_proveedor_anios",
+        "params": ["proveedor", "anios", "label1", "label2"]
+    },
+    "comparar_proveedores_meses": {
+        "funcion": "get_comparacion_proveedores_meses",
+        "params": ["proveedores", "mes1", "mes2", "label1", "label2"]
+    },
+    "comparar_proveedores_anios": {
+        "funcion": "get_comparacion_proveedores_anios",
+        "params": ["proveedores", "anios", "label1", "label2"]
+    },
+    "ultima_factura": {
+        "funcion": "get_ultima_factura_inteligente",
+        "params": ["patron"]
+    },
+    "facturas_articulo": {
+        "funcion": "get_facturas_de_articulo",
+        "params": ["articulo"]
+    },
+    "stock_total": {
+        "funcion": "get_stock_total",
+        "params": []
+    },
+    "stock_articulo": {
+        "funcion": "get_stock_articulo",
+        "params": ["articulo"]
+    },
+}
+
+def obtener_info_tipo(tipo: str) -> Optional[Dict]:
+    return MAPEO_FUNCIONES.get(tipo)
+
+def es_tipo_valido(tipo: str) -> bool:
+    tipos_especiales = [
+        "conversacion",
+        "conocimiento",
+        "no_entendido",
+        "comparar_proveedor_meses",
+        "comparar_proveedor_anios",
+        "comparar_proveedores_meses",
+        "comparar_proveedores_anios",
+    ]
+    return tipo in MAPEO_FUNCIONES or tipo in tipos_especialesros": {},
             "sugerencia": "No pude interpretar. Probá: compras roche noviembre 2025",
             "debug": "openai error",
         }
@@ -727,128 +831,4 @@ def interpretar_pregunta(pregunta: str) -> Dict:
 
         return {
             "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar compras roche 2024 2025.",
-            "debug": f"Condiciones insuficientes: años={anios}, meses={meses_nombre}",
-        }
-
-    # STOCK
-    if "stock" in texto_lower:
-        if arts:
-            return {
-                "tipo": "stock_articulo",
-                "parametros": {"articulo": arts[0]},
-                "debug": "stock articulo",
-            }
-        return {
-            "tipo": "stock_total",
-            "parametros": {},
-            "debug": "stock total",
-        }
-
-    # DEFAULT
-    out_ai = _interpretar_con_openai(texto_original)
-    if out_ai:
-        return out_ai
-
-    return {
-        "tipo": "no_entendido",
-        "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279",
-        "debug": "no match",
-    }
-
- # =========================
-    # NUEVO: TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE) - COMPAT MULTI
- # =========================
-    elif tipo == "compras_Todoas las facturas de un Proveedor":
-        proveedores = parametros.get("proveedores", [])
-        # compat si viene "proveedor" singular
-        if (not proveedores) and parametros.get("proveedor"):
-            proveedores = [parametros.get("proveedor")]
-
-    return sqlq_compras.get_facturas_proveedor_detalle(
-       proveedores=proveedores or [],
-       meses=parametros.get("meses"),
-       anios=parametros.get("anios"),
-       desde=parametros.get("desde"),
-       hasta=parametros.get("hasta"),
-       articulo=parametros.get("articulo"),
-       moneda=parametros.get("moneda"),
-       limite=parametros.get("limite", 5000),
-    )
-
-# =====================================================================
-# MAPEO TIPO → FUNCIÓN SQL
-# =====================================================================
-MAPEO_FUNCIONES = {
-    "compras_anio": {
-        "funcion": "get_compras_anio",
-        "params": ["anio"],
-        "resumen": "get_total_compras_anio"
-    },
-    "compras_proveedor_anio": {
-        "funcion": "get_detalle_compras_proveedor_anio",
-        "params": ["proveedor", "anio"],
-        "resumen": "get_total_compras_proveedor_anio"
-    },
-    "compras_proveedor_mes": {
-        "funcion": "get_detalle_compras_proveedor_mes",
-        "params": ["proveedor", "mes"]
-    },
-    "compras_mes": {
-        "funcion": "get_compras_por_mes_excel",
-        "params": ["mes"]
-    },
-    "detalle_factura_numero": {
-        "funcion": "get_detalle_factura_por_numero",
-        "params": ["nro_factura"]
-    },
-    "comparar_proveedor_meses": {
-        "funcion": "get_comparacion_proveedor_meses",
-        "params": ["proveedor", "mes1", "mes2", "label1", "label2"]
-    },
-    "comparar_proveedor_anios": {
-        "funcion": "get_comparacion_proveedor_anios",
-        "params": ["proveedor", "anios", "label1", "label2"]
-    },
-    "comparar_proveedores_meses": {
-        "funcion": "get_comparacion_proveedores_meses",
-        "params": ["proveedores", "mes1", "mes2", "label1", "label2"]
-    },
-    "comparar_proveedores_anios": {
-        "funcion": "get_comparacion_proveedores_anios",
-        "params": ["proveedores", "anios", "label1", "label2"]
-    },
-    "ultima_factura": {
-        "funcion": "get_ultima_factura_inteligente",
-        "params": ["patron"]
-    },
-    "facturas_articulo": {
-        "funcion": "get_facturas_de_articulo",
-        "params": ["articulo"]
-    },
-    "stock_total": {
-        "funcion": "get_stock_total",
-        "params": []
-    },
-    "stock_articulo": {
-        "funcion": "get_stock_articulo",
-        "params": ["articulo"]
-    },
-}
-
-def obtener_info_tipo(tipo: str) -> Optional[Dict]:
-    return MAPEO_FUNCIONES.get(tipo)
-
-def es_tipo_valido(tipo: str) -> bool:
-    tipos_especiales = [
-        "conversacion",
-        "conocimiento",
-        "no_entendido",
-        "comparar_proveedor_meses",
-        "comparar_proveedor_anios",
-        "comparar_proveedores_meses",
-        "comparar_proveedores_anios",
-    ]
-    return tipo in MAPEO_FUNCIONES or tipo in tipos_especiales
+            "paramet
