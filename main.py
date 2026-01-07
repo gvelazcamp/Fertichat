@@ -277,6 +277,9 @@ elif menu_actual == "📊 Dashboard":
 elif menu_actual == "📄 Pedidos internos":
     mostrar_pedidos_internos()
 
+st.write("ORQUESTADOR_CARGADO =", st.session_state.get("ORQUESTADOR_CARGADO"))
+
+
 elif menu_actual == "🧾 Baja de stock":
     mostrar_baja_stock()
 
