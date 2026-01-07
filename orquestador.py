@@ -43,11 +43,6 @@ from sql_compras import (
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
 
-    # Gastos
-    get_gastos_todas_familias_mes,
-    get_gastos_todas_familias_anio,
-    get_gastos_secciones_detalle_completo,
-
     # Top
     get_top_10_proveedores_chatbot,
 )
