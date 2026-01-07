@@ -673,7 +673,10 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
     # =========================
     # TODAS LAS FACTURAS DE PROVEEDOR (DETALLE)
     # =========================
-    elif tipo == "compras_Todas las facturas de un Proveedor":
+    elif tipo in (
+        "compras_Todas las facturas de un Proveedor",
+        "compras_Todoas las facturas de un Proveedor_________",  # compat typo viejo
+    ):
         proveedores = parametros.get("proveedores", [])
         # compat si viene singular
         if (not proveedores) and parametros.get("proveedor"):
