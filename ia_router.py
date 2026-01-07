@@ -197,6 +197,10 @@ def interpretar_pregunta(pregunta: str) -> Dict:
     if "compra" in texto_lower or "compras" in texto_lower:
         return interpretar_canonico(pregunta)
 
+     # ✅ FACTURAS / COMPROBANTES (ruta al intérprete canónico de compras)
+    if any(k in texto_lower for k in ["factura", "facturas", "comprobante", "comprobantes"]):
+        return interpretar_canonico(pregunta)
+        
     # OPENAI (opcional)
     if client and USAR_OPENAI_PARA_DATOS:
         try:
