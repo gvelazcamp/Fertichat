@@ -658,9 +658,25 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 if len(proveedores_lista) >= MAX_PROVEEDORES:
                     break
 
-        # fallback 1: match estándar
-        if not proveedores_lista and provs:
-            proveedores_lista = provs
+        # fallback : proveedor genérico basado en texto procesado
+        if not proveedores_lista:
+            tmp = texto_lower
+            tmp = re.sub(
+                r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b",
+                " ",
+                tmp,
+            )
+            tmp = re.sub(
+                r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b",
+                " ",
+                tmp,
+            )
+            tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
+            tmp = re.sub(r"\s+", " ", tmp).strip()
+
+            if tmp and len(tmp) >= 3:
+                proveedores_lista = [tmp]
+
             
         # fallback 2: proveedor libre
         if not proveedores_lista:
