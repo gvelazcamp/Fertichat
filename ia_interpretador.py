@@ -48,8 +48,7 @@ MAX_MESES = 6
 MAX_ANIOS = 4
 
 # =====================================================================
-# NUEVO: EXCLUSIÓN DE NOMBRES PERSONALES (AGREGADO)
-# - Evita que "gonzalo ..." se tome como proveedor
+# EXCLUSIÓN DE NOMBRES PERSONALES
 # =====================================================================
 NOMBRES_PERSONALES_EXCLUIR = [
     "gonzalo",
@@ -82,7 +81,7 @@ TABLA_TIPOS = """
 """
 
 # =====================================================================
-# TABLA CANÓNICA (50 combinaciones permitidas)
+# TABLA CANÓNICA (placeholder reducido)
 # =====================================================================
 TABLA_CANONICA_50 = r"""
 | # | ACCIÓN | OBJETO | TIEMPO | MULTI | TIPO (output) | PARAMS |
@@ -112,7 +111,7 @@ def _key(s: str) -> str:
 _NOMBRES_PERSONALES_KEYS = set(_key(n) for n in (NOMBRES_PERSONALES_EXCLUIR or []) if n)
 
 def _tokens(texto: str) -> List[str]:
-    raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", texto.lower())
+    raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", (texto or "").lower())
     out: List[str] = []
     for t in raw:
         k = _key(t)
@@ -187,7 +186,7 @@ def contiene_factura(texto: str) -> bool:
             r"\b(detalle\s+)?factura(s)?\b"
             r"|\bnro\.?\s*(comprobante|factura)\b"
             r"|\bnro\.?\s*comprobante\b"
-            r"|\bcomprobante\b",
+            r"|\bcomprobante(s)?\b",
             t,
             flags=re.IGNORECASE
         )
@@ -220,7 +219,7 @@ def _extraer_nro_factura(texto: str) -> Optional[str]:
     return None
 
 # =====================================================================
-# EXTRACCIÓN SIMPLE DE PARÁMETROS
+# EXTRACCIÓN SIMPLE DE PARÁMETROS (compat)
 # =====================================================================
 def extraer_parametros(texto: str) -> Dict:
     MESES_LOCAL = {
@@ -232,18 +231,19 @@ def extraer_parametros(texto: str) -> Dict:
 
     parametros = {"proveedor": None, "mes": None, "anio": None}
 
-    anios = re.findall(r"(2023|2024|2025|2026)", texto)
+    anios = re.findall(r"(2023|2024|2025|2026)", (texto or ""))
     if anios:
         parametros["anio"] = int(anios[0])
 
+    t = (texto or "").lower()
     for mes_nombre, mes_num in MESES_LOCAL.items():
-        if mes_nombre in texto:
+        if mes_nombre in t:
             parametros["mes"] = mes_num
             break
 
     PROVEEDORES = ["roche", "biodiagnostico", "tresul"]
     for proveedor in PROVEEDORES:
-        if proveedor in texto:
+        if proveedor in t:
             parametros["proveedor"] = proveedor
             break
 
@@ -354,26 +354,18 @@ def _extraer_lista_proveedores_desde_texto(texto_lower: str, provs_detectados: L
     return out
 
 # =====================================================================
-# NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA
+# PARSEO RANGO FECHAS + MONEDA
 # =====================================================================
 def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Devuelve (desde, hasta) en formato YYYY-MM-DD si detecta 2 fechas.
-    Soporta:
-    - YYYY-MM-DD
-    - DD/MM/YYYY o DD-MM-YYYY
-    """
     if not texto:
         return None, None
 
     t = str(texto)
 
-    # ISO: YYYY-MM-DD
     iso = re.findall(r"\b(20\d{2}-\d{2}-\d{2})\b", t)
     if len(iso) >= 2:
         return iso[0], iso[1]
 
-    # LatAm: DD/MM/YYYY o DD-MM-YYYY
     lat = re.findall(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b", t)
     if len(lat) >= 2:
         def _fmt(d, m, y):
@@ -382,6 +374,7 @@ def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
                 return dt.strftime("%Y-%m-%d")
             except Exception:
                 return None
+
         d1 = _fmt(*lat[0])
         d2 = _fmt(*lat[1])
         return d1, d2
@@ -389,10 +382,6 @@ def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
     return None, None
 
 def _extraer_moneda(texto: str) -> Optional[str]:
-    """
-    Detecta moneda pedida por el usuario.
-    Retorna: "USD" o "$" o None
-    """
     if not texto:
         return None
     t = texto.lower()
@@ -407,7 +396,7 @@ def _extraer_moneda(texto: str) -> Optional[str]:
 # PARSEO TIEMPO
 # =====================================================================
 def _extraer_anios(texto: str) -> List[int]:
-    anios = re.findall(r"(2023|2024|2025|2026)", texto)
+    anios = re.findall(r"(2023|2024|2025|2026)", (texto or ""))
     out: List[int] = []
     for a in anios:
         try:
@@ -424,7 +413,8 @@ def _extraer_anios(texto: str) -> List[int]:
     return out2[:MAX_ANIOS]
 
 def _extraer_meses_nombre(texto: str) -> List[str]:
-    ms = [m for m in MESES.keys() if m in texto.lower()]
+    t = (texto or "").lower()
+    ms = [m for m in MESES.keys() if m in t]
     seen = set()
     out: List[str] = []
     for m in ms:
@@ -434,7 +424,7 @@ def _extraer_meses_nombre(texto: str) -> List[str]:
     return out[:MAX_MESES]
 
 def _extraer_meses_yyyymm(texto: str) -> List[str]:
-    ms = re.findall(r"(2023|2024|2025|2026)[-/](0[1-9]|1[0-2])", texto)
+    ms = re.findall(r"(2023|2024|2025|2026)[-/](0[1-9]|1[0-2])", (texto or ""))
     out = [f"{a}-{m}" for a, m in ms]
     seen = set()
     out2: List[str] = []
@@ -501,41 +491,10 @@ def _interpretar_con_openai(pregunta: str) -> Optional[Dict]:
         return out
 
     except Exception:
-        return {
-            "tipo": "no_entendido",
-            "parametros": {},
-            "sugerencia": "Intentá: comparar compras roche junio julio 2025 o comparar compras roche 2024 2025.",
-            "debug": f"Condiciones insuficientes: años={anios}, meses={meses_nombre}",
-        }
-
-    # STOCK
-    if "stock" in texto_lower:
-        if arts:
-            return {
-                "tipo": "stock_articulo",
-                "parametros": {"articulo": arts[0]},
-                "debug": "stock articulo",
-            }
-        return {
-            "tipo": "stock_total",
-            "parametros": {},
-            "debug": "stock total",
-        }
-
-    # DEFAULT
-    out_ai = _interpretar_con_openai(texto_original)
-    if out_ai:
-        return out_ai
-
-    return {
-        "tipo": "no_entendido",
-        "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279",
-        "debug": "no match",
-    }
+        return None
 
 # =====================================================================
-# MAPEO TIPO → FUNCIÓN SQL
+# MAPEO TIPO → FUNCIÓN SQL (compat)
 # =====================================================================
 MAPEO_FUNCIONES = {
     "compras_anio": {
@@ -594,7 +553,7 @@ MAPEO_FUNCIONES = {
     },
 
     # =========================
-    # NUEVO: TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE)
+    # TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE)
     # =========================
     "compras_Todas las facturas de un Proveedor": {
         "funcion": "get_facturas_proveedor_detalle",
@@ -617,11 +576,9 @@ def es_tipo_valido(tipo: str) -> bool:
     ]
     return tipo in MAPEO_FUNCIONES or tipo in tipos_especiales
 
-
 # =====================================================================
 # INTERPRETADOR PRINCIPAL
 # =====================================================================
-
 def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     """
     Interpretador canónico:
@@ -629,10 +586,15 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     - NO ejecuta SQL, solo devuelve {tipo, parametros}.
     """
     if not pregunta or not pregunta.strip():
-        return {"tipo": "no_entendido", "parametros": {}, "debug": "pregunta vacía"}
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "Escribí una consulta.",
+            "debug": "pregunta vacía",
+        }
 
     texto_original = pregunta.strip()
-    texto_lower_original = texto_original.lower()
+    texto_lower_original = texto_original.lower().strip()
 
     # =========================
     # FAST-PATH: detalle factura por número
@@ -643,14 +605,14 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
             return {
                 "tipo": "detalle_factura_numero",
                 "parametros": {"nro_factura": nro},
-                "debug": f"factura nro={nro}"
+                "debug": f"detalle factura detectado ({nro})",
             }
 
     # =========================
     # Normalización base
     # =========================
     texto_limpio = limpiar_consulta(texto_original)
-    texto_lower = texto_limpio.lower()
+    texto_lower = texto_limpio.lower().strip()
 
     # =========================
     # Índices (proveedores / artículos) desde BD
@@ -666,9 +628,13 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     meses_nombre = _extraer_meses_nombre(texto_lower)
     meses_yyyymm = _extraer_meses_yyyymm(texto_lower)
 
+    flag_compras = contiene_compras(texto_lower_original) or contiene_compras(texto_lower)
+    flag_comparar = contiene_comparar(texto_lower_original) or contiene_comparar(texto_lower)
+
     # =================================================================
     # NUEVO: TODAS LAS FACTURAS DE UN PROVEEDOR (DETALLE)
     # - Se activa si el usuario pide "facturas" / "comprobantes" sin nro específico
+    # - Incluye typo: "todoas"
     # =================================================================
     if (
         (
@@ -685,7 +651,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         seen_prov = set()
         toks = _tokens(texto_lower)
 
-        # tokens a ignorar (ruido / tiempo)
         ignorar = set([
             "todas", "todoas", "toda", "todaslas", "factura", "facturas",
             "comprobante", "comprobantes", "compra", "compras",
@@ -713,14 +678,28 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 if len(proveedores_lista) >= MAX_PROVEEDORES:
                     break
 
-        # Si no logró multi, fallback al match estándar (1 proveedor)
+        # Si no logró multi, fallback al match estándar (proveedor por índice)
         if not proveedores_lista and provs:
             proveedores_lista = (provs or [])[:MAX_PROVEEDORES]
+
+        # Si NO hay proveedor pero hay artículo, resolvemos como facturas_articulo / ultima_factura
+        if (not proveedores_lista) and arts:
+            if re.search(r"\bultima\s+factura\b", texto_lower_original):
+                return {
+                    "tipo": "ultima_factura",
+                    "parametros": {"patron": arts[0]},
+                    "debug": "ultima factura (articulo detectado)",
+                }
+            return {
+                "tipo": "facturas_articulo",
+                "parametros": {"articulo": arts[0]},
+                "debug": "facturas articulo (no proveedor)",
+            }
 
         # Fallback: si no detectó proveedor por lista, intentar "libre"
         if not proveedores_lista:
             tmp = texto_lower
-            tmp = re.sub(r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
+            tmp = re.sub(r"\b(todas|todoas|todas\s+las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
             tmp = re.sub(r"\b(compras?|comparar|comparame|compara)\b", " ", tmp)
             tmp = re.sub(
                 r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b",
@@ -770,6 +749,250 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 "hasta": hasta,
                 "articulo": articulo,
                 "moneda": moneda,
+                "limite": 5000,
             },
             "debug": "facturas proveedor detalle",
-        }                          
+        }
+
+    # =========================
+    # STOCK
+    # =========================
+    if "stock" in texto_lower_original or "stock" in texto_lower:
+        if arts:
+            return {
+                "tipo": "stock_articulo",
+                "parametros": {"articulo": arts[0]},
+                "debug": "stock articulo",
+            }
+        return {
+            "tipo": "stock_total",
+            "parametros": {},
+            "debug": "stock total",
+        }
+
+    # =========================
+    # ÚLTIMA FACTURA / FACTURAS ARTÍCULO (heurística mínima)
+    # =========================
+    if re.search(r"\bultima\s+factura\b", texto_lower_original):
+        if arts:
+            return {
+                "tipo": "ultima_factura",
+                "parametros": {"patron": arts[0]},
+                "debug": "ultima factura (articulo detectado)",
+            }
+        patron = re.sub(r".*\bultima\s+factura\b", "", texto_lower_original).strip()
+        patron = patron if patron else texto_limpio
+        return {
+            "tipo": "ultima_factura",
+            "parametros": {"patron": patron},
+            "debug": "ultima factura (patron libre)",
+        }
+
+    if (("cuando vino" in texto_lower_original) or re.search(r"\bfacturas?\s+de\b", texto_lower_original)) and arts:
+        return {
+            "tipo": "facturas_articulo",
+            "parametros": {"articulo": arts[0]},
+            "debug": "facturas articulo",
+        }
+
+    # =========================
+    # COMPRAS (no comparar)
+    # =========================
+    if flag_compras and (not flag_comparar):
+        proveedor_libre = None
+        if not provs:
+            tmp = texto_lower
+            tmp = re.sub(r"\bcompras?\b", " ", tmp).strip()
+            tmp2 = re.sub(
+                r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b",
+                " ",
+                tmp
+            )
+            tmp2 = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp2).strip()
+            tmp2 = re.sub(r"\s+", " ", tmp2).strip()
+            if tmp2 and len(tmp2) >= 3:
+                proveedor_libre = tmp2
+
+        proveedor_final = provs[0] if provs else proveedor_libre
+
+        if proveedor_final:
+            if len(meses_yyyymm) >= 1:
+                return {
+                    "tipo": "compras_proveedor_mes",
+                    "parametros": {"proveedor": proveedor_final, "mes": meses_yyyymm[0]},
+                    "debug": "compras proveedor mes (YYYY-MM)",
+                }
+
+            if len(meses_nombre) >= 1 and len(anios) >= 1:
+                mes_key = _to_yyyymm(anios[0], meses_nombre[0])
+                return {
+                    "tipo": "compras_proveedor_mes",
+                    "parametros": {"proveedor": proveedor_final, "mes": mes_key},
+                    "debug": "compras proveedor mes (nombre+anio)",
+                }
+
+            if len(anios) >= 1:
+                return {
+                    "tipo": "compras_proveedor_anio",
+                    "parametros": {"proveedor": proveedor_final, "anio": anios[0]},
+                    "debug": "compras proveedor año",
+                }
+
+        if len(meses_yyyymm) >= 1:
+            return {
+                "tipo": "compras_mes",
+                "parametros": {"mes": meses_yyyymm[0]},
+                "debug": "compras mes (YYYY-MM)",
+            }
+
+        if len(meses_nombre) >= 1 and len(anios) >= 1:
+            mes_key = _to_yyyymm(anios[0], meses_nombre[0])
+            return {
+                "tipo": "compras_mes",
+                "parametros": {"mes": mes_key},
+                "debug": "compras mes (nombre+anio)",
+            }
+
+        if len(anios) >= 1:
+            return {
+                "tipo": "compras_anio",
+                "parametros": {"anio": anios[0]},
+                "debug": "compras año",
+            }
+
+    # =========================
+    # COMPARAR COMPRAS
+    # =========================
+    if flag_comparar and flag_compras:
+        proveedores_lista = _extraer_lista_proveedores_desde_texto(texto_lower, provs)
+
+        # MULTI-PROVEEDOR (prioridad)
+        if len(proveedores_lista) >= 2:
+            if len(meses_yyyymm) >= 2:
+                mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
+                return {
+                    "tipo": "comparar_proveedores_meses",
+                    "parametros": {
+                        "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                        "mes1": mes1,
+                        "mes2": mes2,
+                        "label1": mes1,
+                        "label2": mes2,
+                    },
+                    "debug": "comparativa multi-proveedor (mes vs mes) YYYY-MM",
+                }
+
+            if len(meses_nombre) >= 2 and len(anios) >= 1:
+                anio = anios[0]
+                mes1 = _to_yyyymm(anio, meses_nombre[0])
+                mes2 = _to_yyyymm(anio, meses_nombre[1])
+                return {
+                    "tipo": "comparar_proveedores_meses",
+                    "parametros": {
+                        "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                        "mes1": mes1,
+                        "mes2": mes2,
+                        "label1": f"{meses_nombre[0]} {anio}",
+                        "label2": f"{meses_nombre[1]} {anio}",
+                    },
+                    "debug": "comparativa multi-proveedor (mes vs mes) nombre+anio",
+                }
+
+            if len(anios) >= 2:
+                a1, a2 = anios[0], anios[1]
+                return {
+                    "tipo": "comparar_proveedores_anios",
+                    "parametros": {
+                        "proveedores": proveedores_lista[:MAX_PROVEEDORES],
+                        "anios": [a1, a2],
+                        "label1": str(a1),
+                        "label2": str(a2),
+                    },
+                    "debug": "comparativa multi-proveedor (año vs año)",
+                }
+
+        # 1 PROVEEDOR
+        proveedor = provs[0] if provs else None
+        if not proveedor:
+            tmp = re.sub(r"(comparar|comparame|compara|compras?)", " ", texto_lower)
+            tmp = re.sub(
+                r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)",
+                " ",
+                tmp
+            )
+            tmp = re.sub(r"(2023|2024|2025|2026)", " ", tmp).strip()
+            tmp = re.sub(r"\s+", " ", tmp).strip()
+            if len(tmp) >= 2:
+                proveedor = tmp
+
+        if not proveedor:
+            return {
+                "tipo": "no_entendido",
+                "parametros": {},
+                "sugerencia": "No encontré al proveedor, intentá: comparar compras roche 2024 2025.",
+                "debug": "comparativa: no proveedor",
+            }
+
+        if len(meses_yyyymm) >= 2:
+            mes1, mes2 = meses_yyyymm[0], meses_yyyymm[1]
+            return {
+                "tipo": "comparar_proveedor_meses",
+                "parametros": {
+                    "proveedor": proveedor,
+                    "mes1": mes1,
+                    "mes2": mes2,
+                    "label1": mes1,
+                    "label2": mes2,
+                },
+                "debug": "comparando meses (YYYY-MM)",
+            }
+
+        if len(meses_nombre) >= 2 and len(anios) >= 1:
+            anio = anios[0]
+            mes1 = _to_yyyymm(anio, meses_nombre[0])
+            mes2 = _to_yyyymm(anio, meses_nombre[1])
+            return {
+                "tipo": "comparar_proveedor_meses",
+                "parametros": {
+                    "proveedor": proveedor,
+                    "mes1": mes1,
+                    "mes2": mes2,
+                    "label1": f"{meses_nombre[0]} {anio}",
+                    "label2": f"{meses_nombre[1]} {anio}",
+                },
+                "debug": "comparando meses (nombre+anio)",
+            }
+
+        if len(anios) >= 2:
+            a1, a2 = anios[0], anios[1]
+            return {
+                "tipo": "comparar_proveedor_anios",
+                "parametros": {
+                    "proveedor": proveedor,
+                    "anios": [a1, a2],
+                    "label1": str(a1),
+                    "label2": str(a2),
+                },
+                "debug": "comparando años",
+            }
+
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "Probá: comparar compras roche 2024 2025 | comparar compras roche junio julio 2025.",
+            "debug": "comparativa: faltan meses/años",
+        }
+
+    # =========================
+    # DEFAULT: OpenAI (si está habilitado) o no entendido
+    # =========================
+    out_ai = _interpretar_con_openai(texto_original)
+    if out_ai:
+        return out_ai
+
+    return {
+        "tipo": "no_entendido",
+        "parametros": {},
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche 2024 2025 | todas las facturas roche 2025 | detalle factura 273279",
+        "debug": "no match",
+    }
