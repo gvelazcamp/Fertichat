@@ -601,6 +601,17 @@ def get_facturas_proveedor_detalle(
     ORDER BY "Fecha" DESC NULLS LAST
     LIMIT {limite};
     """
+    # =========================
+    # DEBUG VISIBLE EN STREAMLIT (opcional)
+    # =========================
+    try:
+        import streamlit as st
+        if st.session_state.get("DEBUG_SQL", False):
+            st.session_state["DBG_SQL_LAST_QUERY"] = query
+            st.session_state["DBG_SQL_LAST_PARAMS"] = list(params)
+            st.session_state["DBG_SQL_LAST_TAG"] = "get_facturas_proveedor_detalle"
+    except Exception:
+        pass
 
     return ejecutar_consulta(query, tuple(params))
 
