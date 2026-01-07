@@ -6,6 +6,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import re
+import difflib
+import unicodedata
+from typing import Optional, Dict, List, Tuple
+
+import ia_compras as iaq_compras
 
 # IMPORTS
 from ia_router import interpretar_pregunta, obtener_info_tipo  # obtener_info_tipo queda por compat
@@ -22,6 +28,306 @@ import sql_comparativas as sqlq_comparativas
 def inicializar_historial():
     if "historial_compras" not in st.session_state:
         st.session_state["historial_compras"] = []
+
+
+# =========================
+# SUGERENCIAS (SI/NO) - CORRECCIÓN RÁPIDA DE PROVEEDORES
+# =========================
+
+MESES_NOMBRE = {
+    "01": "enero",
+    "02": "febrero",
+    "03": "marzo",
+    "04": "abril",
+    "05": "mayo",
+    "06": "junio",
+    "07": "julio",
+    "08": "agosto",
+    "09": "septiembre",
+    "10": "octubre",
+    "11": "noviembre",
+    "12": "diciembre",
+}
+
+_STOPWORDS_PROV = {
+    "compras", "compra", "comparar", "compara", "comparame", "comparame", "mes", "año", "anio",
+    "del", "de", "la", "el", "y", "e", "en", "para", "por", "entre", "vs", "versus",
+    "laboratorio", "lab", "s", "sa", "srl", "ltda", "lt", "inc", "ltd", "uruguay", "uy",
+}
+
+_MESES_TOKENS = {
+    "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "setiembre",
+    "octubre", "noviembre", "diciembre"
+}
+
+
+def _strip_accents_local(s: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s or "")
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def _key_local(s: str) -> str:
+    s = _strip_accents_local((s or "").lower().strip())
+    s = re.sub(r"[^a-z0-9]+", "", s)
+    return s
+
+
+def _tiene_sep_multi_prov(texto: str) -> bool:
+    t = (texto or "").lower()
+    return ("," in t) or (" y " in t) or (" e " in t)
+
+
+def _mes_yyyymm_a_nombre(mes_yyyymm: str) -> str:
+    # "2025-11" -> "noviembre 2025"
+    try:
+        y, m = mes_yyyymm.split("-")
+        return f"{MESES_NOMBRE.get(m.zfill(2), mes_yyyymm)} {y}"
+    except Exception:
+        return mes_yyyymm
+
+
+def _anio_str_list(anios: List[int]) -> str:
+    return " ".join([str(a) for a in anios if a])
+
+
+def _extraer_anios_texto(texto: str) -> List[int]:
+    out: List[int] = []
+    for m in re.findall(r"\b(20\d{2})\b", (texto or "")):
+        try:
+            out.append(int(m))
+        except Exception:
+            continue
+    # únicos preservando orden
+    seen = set()
+    uniq: List[int] = []
+    for a in out:
+        if a not in seen:
+            uniq.append(a)
+            seen.add(a)
+    return uniq
+
+
+def _short_from_proveedor(orig: str) -> str:
+    # intenta devolver un "alias corto" útil (evita "laboratorio", "sa", etc.)
+    tokens = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", (orig or "").lower())
+    clean: List[str] = []
+    for t in tokens:
+        k = _key_local(t)
+        if len(k) < 4:
+            continue
+        if k in _STOPWORDS_PROV:
+            continue
+        if k in _MESES_TOKENS:
+            continue
+        clean.append(t)
+    if not clean:
+        # fallback: primera palabra no vacía
+        for t in tokens:
+            if t.strip():
+                return t.strip()
+        return orig.strip()
+    # prioriza la palabra más larga (suele ser el "nombre real")
+    clean.sort(key=lambda x: len(_key_local(x)), reverse=True)
+    return clean[0].strip()
+
+
+@st.cache_data(ttl=60 * 60)
+def _catalogo_proveedores_cache() -> Dict[str, object]:
+    listas = iaq_compras._cargar_listas_supabase()
+    proveedores_full: List[str] = [p for p in (listas.get("proveedores") or []) if p]
+
+    full_keys: List[str] = [_key_local(p) for p in proveedores_full]
+
+    # mapping short_key -> short_text (si hay colisiones, dejamos el primero)
+    short_key_to_short: Dict[str, str] = {}
+    short_keys: List[str] = []
+
+    for p in proveedores_full:
+        short = _short_from_proveedor(p)
+        sk = _key_local(short)
+        if len(sk) < 4:
+            continue
+        if sk not in short_key_to_short:
+            short_key_to_short[sk] = short
+            short_keys.append(sk)
+
+    return {
+        "proveedores_full": proveedores_full,
+        "full_keys": full_keys,
+        "short_keys": short_keys,
+        "short_key_to_short": short_key_to_short,
+    }
+
+
+def _proveedor_parece_valido(prov_input: str) -> bool:
+    pkey = _key_local(prov_input or "")
+    if len(pkey) < 4:
+        return False
+    cat = _catalogo_proveedores_cache()
+    full_keys: List[str] = cat["full_keys"]  # type: ignore
+    # si el input aparece como substring en algún proveedor real, lo consideramos válido (ej: "roche")
+    for fk in full_keys:
+        if pkey and pkey in fk:
+            return True
+    return False
+
+
+def _match_proveedor_cercano(prov_input: str, cutoff: float = 0.72) -> Optional[str]:
+    pkey = _key_local(prov_input or "")
+    if len(pkey) < 4:
+        return None
+
+    cat = _catalogo_proveedores_cache()
+    short_keys: List[str] = cat["short_keys"]  # type: ignore
+    short_key_to_short: Dict[str, str] = cat["short_key_to_short"]  # type: ignore
+
+    matches = difflib.get_close_matches(pkey, short_keys, n=1, cutoff=cutoff)
+    if not matches:
+        return None
+    return short_key_to_short.get(matches[0])
+
+
+def _infer_proveedores_desde_texto(texto: str, max_items: int = 3) -> List[str]:
+    # busca "palabras" que parezcan proveedores, incluso con typos
+    raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ]{3,}", (texto or "").lower())
+    candidatos: List[str] = []
+    for w in raw:
+        kw = _key_local(w)
+        if len(kw) < 4:
+            continue
+        if kw in _STOPWORDS_PROV or kw in _MESES_TOKENS:
+            continue
+        # intenta match cercano
+        m = _match_proveedor_cercano(w, cutoff=0.75)
+        if m:
+            mk = _key_local(m)
+            if mk not in [_key_local(x) for x in candidatos]:
+                candidatos.append(m)
+        if len(candidatos) >= max_items:
+            break
+    return candidatos
+
+
+def _extraer_sugerencia_simple(sugerencia: str) -> Optional[str]:
+    # toma la primera opción tipo "Probá: ... | ... | ..."
+    if not sugerencia:
+        return None
+    s = sugerencia.strip()
+    # si viene "Probá:" o "Sugerencia:" etc, recorta
+    s = re.sub(r"^(probá|proba|sugerencia|tip)\s*:\s*", "", s, flags=re.IGNORECASE).strip()
+    # primer segmento antes de "|"
+    if "|" in s:
+        s = s.split("|", 1)[0].strip()
+    # limpieza final
+    return s if s else None
+
+
+def _generar_sugerencia_ejecutable(pregunta: str, tipo: str, parametros: Dict) -> Optional[Dict[str, str]]:
+    # 1) Si falta separador multi-proveedor (ej: "roche biodiagnostico 2024 2025"), sugerimos con coma.
+    if ("compar" in (pregunta or "").lower()) and ("compra" in (pregunta or "").lower()):
+        if not _tiene_sep_multi_prov(pregunta):
+            provs_inferidos = _infer_proveedores_desde_texto(pregunta, max_items=3)
+            anios = parametros.get("anios") or _extraer_anios_texto(pregunta)
+            if len(provs_inferidos) >= 2 and len(anios) >= 2:
+                sugerida = f"comparar compras {provs_inferidos[0]}, {provs_inferidos[1]} {_anio_str_list(anios[:2])}"
+                return {"pregunta": sugerida, "motivo": "Faltaba separador entre proveedores (usar coma o 'y')."}
+
+    # 2) Corrección de proveedor en consultas proveedor/mes/año y comparativas
+    proveedores: List[str] = []
+
+    if isinstance(parametros.get("proveedores"), list) and parametros.get("proveedores"):
+        proveedores = [str(x) for x in parametros.get("proveedores") if x]
+    elif parametros.get("proveedor"):
+        proveedores = [str(parametros.get("proveedor"))]
+
+    if not proveedores:
+        return None
+
+    # si todos parecen válidos, no sugerimos
+    if all(_proveedor_parece_valido(p) for p in proveedores):
+        return None
+
+    # intentamos corregir el primero inválido
+    for p in proveedores:
+        if _proveedor_parece_valido(p):
+            continue
+        m = _match_proveedor_cercano(p, cutoff=0.72)
+        if not m:
+            continue
+
+        # reconstrucción mínima de la pregunta sugerida (sin tocar tu lógica, solo propone texto)
+        p_sug = m
+
+        # compras proveedor mes
+        if tipo == "compras_proveedor_mes" and parametros.get("mes"):
+            mes_str = _mes_yyyymm_a_nombre(str(parametros.get("mes")))
+            return {
+                "pregunta": f"compras {p_sug} {mes_str}",
+                "motivo": f"Proveedor no reconocido: '{p}' → '{p_sug}'."
+            }
+
+        # compras proveedor año
+        if tipo == "compras_proveedor_anio" and parametros.get("anio"):
+            return {
+                "pregunta": f"compras {p_sug} {int(parametros.get('anio'))}",
+                "motivo": f"Proveedor no reconocido: '{p}' → '{p_sug}'."
+            }
+
+        # comparar proveedor años (single)
+        if tipo == "comparar_proveedor_anios" and parametros.get("anios"):
+            anios = parametros.get("anios") or []
+            return {
+                "pregunta": f"comparar compras {p_sug} {_anio_str_list(anios)}",
+                "motivo": f"Proveedor no reconocido: '{p}' → '{p_sug}'."
+            }
+
+        # comparar proveedor meses (single)
+        if tipo == "comparar_proveedor_meses" and parametros.get("mes1") and parametros.get("mes2"):
+            mes1 = _mes_yyyymm_a_nombre(str(parametros.get("mes1")))
+            mes2 = _mes_yyyymm_a_nombre(str(parametros.get("mes2")))
+            return {
+                "pregunta": f"comparar compras {p_sug} {mes1} {mes2}",
+                "motivo": f"Proveedor no reconocido: '{p}' → '{p_sug}'."
+            }
+
+        # multi proveedores años
+        if tipo in ("comparar_proveedores_anios", "comparar_proveedores_anios_multi") and parametros.get("anios"):
+            anios = parametros.get("anios") or []
+            # reemplaza el inválido por el sugerido
+            provs_corr = []
+            for pp in proveedores:
+                if _proveedor_parece_valido(pp):
+                    provs_corr.append(pp)
+                else:
+                    provs_corr.append(p_sug)
+            sugerida = f"comparar compras {', '.join(provs_corr)} {_anio_str_list(anios)}"
+            return {"pregunta": sugerida, "motivo": f"Corrigiendo proveedor: '{p}' → '{p_sug}'."}
+
+        # multi proveedores meses
+        if tipo in ("comparar_proveedores_meses", "comparar_proveedores_meses_multi"):
+            meses = parametros.get("meses") or []
+            if not meses:
+                m1 = parametros.get("mes1")
+                m2 = parametros.get("mes2")
+                if m1 and m2:
+                    meses = [m1, m2]
+            meses_txt = " ".join([_mes_yyyymm_a_nombre(str(x)) for x in (meses or [])])
+            if meses_txt:
+                provs_corr = []
+                for pp in proveedores:
+                    if _proveedor_parece_valido(pp):
+                        provs_corr.append(pp)
+                    else:
+                        provs_corr.append(p_sug)
+                sugerida = f"comparar compras {', '.join(provs_corr)} {meses_txt}"
+                return {"pregunta": sugerida, "motivo": f"Corrigiendo proveedor: '{p}' → '{p_sug}'."}
+
+        # fallback genérico
+        return {"pregunta": f"compras {p_sug}", "motivo": f"Proveedor no reconocido: '{p}' → '{p_sug}'."}
+
+    return None
 
 
 # =========================
@@ -474,6 +780,111 @@ def Compras_IA():
 
             st.markdown(msg["content"])
 
+            # =========================
+            # SUGERENCIA (SI/NO) - EJECUTAR CONSULTA CORREGIDA
+            # =========================
+            suger = msg.get("sugerencia_ejecutable")
+            if suger and isinstance(suger, dict):
+                suger_preg = suger.get("pregunta")
+                suger_motivo = suger.get("motivo", "")
+                if suger_preg:
+                    sug_id = f"sug_{int(msg.get('timestamp', 0)*1000)}_{idx}"
+                    done_key = f"{sug_id}_done"
+                    if not st.session_state.get(done_key, False):
+                        if suger_motivo:
+                            st.info(suger_motivo)
+                        st.markdown(f"**¿Quisiste decir:** `{suger_preg}` ?")
+
+                        col_s1, col_s2 = st.columns([2, 1])
+                        with col_s1:
+                            opt = st.radio(
+                                "Confirmación",
+                                ["No", "Sí"],
+                                horizontal=True,
+                                index=0,
+                                key=f"{sug_id}_radio",
+                                label_visibility="collapsed",
+                            )
+                        with col_s2:
+                            ejecutar_btn = st.button(
+                                "▶ Ejecutar",
+                                key=f"{sug_id}_btn",
+                                disabled=(opt != "Sí"),
+                                use_container_width=True,
+                            )
+
+                        if ejecutar_btn:
+                            st.session_state[done_key] = True
+
+                            # Agregar al historial como "confirmación" del usuario
+                            st.session_state["historial_compras"].append(
+                                {
+                                    "role": "user",
+                                    "content": f"✅ Sí: {suger_preg}",
+                                    "timestamp": datetime.now().timestamp(),
+                                }
+                            )
+
+                            # Ejecutar sugerencia (misma lógica del input principal)
+                            res2 = interpretar_pregunta(suger_preg)
+                            tipo2 = res2.get("tipo", "")
+                            params2 = res2.get("parametros", {})
+
+                            resp2_content = ""
+                            resp2_df = None
+
+                            try:
+                                if tipo2 == "conversacion":
+                                    resp2_content = responder_con_openai(suger_preg, tipo="conversacion")
+                                elif tipo2 == "conocimiento":
+                                    resp2_content = responder_con_openai(suger_preg, tipo="conocimiento")
+                                elif tipo2 == "no_entendido":
+                                    resp2_content = "🤔 No entendí bien tu pregunta."
+                                    sug_txt2 = _extraer_sugerencia_simple(res2.get("sugerencia", ""))
+                                    if sug_txt2:
+                                        resp2_content += f"\n\n**Sugerencia:** {sug_txt2}"
+                                else:
+                                    resultado_sql2 = ejecutar_consulta_por_tipo(tipo2, params2)
+                                    if isinstance(resultado_sql2, pd.DataFrame):
+                                        if len(resultado_sql2) == 0:
+                                            resp2_content = "⚠️ No se encontraron resultados"
+                                            sug_obj2 = _generar_sugerencia_ejecutable(suger_preg, tipo2, params2)
+                                            # si hay otra sugerencia, la guardamos para permitir corrección en cadena
+                                            if sug_obj2:
+                                                st.session_state["historial_compras"].append(
+                                                    {
+                                                        "role": "assistant",
+                                                        "content": resp2_content,
+                                                        "df": None,
+                                                        "tipo": tipo2,
+                                                        "pregunta": suger_preg,
+                                                        "sugerencia_ejecutable": sug_obj2,
+                                                        "timestamp": datetime.now().timestamp(),
+                                                    }
+                                                )
+                                                st.rerun()
+                                        else:
+                                            resp2_content = f"✅ Encontré **{len(resultado_sql2)}** resultados"
+                                            resp2_df = resultado_sql2
+                                    else:
+                                        resp2_content = str(resultado_sql2)
+
+                            except Exception as e:
+                                resp2_content = f"❌ Error: {str(e)}"
+
+                            st.session_state["historial_compras"].append(
+                                {
+                                    "role": "assistant",
+                                    "content": resp2_content,
+                                    "df": resp2_df,
+                                    "tipo": tipo2,
+                                    "pregunta": suger_preg,
+                                    "timestamp": datetime.now().timestamp(),
+                                }
+                            )
+
+                            st.rerun()
+
             if "df" in msg and msg["df"] is not None:
                 df = msg["df"]
 
@@ -541,6 +952,7 @@ def Compras_IA():
 
         respuesta_content = ""
         respuesta_df = None
+        sugerencia_ejecutable = None
 
         if tipo == "conversacion":
             respuesta_content = responder_con_openai(pregunta, tipo="conversacion")
@@ -550,8 +962,13 @@ def Compras_IA():
 
         elif tipo == "no_entendido":
             respuesta_content = "🤔 No entendí bien tu pregunta."
-            if resultado.get("sugerencia"):
-                respuesta_content += f"\n\n**Sugerencia:** {resultado['sugerencia']}"
+            sug_txt = _extraer_sugerencia_simple(resultado.get("sugerencia", ""))
+            if sug_txt:
+                respuesta_content += f"\n\n**Sugerencia:** {sug_txt}"
+                sugerencia_ejecutable = {
+                    "pregunta": sug_txt,
+                    "motivo": "Sugerencia detectada (si confirmás, la ejecuto)."
+                }
 
         else:
             try:
@@ -560,6 +977,7 @@ def Compras_IA():
                 if isinstance(resultado_sql, pd.DataFrame):
                     if len(resultado_sql) == 0:
                         respuesta_content = "⚠️ No se encontraron resultados"
+                        sugerencia_ejecutable = _generar_sugerencia_ejecutable(pregunta, tipo, parametros)
                     else:
                         respuesta_content = f"✅ Encontré **{len(resultado_sql)}** resultados"
                         respuesta_df = resultado_sql
@@ -576,6 +994,7 @@ def Compras_IA():
                 "df": respuesta_df,
                 "tipo": tipo,
                 "pregunta": pregunta,
+                "sugerencia_ejecutable": sugerencia_ejecutable,
                 "timestamp": datetime.now().timestamp(),
             }
         )
