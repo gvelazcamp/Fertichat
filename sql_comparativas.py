@@ -4,6 +4,7 @@
 
 import pandas as pd
 from typing import List
+
 from sql_core import (
     ejecutar_consulta,
     _sql_total_num_expr,
@@ -81,8 +82,8 @@ def get_comparacion_proveedor_meses(*args, **kwargs) -> pd.DataFrame:
         label2 = mes2
 
     # Sanitizar labels
-    label1_sql = str(label1).replace('"', '').strip()
-    label2_sql = str(label2).replace('"', '').strip()
+    label1_sql = str(label1).replace('"', "").strip()
+    label2_sql = str(label2).replace('"', "").strip()
 
     total_expr = _sql_total_num_expr_general()
     proveedor_norm = (proveedor or "").strip().lower()
@@ -153,31 +154,17 @@ def get_comparacion_articulo_anios(anios: List[int], articulo_like: str) -> pd.D
 def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) -> pd.DataFrame:
     """
     ✅ VERSIÓN LIMITADA: Trae solo el proveedor con más compras que matchee el LIKE.
-    
-    Comparación por proveedor usando LIKE (ej: tresul, biodiagnostico, roche)
-    
-    Args:
-        proveedor_like: Texto a buscar en nombre del proveedor (ej: "tresul")
-        anios: Lista de años a comparar (mínimo 2)
-    
-    Returns:
-        DataFrame con 1 fila: Proveedor, {año1}, {año2}
     """
-    # Normalizar proveedor
     proveedor_like = proveedor_like.strip().lower()
-    
-    # Validar años
+
     anios = sorted(anios)
     if len(anios) < 2:
         print(f"⚠️ get_comparacion_proveedor_anios_like: necesita al menos 2 años, recibió {len(anios)}")
         return pd.DataFrame()
-    
+
     a1, a2 = anios[0], anios[1]
-    
-    # Expresión SQL para convertir montos
     total_expr = _sql_total_num_expr_general()
-    
-    # ✅ QUERY LIMITADA A 1 PROVEEDOR (el que más compras tiene)
+
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
@@ -189,25 +176,23 @@ def get_comparacion_proveedor_anios_like(proveedor_like: str, anios: list[int]) 
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
           AND "Año"::int IN (%s, %s)
         GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY total_general DESC  -- Ordenar por el que más compras tiene
-        LIMIT 1  -- Solo traer el principal
+        ORDER BY total_general DESC
+        LIMIT 1
     """
-    
-    # Parámetros con % para LIKE
+
     params = (
-        a1,                        # primer año en CASE
-        a2,                        # segundo año en CASE
-        f"%{proveedor_like}%",     # LIKE con wildcards
-        a1,                        # primer año en IN
-        a2,                        # segundo año en IN
+        a1,
+        a2,
+        f"%{proveedor_like}%",
+        a1,
+        a2,
     )
-    
+
     df = ejecutar_consulta(sql, params)
-    
-    # Eliminar la columna auxiliar total_general antes de retornar
-    if df is not None and not df.empty and 'total_general' in df.columns:
-        df = df.drop(columns=['total_general'])
-    
+
+    if df is not None and not df.empty and "total_general" in df.columns:
+        df = df.drop(columns=["total_general"])
+
     return df
 
 
@@ -220,14 +205,18 @@ def get_comparacion_proveedor_anios_monedas(anios: List[int], proveedores: List[
     prov_where = ""
     prov_params = []
     if proveedores:
-        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
+        parts = [f'LOWER(TRIM("Cliente / Proveedor")) LIKE %s' for _ in proveedores]
         prov_params = [f"%{p.lower()}%" for p in proveedores]
         prov_where = f"AND ({' OR '.join(parts)})"
 
     cols = []
     for y in anios:
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
+        cols.append(
+            f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """
+        )
+        cols.append(
+            f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """
+        )
 
     cols_sql = ",\n            ".join(cols)
     y_last = anios[-1]
@@ -258,14 +247,18 @@ def get_comparacion_familia_anios_monedas(anios: List[int], familias: List[str] 
     fam_where = ""
     fam_params = []
     if familias:
-        parts = [f"TRIM(COALESCE(\"Familia\", '')) = %s" for _ in familias]
+        parts = [f'TRIM(COALESCE("Familia", \'\')) = %s' for _ in familias]
         fam_params = list(familias)
         fam_where = f"AND ({' OR '.join(parts)})"
 
     cols = []
     for y in anios:
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """)
-        cols.append(f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """)
+        cols.append(
+            f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END) AS "{y}_$" """
+        )
+        cols.append(
+            f"""SUM(CASE WHEN "Año"::int = {y} AND TRIM("Moneda") IN ('U$S','U$$') THEN {total_usd} ELSE 0 END) AS "{y}_USD" """
+        )
 
     cols_sql = ",\n            ".join(cols)
     y_last = anios[-1]
@@ -286,8 +279,9 @@ def get_comparacion_familia_anios_monedas(anios: List[int], familias: List[str] 
     """
     return ejecutar_consulta(sql, tuple(fam_params) if fam_params else None)
 
+
 # =====================================================================
-# COMPARACIÓN MULTI PROVEEDORES - MULTI MESES
+# COMPARACIÓN MULTI PROVEEDORES - MULTI MESES (FIX)
 # =====================================================================
 
 def get_comparacion_proveedores_meses_multi(
@@ -306,18 +300,9 @@ def get_comparacion_proveedores_meses_multi(
 
     total_expr = _sql_total_num_expr_general()
 
-    # WHERE proveedores
-    prov_clauses = []
-    params: List = []
-
-    for p in proveedores:
-        prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
-        params.append(f"%{p.lower()}%")
-
-    prov_where = " OR ".join(prov_clauses)
-
-    # Columnas dinámicas por mes
+    # 1) Columnas dinámicas por mes (sus %s van PRIMERO en params)
     cols = []
+    params: List = []
     for m in meses:
         cols.append(
             f"""SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{m}" """
@@ -325,6 +310,22 @@ def get_comparacion_proveedores_meses_multi(
         params.append(m)
 
     cols_sql = ",\n            ".join(cols)
+
+    # 2) WHERE proveedores (sus %s van DESPUÉS)
+    prov_clauses = []
+    for p in proveedores:
+        p_norm = p.strip().lower()
+        if not p_norm:
+            continue
+        prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
+        params.append(f"%{p_norm}%")
+
+    if not prov_clauses:
+        return pd.DataFrame()
+
+    prov_where = " OR ".join(prov_clauses)
+
+    # 3) IN meses (sus %s van AL FINAL)
     meses_placeholders = ", ".join(["%s"] * len(meses))
     params.extend(meses)
 
@@ -342,6 +343,92 @@ def get_comparacion_proveedores_meses_multi(
     """
 
     return ejecutar_consulta(sql, tuple(params))
+
+
+# =====================================================================
+# COMPARACIÓN MULTI PROVEEDORES - MULTI AÑOS (NUEVO)
+# =====================================================================
+
+def get_comparacion_proveedores_anios_multi(
+    proveedores: List[str],
+    anios: List[int]
+) -> pd.DataFrame:
+    """
+    Compara múltiples proveedores en múltiples años.
+    Ej:
+      proveedores = ["roche", "tresul"]
+      anios = [2024, 2025]
+    Devuelve filas por Proveedor y columnas por año (y Diferencia si hay 2 años).
+    """
+
+    if not proveedores or not anios:
+        return pd.DataFrame()
+
+    # Normalizar años a int
+    anios_ok: List[int] = []
+    for y in anios:
+        try:
+            anios_ok.append(int(y))
+        except Exception:
+            pass
+
+    anios_ok = sorted(list(set(anios_ok)))
+    if len(anios_ok) < 2:
+        return pd.DataFrame()
+
+    total_expr = _sql_total_num_expr_general()
+
+    # Columnas por año (embebidas como int seguro)
+    cols = []
+    for y in anios_ok:
+        cols.append(
+            f"""SUM(CASE WHEN "Año"::int = {y} THEN {total_expr} ELSE 0 END) AS "{y}" """
+        )
+    cols_sql = ",\n            ".join(cols)
+
+    # Diferencia solo si hay exactamente 2 años
+    diff_sql = ""
+    if len(anios_ok) == 2:
+        y1, y2 = anios_ok[0], anios_ok[1]
+        diff_sql = f""",
+            (SUM(CASE WHEN "Año"::int = {y2} THEN {total_expr} ELSE 0 END) -
+             SUM(CASE WHEN "Año"::int = {y1} THEN {total_expr} ELSE 0 END)) AS Diferencia
+        """
+
+    anios_sql = ", ".join(str(y) for y in anios_ok)
+
+    # WHERE proveedores
+    prov_clauses = []
+    params: List = []
+    for p in proveedores:
+        p_norm = p.strip().lower()
+        if not p_norm:
+            continue
+        prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
+        params.append(f"%{p_norm}%")
+
+    if not prov_clauses:
+        return pd.DataFrame()
+
+    prov_where = " OR ".join(prov_clauses)
+
+    sql = f"""
+        SELECT
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            {cols_sql}
+            {diff_sql}
+        FROM chatbot_raw
+        WHERE ({prov_where})
+          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND "Año"::int IN ({anios_sql})
+        GROUP BY TRIM("Cliente / Proveedor")
+        ORDER BY Proveedor
+        LIMIT 300
+    """
+
+    return ejecutar_consulta(sql, tuple(params))
+
+
 # =====================================================================
 # GASTOS POR FAMILIAS
 # =====================================================================
@@ -416,60 +503,3 @@ def get_gastos_por_familia(where_clause: str, params: tuple) -> pd.DataFrame:
         ORDER BY Total DESC
     """
     return ejecutar_consulta(sql, params)
-# =====================================================================
-# COMPARACIÓN MULTI PROVEEDORES - MULTI MESES
-# =====================================================================
-
-def get_comparacion_proveedores_meses_multi(
-    proveedores: List[str],
-    meses: List[str]
-) -> pd.DataFrame:
-    """
-    Compara múltiples proveedores en múltiples meses.
-    Ej:
-      proveedores = ["roche", "biodiagnostico", "tresul"]
-      meses = ["2025-06", "2025-07"]
-    """
-
-    if not proveedores or not meses:
-        return pd.DataFrame()
-
-    total_expr = _sql_total_num_expr_general()
-
-    # WHERE proveedores
-    prov_clauses = []
-    params: List = []
-
-    for p in proveedores:
-        prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
-        params.append(f"%{p.lower()}%")
-
-    prov_where = " OR ".join(prov_clauses)
-
-    # Columnas dinámicas por mes
-    cols = []
-    for m in meses:
-        cols.append(
-            f"""SUM(CASE WHEN TRIM("Mes") = %s THEN {total_expr} ELSE 0 END) AS "{m}" """
-        )
-        params.append(m)
-
-    cols_sql = ",\n            ".join(cols)
-    meses_placeholders = ", ".join(["%s"] * len(meses))
-    params.extend(meses)
-
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            {cols_sql}
-        FROM chatbot_raw
-        WHERE ({prov_where})
-          AND TRIM("Mes") IN ({meses_placeholders})
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-        GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY Proveedor
-        LIMIT 300
-    """
-
-    return ejecutar_consulta(sql, tuple(params))
-    
