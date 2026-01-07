@@ -611,4 +611,3 @@ if __name__ == "__main__":
         print(f"   Tipo: {res.get('tipo')}")
         print(f"   Params: {res.get('parametros')}")
         print(f"   Debug: {res.get('debug')}")
-```0
