@@ -4,6 +4,8 @@
 
 import os
 import re
+print(re.__file__)  # Esto debería indicar la ruta al archivo estándar `re.py`.
+
 import json
 import unicodedata
 from typing import Dict, Optional, List, Tuple, Any
