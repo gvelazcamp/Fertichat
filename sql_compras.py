@@ -480,10 +480,9 @@ def get_facturas_de_articulo(patron_articulo: str, solo_ultima: bool = False) ->
     return ejecutar_consulta(sql, (f"%{patron_articulo.lower()}%",))
 
 
-# =====================================================================
-# FACTURAS - PROVEEDOR (NUEVO)
-# =====================================================================
-
+# =========================
+# TODAS LAS FACTURAS DE PROVEEDOR (DETALLE)
+# =========================
 def get_facturas_proveedor_detalle(
     proveedores: List[str],
     meses: Optional[List[str]] = None,
@@ -493,36 +492,62 @@ def get_facturas_proveedor_detalle(
     articulo: Optional[str] = None,
     moneda: Optional[str] = None,
     limite: int = 5000,
-) -> pd.DataFrame:
+):
     """
-    Trae todas las facturas (detalle) de uno o más proveedores con filtros opcionales:
-    - meses: lista YYYY-MM (columna "Mes")
-    - anios: lista int (columna "Año")
-    - desde/hasta: YYYY-MM-DD (columna "Fecha")
-    - articulo: filtro LIKE por Articulo
-    - moneda: "$" / "USD" (o variantes)
+    Devuelve detalle de facturas (compras) filtrando por proveedor(es) y tiempo.
+    - meses: lista ["YYYY-MM", ...]  (usa columna Mes)
+    - anios: lista [2025, ...]       (usa columna Año)
+    - desde/hasta: "YYYY-MM-DD"      (usa columna Fecha::date)
     """
-    total_expr = _sql_total_num_expr_general()
 
-    where_parts: List[str] = []
-    params: List[object] = []
+    def _short_token_prov(p: str) -> Optional[str]:
+        # token “corto” para matchear proveedores con nombres largos/variables (ej: ROCHE ...)
+        stop = {
+            "laboratorio", "lab", "sa", "srl", "ltda", "lt", "inc", "ltd",
+            "uruguay", "uy", "sociedad", "anonima", "anónima", "de", "del",
+            "la", "el", "y", "e",
+        }
+        raw = re.findall(r"[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]+", (p or "").lower())
+        toks = []
+        for t in raw:
+            tt = re.sub(r"[^a-z0-9]+", "", t.lower())
+            if len(tt) < 4:
+                continue
+            if tt in stop:
+                continue
+            toks.append(t)
+        if not toks:
+            return None
+        toks.sort(key=lambda x: len(re.sub(r"[^a-z0-9]+", "", x.lower())), reverse=True)
+        return toks[0].strip() if toks[0].strip() else None
 
-    # Compras únicamente
-    where_parts.append("(\"Tipo Comprobante\" = 'Compra Contado' OR \"Tipo Comprobante\" LIKE 'Compra%%')")
+    if not proveedores:
+        return pd.DataFrame()
 
-    # Excluir factura dummy si existiera
-    where_parts.append("TRIM(\"Nro. Comprobante\") <> 'A0000000'")
+    limite = int(limite or 5000)
+    if limite <= 0:
+        limite = 5000
 
-    # Proveedores (OBLIGATORIO)
-    provs = [p for p in (proveedores or []) if p]
-    if not provs:
-        return pd.DataFrame(columns=["Proveedor", "Nro_Factura", "Fecha", "Articulo", "Cantidad", "Moneda", "Total"])
+    where_parts = [
+        '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'
+    ]
+    params: List[Any] = []
 
-    prov_conds: List[str] = []
-    for _ in provs:
-        prov_conds.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
-    where_parts.append("(" + " OR ".join(prov_conds) + ")")
-    params.extend([f"%{str(p).lower()}%" for p in provs])
+    # Proveedores (OR). Usa: nombre completo + token corto (si aplica) para que ROCHE no se pierda.
+    prov_clauses: List[str] = []
+    for p in [str(x).strip() for x in proveedores if str(x).strip()]:
+        p_full = p.lower().strip()
+        p_short = _short_token_prov(p)  # ej "roche"
+
+        if p_short and p_short.lower().strip() != p_full and len(p_short.strip()) >= 4:
+            prov_clauses.append('(LOWER(TRIM("Cliente / Proveedor")) LIKE %s OR LOWER(TRIM("Cliente / Proveedor")) LIKE %s)')
+            params.append(f"%{p_full}%")
+            params.append(f"%{p_short.lower().strip()}%")
+        else:
+            prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
+            params.append(f"%{p_full}%")
+
+    where_parts.append("(" + " OR ".join(prov_clauses) + ")")
 
     # Filtro artículo (opcional)
     if articulo and str(articulo).strip():
@@ -533,19 +558,19 @@ def get_facturas_proveedor_detalle(
     if moneda and str(moneda).strip():
         m = str(moneda).strip().upper()
         if m in ("USD", "U$S", "U$$", "US$"):
-            where_parts.append("TRIM(\"Moneda\") IN ('U$S', 'U$$', 'USD', 'US$')")
+            where_parts.append('TRIM("Moneda") IN (\'U$S\', \'U$$\', \'USD\', \'US$\')')
         elif m in ("$", "PESOS", "UYU", "URU"):
-            where_parts.append("TRIM(\"Moneda\") = '$'")
+            where_parts.append('TRIM("Moneda") = \'$\'')
         else:
             where_parts.append('UPPER(TRIM("Moneda")) LIKE %s')
             params.append(f"%{m}%")
 
-    # Filtro por fechas exactas (prioridad)
+    # Tiempo (prioridad: rango exacto)
     if desde and hasta:
         where_parts.append('"Fecha"::date BETWEEN %s AND %s')
         params.extend([desde, hasta])
     else:
-        # Filtro por meses (YYYY-MM)
+        # Meses (usa columna Mes)
         if meses:
             meses_ok = [m for m in (meses or []) if m]
             if meses_ok:
@@ -553,7 +578,7 @@ def get_facturas_proveedor_detalle(
                 where_parts.append(f'TRIM("Mes") IN ({ph})')
                 params.extend(meses_ok)
 
-        # Filtro por años (si no hay meses)
+        # Años (solo si NO hay meses)
         if (not meses) and anios:
             anios_ok = [int(a) for a in (anios or []) if a]
             if anios_ok:
@@ -561,26 +586,22 @@ def get_facturas_proveedor_detalle(
                 where_parts.append(f'"Año"::int IN ({ph})')
                 params.extend(anios_ok)
 
-    where_sql = " AND ".join(where_parts)
-
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Nro. Comprobante") AS Nro_Factura,
-            "Fecha",
-            TRIM("Articulo") AS Articulo,
-            "Cantidad",
-            "Moneda",
-            {total_expr} AS Total
-        FROM chatbot_raw
-        WHERE {where_sql}
-        ORDER BY "Fecha" DESC NULLS LAST, TRIM("Cliente / Proveedor"), TRIM("Nro. Comprobante"), TRIM("Articulo")
-        LIMIT %s
+    query = f"""
+    SELECT
+        "Fecha",
+        TRIM("Cliente / Proveedor") AS Proveedor,
+        TRIM("Nro. Comprobante") AS NroFactura,
+        TRIM("Tipo Comprobante") AS Tipo,
+        TRIM("Articulo") AS Articulo,
+        "Moneda",
+        "Total"
+    FROM chatbot_raw
+    WHERE {" AND ".join(where_parts)}
+    ORDER BY "Fecha" DESC NULLS LAST
+    LIMIT {limite};
     """
-    params.append(int(limite) if limite else 5000)
 
-    return ejecutar_consulta(sql, tuple(params))
-
+    return ejecutar_consulta(query, tuple(params))
 
 # =====================================================================
 # SERIES TEMPORALES Y DATASET COMPLETO
