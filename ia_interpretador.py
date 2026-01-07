@@ -354,6 +354,56 @@ def _extraer_lista_proveedores_desde_texto(texto_lower: str, provs_detectados: L
     return out
 
 # =====================================================================
+# NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA
+# =====================================================================
+def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Devuelve (desde, hasta) en formato YYYY-MM-DD si detecta 2 fechas.
+    Soporta:
+    - YYYY-MM-DD
+    - DD/MM/YYYY o DD-MM-YYYY
+    """
+    if not texto:
+        return None, None
+
+    t = str(texto)
+
+    # ISO: YYYY-MM-DD
+    iso = re.findall(r"\b(20\d{2}-\d{2}-\d{2})\b", t)
+    if len(iso) >= 2:
+        return iso[0], iso[1]
+
+    # LatAm: DD/MM/YYYY o DD-MM-YYYY
+    lat = re.findall(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b", t)
+    if len(lat) >= 2:
+        def _fmt(d, m, y):
+            try:
+                dt = datetime(int(y), int(m), int(d))
+                return dt.strftime("%Y-%m-%d")
+            except Exception:
+                return None
+        d1 = _fmt(*lat[0])
+        d2 = _fmt(*lat[1])
+        return d1, d2
+
+    return None, None
+
+def _extraer_moneda(texto: str) -> Optional[str]:
+    """
+    Detecta moneda pedida por el usuario.
+    Retorna: "USD" o "$" o None
+    """
+    if not texto:
+        return None
+    t = texto.lower()
+
+    if re.search(r"\b(usd|u\$s|u\$\$|dolar|dolares|dólar|dólares|us\$)\b", t):
+        return "USD"
+    if re.search(r"\b(peso|pesos|uyu|uru)\b", t) or "$" in t:
+        return "$"
+    return None
+
+# =====================================================================
 # PARSEO TIEMPO
 # =====================================================================
 def _extraer_anios(texto: str) -> List[int]:
