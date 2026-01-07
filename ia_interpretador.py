@@ -61,6 +61,22 @@ NOMBRES_PERSONALES_EXCLUIR = [
 ]
 
 # =====================================================================
+# ALIAS / SINÓNIMOS DE PROVEEDOR (fallback cuando BD falla)
+# - NO rompe nada: solo ayuda a NO caer en "compras_anio" cuando hay proveedor
+# =====================================================================
+ALIAS_PROVEEDOR = {
+    "roche": "roche",
+    "rocheinternational": "roche",
+    "rocheinternational": "roche",
+    "laboratoriotresul": "tresul",
+    "tresul": "tresul",
+    "tesul": "tresul",
+    "biodiagnostico": "biodiagnostico",
+    "bio": "biodiagnostico",
+    "cabinsur": "biodiagnostico",
+}
+
+# =====================================================================
 # TABLA DE TIPOS
 # =====================================================================
 TABLA_TIPOS = """
@@ -112,6 +128,10 @@ def _key(s: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "", s)
     return s
 
+def _alias_proveedor(prov: str) -> str:
+    k = _key(prov)
+    return ALIAS_PROVEEDOR.get(k, prov)
+
 _NOMBRES_PERSONALES_KEYS = set(_key(n) for n in (NOMBRES_PERSONALES_EXCLUIR or []) if n)
 
 def _tokens(texto: str) -> List[str]:
@@ -162,6 +182,46 @@ def limpiar_consulta(texto: str) -> str:
 
     texto = re.sub(r"\s{2,}", " ", texto).strip()
     return texto
+
+def _extraer_proveedor_libre(texto_lower_original: str) -> Optional[str]:
+    """
+    Fallback para NO depender de listas de Supabase.
+    Devuelve un proveedor "usable" (ej: 'roche', 'tresul', 'biodiagnostico') si aparece.
+    """
+    if not texto_lower_original:
+        return None
+
+    toks = _tokens(texto_lower_original)
+
+    ignorar = set(
+        [
+            "todas", "todoas", "toda", "todaslas",
+            "factura", "facturas", "comprobante", "comprobantes",
+            "compra", "compras",
+            "comparar", "comparame", "compara",
+            "detalle", "nro", "numero",
+            "total", "totales",
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "setiembre", "octubre", "noviembre", "diciembre",
+            "2023", "2024", "2025", "2026",
+            "usd", "dolar", "dolares", "dólar", "dólares", "pesos", "peso", "uyu", "uru",
+        ]
+    )
+
+    # Primero: si alguna palabra está en ALIAS_PROVEEDOR, usar esa
+    for tk in toks:
+        if not tk or tk in ignorar:
+            continue
+        if tk in ALIAS_PROVEEDOR:
+            return ALIAS_PROVEEDOR[tk]
+
+    # Segundo: devolver primer token "posible" (mínimo 3)
+    for tk in toks:
+        if not tk or tk in ignorar:
+            continue
+        return tk
+
+    return None
 
 # =====================================================================
 # HELPERS DE KEYWORDS
@@ -220,36 +280,6 @@ def _extraer_nro_factura(texto: str) -> Optional[str]:
         return nro or None
 
     return None
-
-# =====================================================================
-# EXTRACCIÓN SIMPLE DE PARÁMETROS (LEGACY - se mantiene)
-# =====================================================================
-def extraer_parametros(texto: str) -> Dict:
-    MESES_LOCAL = {
-        "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-        "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-        "septiembre": "09", "setiembre": "09", "octubre": "10",
-        "noviembre": "11", "diciembre": "12"
-    }
-
-    parametros = {"proveedor": None, "mes": None, "anio": None}
-
-    anios = re.findall(r"(2023|2024|2025|2026)", texto)
-    if anios:
-        parametros["anio"] = int(anios[0])
-
-    for mes_nombre, mes_num in MESES_LOCAL.items():
-        if mes_nombre in texto:
-            parametros["mes"] = mes_num
-            break
-
-    PROVEEDORES = ["roche", "biodiagnostico", "tresul"]
-    for proveedor in PROVEEDORES:
-        if proveedor in texto:
-            parametros["proveedor"] = proveedor
-            break
-
-    return parametros
 
 # =====================================================================
 # CARGA LISTAS DESDE SUPABASE
@@ -330,21 +360,8 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
 
     return out
 
-def detectar_proveedor_o_articulo(texto: str) -> Dict[str, List[str]]:
-    prov_index, art_index = _get_indices()
-
-    proveedores = _match_best(texto, prov_index, max_items=1)
-    if proveedores:
-        return {"tipo": "proveedor", "valores": proveedores}
-
-    articulos = _match_best(texto, art_index, max_items=1)
-    if articulos:
-        return {"tipo": "articulo", "valores": articulos}
-
-    return {"tipo": "ninguno", "valores": []}
-
 # =====================================================================
-# NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA
+# NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA + LIMITE
 # =====================================================================
 def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
     if not texto:
@@ -620,8 +637,17 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     # Índices (proveedores / artículos) desde BD
     # =========================
     idx_prov, idx_art = _get_indices()
+
     provs = _match_best(texto_lower, idx_prov, max_items=MAX_PROVEEDORES)
     arts = _match_best(texto_lower, idx_art, max_items=MAX_ARTICULOS)
+
+    # =========================
+    # Fallback proveedor (si BD no detectó)
+    # =========================
+    if not provs:
+        prov_libre = _extraer_proveedor_libre(texto_lower_original)
+        if prov_libre:
+            provs = [_alias_proveedor(prov_libre)]
 
     # =========================
     # Tiempo: años y meses
@@ -635,12 +661,12 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     # - separado de "compras"
     # =================================================================
     dispara_facturas_listado = False
-    if contiene_factura(texto_lower_original):
-        # Si contiene "facturas"/"comprobantes" sin nro -> listado
-        if _extraer_nro_factura(texto_original) is None:
-            dispara_facturas_listado = True
 
-    # También soporta "todas las facturas ..." explícito
+    # Si pide facturas/comprobantes y NO dio nro -> listado
+    if contiene_factura(texto_lower_original) and (_extraer_nro_factura(texto_original) is None):
+        dispara_facturas_listado = True
+
+    # También soporta "todas las facturas ..."
     if (
         re.search(r"\b(todas|todoas)\b", texto_lower_original)
         and re.search(r"\b(facturas?|comprobantes?)\b", texto_lower_original)
@@ -649,21 +675,10 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         dispara_facturas_listado = True
 
     if dispara_facturas_listado:
-        # Proveedor: CANÓNICO = 1 proveedor para evitar traer "todos"
+        # CANÓNICO: 1 proveedor para evitar traer "todos"
         proveedores_lista: List[str] = []
         if provs:
             proveedores_lista = [provs[0]]
-
-        # Fallback (solo si no matcheó por lista BD)
-        if not proveedores_lista:
-            tmp = texto_lower
-            tmp = re.sub(r"\b(todas|todoas|todas las|facturas?|comprobantes?|de|del|la|el)\b", " ", tmp)
-            tmp = re.sub(r"\b(compras?|comparar|comparame|compara)\b", " ", tmp)
-            tmp = re.sub(r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b", " ", tmp)
-            tmp = re.sub(r"\b(2023|2024|2025|2026)\b", " ", tmp)
-            tmp = re.sub(r"\s+", " ", tmp).strip()
-            if tmp and len(tmp) >= 3:
-                proveedores_lista = [tmp]
 
         if not proveedores_lista:
             return {
@@ -673,7 +688,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 "debug": "facturas_proveedor: no encontré proveedor",
             }
 
-        # Tiempo: meses/años o rango
         desde, hasta = _extraer_rango_fechas(texto_original)
 
         meses_out: List[str] = []
@@ -714,7 +728,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     if contiene_compras(texto_lower_original) and not contiene_comparar(texto_lower_original):
         # Compras proveedor (mes)
         if provs and (meses_yyyymm or (meses_nombre and anios)):
-            proveedor = provs[0]
+            proveedor = _alias_proveedor(provs[0])
             if meses_yyyymm:
                 mes = meses_yyyymm[0]
             else:
@@ -729,9 +743,10 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
 
         # Compras proveedor (año)
         if provs and anios:
+            proveedor = _alias_proveedor(provs[0])
             return {
                 "tipo": "compras_proveedor_anio",
-                "parametros": {"proveedor": provs[0], "anio": anios[0]},
+                "parametros": {"proveedor": proveedor, "anio": anios[0]},
                 "debug": "compras proveedor año",
             }
 
@@ -750,7 +765,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     # COMPARAR COMPRAS
     # =========================
     if contiene_comparar(texto_lower_original):
-        # meses para comparar (2)
         meses_cmp: List[str] = []
         if meses_yyyymm:
             meses_cmp = meses_yyyymm[:2]
@@ -763,7 +777,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 return {
                     "tipo": "comparar_proveedores_meses",
                     "parametros": {
-                        "proveedores": provs[:MAX_PROVEEDORES],
+                        "proveedores": [_alias_proveedor(p) for p in provs[:MAX_PROVEEDORES]],
                         "mes1": meses_cmp[0],
                         "mes2": meses_cmp[1],
                         "label1": meses_cmp[0],
@@ -775,7 +789,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 return {
                     "tipo": "comparar_proveedor_meses",
                     "parametros": {
-                        "proveedor": provs[0],
+                        "proveedor": _alias_proveedor(provs[0]),
                         "mes1": meses_cmp[0],
                         "mes2": meses_cmp[1],
                         "label1": meses_cmp[0],
@@ -784,13 +798,12 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                     "debug": "comparar proveedor meses",
                 }
 
-        # años para comparar (2)
         if len(anios) >= 2:
             if len(provs) >= 2:
                 return {
                     "tipo": "comparar_proveedores_anios",
                     "parametros": {
-                        "proveedores": provs[:MAX_PROVEEDORES],
+                        "proveedores": [_alias_proveedor(p) for p in provs[:MAX_PROVEEDORES]],
                         "anios": anios[:2],
                         "label1": str(anios[0]),
                         "label2": str(anios[1]),
@@ -801,7 +814,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 return {
                     "tipo": "comparar_proveedor_anios",
                     "parametros": {
-                        "proveedor": provs[0],
+                        "proveedor": _alias_proveedor(provs[0]),
                         "anios": anios[:2],
                         "label1": str(anios[0]),
                         "label2": str(anios[1]),
@@ -834,6 +847,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     return {
         "tipo": "no_entendido",
         "parametros": {},
-        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279 | todas las facturas roche noviembre 2025",
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279 | todas las facturas roche 2025",
         "debug": "no match",
     }
