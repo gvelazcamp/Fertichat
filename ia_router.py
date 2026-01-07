@@ -221,7 +221,10 @@ MAPEO_FUNCIONES = {
         "funcion": "get_comparacion_proveedor_anios_like",
         "params": ["proveedor", "anios"],
     },
-
+    "total_facturas_proveedor": {
+        "funcion": "get_total_facturas_proveedor",
+        "params": ["proveedores", "meses", "anios", "desde", "hasta", "articulo", "moneda", "limite"],
+    }, 
     # Multi-proveedor
     "comparar_proveedores_meses_multi": {
         "funcion": "get_comparacion_proveedores_meses_multi",
