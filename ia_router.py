@@ -8,14 +8,14 @@ import json
 import unicodedata
 from typing import Dict, Optional
 from datetime import datetime
-from ia_interpretador import interpretar_pregunta as interpretar_canonico
+from ia_interpretador import interpretar_pregunta
 from ia_comparativas import interpretar_comparativas
 import streamlit as st
 from openai import OpenAI
 from config import OPENAI_MODEL
 from ia_interpretador import limpiar_consulta
 from orquestador import procesar_pregunta_router
-
+from ia_interpretador import interpretar_pregunta
 # =====================================================================
 # CONFIGURACIÓN OPENAI (opcional)
 # =====================================================================
