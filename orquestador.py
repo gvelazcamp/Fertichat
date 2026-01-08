@@ -1,34 +1,24 @@
-# orquestador.py
+# =========================
+# ORQUESTADOR.PY
+# =========================
 
 import streamlit as st
 
-# Marcar cargado (sin romper imports/tests fuera de Streamlit)
+# Marcar cargado (visible para debug)
+ORQUESTADOR_CARGADO = True
+ORQUESTADOR_ERROR = None
 try:
     st.session_state["ORQUESTADOR_CARGADO"] = True
 except Exception:
     pass
 
-try:
-    if not st.session_state.get("ORQUESTADOR_CARGADO"):
-        st.session_state["ORQUESTADOR_CARGADO"] = True
-        print("✅ Orquestador activado correctamente.")
-except Exception as e:
-    print(f"❌ Error activando orquestador: {e}")
-
 # =========================
 # ORQUESTADOR V2 - USA IA INTERPRETADOR
-# =========================
-# Flujo:
-# 1. Usuario pregunta
-# 2. IA interpreta → tipo + parámetros
-# 3. Si no entiende → sugerencia con botones
-# 4. Si entiende → llama función SQL
-# 5. Formatea y devuelve resultado
 # =========================
 
 import pandas as pd
 import re
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any, List
 from datetime import datetime
 
 # Importar el interpretador
@@ -39,26 +29,76 @@ from ia_interpretador import interpretar_pregunta, obtener_info_tipo, es_tipo_va
 # =========================
 
 # --- COMPRAS / FACTURAS ---
+# Import “base” (los que suelen existir)
 from sql_compras import (
     get_compras_anio,
     get_total_compras_anio,
     get_detalle_compras_proveedor_mes,
-    get_detalle_compras_proveedor_anio,
     get_total_compras_proveedor_anio,
     get_detalle_compras_articulo_mes,
     get_detalle_compras_articulo_anio,
     get_total_compras_articulo_anio,
-    get_facturas_proveedor_detalle,
     get_compras_por_mes_excel,
     # Facturas
     get_ultima_factura_inteligente,
     get_facturas_de_articulo,
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
-    get_total_factura_proveedor,
     # Top
     get_top_10_proveedores_chatbot,
 )
+
+# --- COMPAT: algunas versiones tuyas tienen nombres distintos ---
+# Detalle proveedor año: a veces se llama get_detalle_compras_proveedor_anio, a veces get_detalle_facturas_proveedor_anio
+try:
+    from sql_compras import get_detalle_compras_proveedor_anio as _get_detalle_prov_anio
+except Exception:
+    _get_detalle_prov_anio = None
+
+try:
+    from sql_compras import get_detalle_facturas_proveedor_anio as _get_detalle_facturas_prov_anio
+except Exception:
+    _get_detalle_facturas_prov_anio = None
+
+
+def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, limite: int = 5000) -> pd.DataFrame:
+    """
+    Wrapper compat para NO romper:
+    - Si existe get_detalle_compras_proveedor_anio(proveedor, anio, ...)
+    - Si existe get_detalle_facturas_proveedor_anio(proveedores:list, anios:list, ...)
+    """
+    if _get_detalle_prov_anio is not None:
+        try:
+            return _get_detalle_prov_anio(proveedor_like, anio, limite)
+        except TypeError:
+            return _get_detalle_prov_anio(proveedor_like, anio)
+
+    if _get_detalle_facturas_prov_anio is not None:
+        try:
+            return _get_detalle_facturas_prov_anio([proveedor_like], [anio], moneda=None, limite=limite)
+        except TypeError:
+            return _get_detalle_facturas_prov_anio([proveedor_like], [anio])
+
+    return pd.DataFrame()
+
+
+# Total facturas proveedor: en tu SQL aparece como get_total_facturas_proveedor (plural)
+try:
+    from sql_compras import get_total_factura_proveedor as get_total_factura_proveedor  # si existe en tu repo
+except Exception:
+    try:
+        from sql_compras import get_total_facturas_proveedor as get_total_factura_proveedor
+    except Exception:
+        def get_total_factura_proveedor(*args, **kwargs) -> pd.DataFrame:
+            return pd.DataFrame()
+
+
+# Facturas por proveedor (detalle) - puede vivir en sql_queries.py o sql_compras.py
+try:
+    from sql_queries import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
+except Exception:
+    from sql_compras import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
+
 
 # --- COMPARATIVAS + GASTOS (según tu sql_comparativas.py) ---
 from sql_comparativas import (
@@ -89,6 +129,7 @@ except Exception:
     def get_comparacion_familia_meses_moneda(*args, **kwargs) -> pd.DataFrame:
         return pd.DataFrame()
 
+
 # --- STOCK ---
 from sql_stock import (
     get_stock_total,
@@ -101,12 +142,6 @@ from sql_stock import (
     get_stock_bajo,
     get_stock_lote_especifico,
 )
-
-# Facturas por proveedor (detalle) - puede vivir en sql_compras.py o sql_queries.py
-try:
-    from sql_queries import get_facturas_proveedor_detalle  # si existe acá
-except Exception:
-    from sql_compras import get_facturas_proveedor_detalle  # fallback
 
 # Importar utilidades
 from utils_format import formatear_dataframe
@@ -122,11 +157,9 @@ def _normalizar_nro_factura(nro: str) -> str:
     if not nro:
         return ""
 
-    # Solo números -> A + 8 dígitos (ej: 273279 -> A00273279)
     if re.fullmatch(r"\d+", nro):
         return "A" + nro.zfill(8)
 
-    # Letra + números -> asegurar 8 dígitos si es A#####
     m = re.fullmatch(r"([A-Z])(\d+)", nro)
     if m:
         letra = m.group(1)
@@ -144,11 +177,9 @@ def _extraer_nro_factura_fallback(texto: str) -> Optional[str]:
 
     t = str(texto).strip()
 
-    # Caso: el texto ES solo el nro (A00273279)
     if re.fullmatch(r"[A-Za-z]\d{5,}", t):
         return _normalizar_nro_factura(t)
 
-    # Caso: "detalle factura 273279" / "factura A00273279" / "comprobante 273279"
     m = re.search(
         r"\b(?:detalle\s+)?(?:factura|comprobante|nro\.?\s*factura|nro\.?\s*comprobante)\b\s*[:#-]?\s*([A-Za-z]?\d{3,})\b",
         t,
@@ -160,25 +191,31 @@ def _extraer_nro_factura_fallback(texto: str) -> Optional[str]:
     return None
 
 
+def _to_like(p: str) -> str:
+    p = str(p or "").strip().lower()
+    if not p:
+        return ""
+    if "%" in p:
+        return p
+    return f"%{p}%"
+
+
 # =====================================================================
 # FUNCIÓN PRINCIPAL
 # =====================================================================
 
 def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Optional[dict]]:
     """
-    Procesa la pregunta del usuario usando el nuevo sistema IA.
-
     Retorna:
-    - mensaje: str con la respuesta o título
-    - df: DataFrame con datos (o None)
-    - sugerencia_info: dict con info de sugerencia si no entendió (o None)
+    - mensaje: str
+    - df: DataFrame o None
+    - sugerencia_info: dict o None
     """
 
     print(f"\n{'='*60}")
     print(f"📝 PREGUNTA: {pregunta}")
     print(f"{'='*60}")
 
-    # PASO 1: Interpretar con IA
     interpretacion = interpretar_pregunta(pregunta)
 
     tipo = interpretacion.get("tipo", "no_entendido")
@@ -189,9 +226,7 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
     print(f"📦 PARAMS: {params}")
     print(f"🔍 DEBUG: {debug}")
 
-    # =========================
     # DEBUG (interpretación)
-    # =========================
     try:
         if st.session_state.get("DEBUG_SQL", False):
             st.session_state["DBG_INT_LAST"] = {
@@ -203,8 +238,6 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
     except Exception:
         pass
 
-    # PASO 2: Manejar casos especiales
-
     # Conversación
     if tipo == "conversacion":
         respuesta = responder_con_openai(pregunta, "conversacion")
@@ -215,22 +248,16 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
         respuesta = responder_con_openai(pregunta, "conocimiento")
         return f"📚 {respuesta}", None, None
 
-    # ✅ FALLBACK FACTURA (AGREGADO):
-    # Si la IA no entiende pero el texto claramente pide "detalle factura ..."
+    # Fallback: si no entendió pero pide detalle factura
     if tipo == "no_entendido":
         nro_fb = _extraer_nro_factura_fallback(pregunta)
         if nro_fb:
-            return _ejecutar_consulta(
-                "detalle_factura_numero",
-                {"nro_factura": nro_fb},
-                pregunta
-            )
+            return _ejecutar_consulta("detalle_factura_numero", {"nro_factura": nro_fb}, pregunta)
 
-    # No entendido → devolver sugerencia
+    # No entendido → sugerencia
     if tipo == "no_entendido":
         sugerencia = interpretacion.get("sugerencia", "No entendí tu pregunta.")
         alternativas = interpretacion.get("alternativas", [])
-
         return (
             f"🤔 {sugerencia}",
             None,
@@ -241,33 +268,30 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
             }
         )
 
-    # PASO 3: Ejecutar consulta según tipo
     return _ejecutar_consulta(tipo, params, pregunta)
 
 
 # =====================================================================
 # EJECUTOR DE CONSULTAS
 # =====================================================================
+
 def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple[str, Optional[pd.DataFrame], None]:
     """Ejecuta la consulta SQL según el tipo de consulta."""
     try:
         # =========================================================
         # COMPRAS
         # =========================================================
-
         if tipo == "compras_anio":
             anio = params.get("anio")
             if not anio:
                 return "❌ Falta especificar el año.", None, None
 
-            # Obtener resumen
             resumen = get_total_compras_anio(anio)
             df = get_compras_anio(anio)
 
             if df is None or df.empty:
                 return f"No encontré compras en {anio}.", None, None
 
-            # Formatear totales
             total_pesos = resumen.get("total_pesos", 0)
             total_usd = resumen.get("total_usd", 0)
             registros = resumen.get("registros", 0)
@@ -297,17 +321,16 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             df = get_detalle_compras_proveedor_mes(proveedor, mes)
 
             if df is None or df.empty:
-                return f"No encontré compras de {proveedor.upper()} en {mes}.", None, None
+                return f"No encontré compras de {str(proveedor).upper()} en {mes}.", None, None
 
             total = df["Total"].sum() if "Total" in df.columns else 0
             total_fmt = f"${total:,.0f}".replace(",", ".")
 
             return (
-                f"📋 Compras de **{proveedor.upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} registros:",
+                f"📋 Compras de **{str(proveedor).upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} registros:",
                 formatear_dataframe(df),
                 None
             )
-
 
         if tipo == "compras_proveedor_anio":
             proveedor = params.get("proveedor")
@@ -320,18 +343,17 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             df = get_detalle_compras_proveedor_anio(proveedor, anio)
 
             if df is None or df.empty:
-                return f"No encontré compras de {proveedor.upper()} en {anio}.", None, None
+                return f"No encontré compras de {str(proveedor).upper()} en {anio}.", None, None
 
             total = resumen.get("total", 0)
             total_fmt = f"${total:,.0f}".replace(",", ".")
             registros = resumen.get("registros", 0)
 
-            msg = f"📋 Compras de **{proveedor.upper()}** en {anio} | 💰 **{total_fmt}** | {registros} registros"
+            msg = f"📋 Compras de **{str(proveedor).upper()}** en {anio} | 💰 **{total_fmt}** | {registros} registros"
             if registros > len(df):
                 msg += f" (mostrando {len(df)})"
 
             return msg + ":", formatear_dataframe(df), None
-
 
         if tipo == "compras_articulo_mes":
             articulo = params.get("articulo")
@@ -343,17 +365,16 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             df = get_detalle_compras_articulo_mes(articulo, mes)
 
             if df is None or df.empty:
-                return f"No encontré compras de {articulo.upper()} en {mes}.", None, None
+                return f"No encontré compras de {str(articulo).upper()} en {mes}.", None, None
 
             total = df["Total"].sum() if "Total" in df.columns else 0
             total_fmt = f"${total:,.0f}".replace(",", ".")
 
             return (
-                f"📦 Compras de **{articulo.upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} registros:",
+                f"📦 Compras de **{str(articulo).upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} registros:",
                 formatear_dataframe(df),
                 None
             )
-
 
         if tipo == "compras_articulo_anio":
             articulo = params.get("articulo")
@@ -366,50 +387,69 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             df = get_detalle_compras_articulo_anio(articulo, anio)
 
             if df is None or df.empty:
-                return f"No encontré compras de {articulo.upper()} en {anio}.", None, None
+                return f"No encontré compras de {str(articulo).upper()} en {anio}.", None, None
 
             total = resumen.get("total", 0)
             total_fmt = f"${total:,.0f}".replace(",", ".")
 
             return (
-                f"📦 Compras de **{articulo.upper()}** en {anio} | 💰 **{total_fmt}** | {len(df)} registros:",
+                f"📦 Compras de **{str(articulo).upper()}** en {anio} | 💰 **{total_fmt}** | {len(df)} registros:",
                 formatear_dataframe(df),
                 None
             )
 
-
         if tipo == "compras_mes":
             mes = params.get("mes")
-
             if not mes:
                 return "❌ Falta especificar el mes.", None, None
 
             df = get_compras_por_mes_excel(mes)
-
             if df is None or df.empty:
                 return f"No encontré compras en {mes}.", None, None
 
             return f"📦 Compras de {mes} ({len(df)} registros):", formatear_dataframe(df), None
 
+        # =========================================================
+        # DETALLE FACTURA POR NÚMERO
+        # =========================================================
+        if tipo == "detalle_factura_numero":
+            nro = params.get("nro_factura")
+            if not nro:
+                return "❌ Falta número de factura.", None, None
+
+            df = get_detalle_factura_por_numero(nro)
+            if df is None or df.empty:
+                return f"No encontré detalle para la factura {nro}.", None, None
+
+            total_df = get_total_factura_por_numero(nro)
+            total_fact = 0
+            if total_df is not None and not total_df.empty and "total_factura" in total_df.columns:
+                try:
+                    total_fact = float(total_df["total_factura"].iloc[0] or 0)
+                except Exception:
+                    total_fact = 0
+
+            total_fmt = f"${total_fact:,.0f}".replace(",", ".") if total_fact else ""
+            titulo = f"🧾 Detalle factura **{nro}**"
+            if total_fmt:
+                titulo += f" | Total: **{total_fmt}**"
+
+            return titulo + ":", formatear_dataframe(df), None
 
         # =========================================================
-        # FACTURAS
+        # FACTURAS (LISTADO)
         # =========================================================
-
         if tipo in ("facturas_proveedor", "facturas_proveedor_detalle"):
             proveedores = params.get("proveedores", [])
             if isinstance(proveedores, str):
                 proveedores = [proveedores]
 
-            # Convertir a patrón inclusivo para LIKE
-            proveedores = [f"%{p.strip().lower()}%" for p in proveedores]
-
-            if not proveedores:
+            proveedores_raw = [str(p).strip() for p in proveedores if str(p).strip()]
+            if not proveedores_raw:
                 return "❌ Indicá el proveedor. Ej: todas las facturas roche 2025", None, None
 
-            # Ejecutar consulta SQL
             df = get_facturas_proveedor_detalle(
-                proveedores=proveedores,  # Aquí ya tenemos '%roche%'
+                proveedores=proveedores_raw,  # <-- raw (roche). El LIKE lo hace SQL.
                 meses=params.get("meses"),
                 anios=params.get("anios"),
                 desde=params.get("desde"),
@@ -425,20 +465,14 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                     tiempo_lbl = f" en {', '.join(params.get('meses'))}"
                 elif params.get("anios"):
                     tiempo_lbl = f" en {', '.join(map(str, params.get('anios')))}"
+                return f"No encontré facturas de **{', '.join([p.upper() for p in proveedores_raw])}**{tiempo_lbl}.", None, None
 
-                return f"No encontré facturas de **{' '.join(proveedores)}**{tiempo_lbl}.", None, None
-
-            prov_lbl = ", ".join([str(p).upper() for p in proveedores[:3]])
+            prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
             return f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):", formatear_dataframe(df), None
 
-    except Exception as e:
-        print(f"❌ Error ejecutando consulta: {e}")
-        return f"❌ Error: {str(e)}", None, None
-        
         # =========================================================
         # COMPARACIONES
         # =========================================================
-
         if tipo == "comparar_proveedor_meses":
             proveedor = params.get("proveedor")
             mes1 = params.get("mes1")
@@ -450,12 +484,10 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ Necesito proveedor y dos meses para comparar.", None, None
 
             df = get_comparacion_proveedor_meses(proveedor, mes1, mes2, label1, label2)
-
             if df is None or df.empty:
-                return f"No encontré datos para comparar {proveedor.upper()} entre {label1} y {label2}.", None, None
+                return f"No encontré datos para comparar {str(proveedor).upper()} entre {label1} y {label2}.", None, None
 
-            return (f"📊 Comparación {proveedor.upper()}: {label1} vs {label2}", formatear_dataframe(df), None)
-
+            return (f"📊 Comparación {str(proveedor).upper()}: {label1} vs {label2}", formatear_dataframe(df), None)
 
         if tipo == "comparar_proveedor_anios":
             proveedor = params.get("proveedor")
@@ -465,13 +497,11 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ Necesito proveedor y al menos dos años para comparar.", None, None
 
             df = get_comparacion_proveedor_anios_like(proveedor, anios)
-
             if df is None or df.empty:
-                return f"No encontré datos para comparar {proveedor.upper()}.", None, None
+                return f"No encontré datos para comparar {str(proveedor).upper()}.", None, None
 
             anios_str = " vs ".join(map(str, anios))
-            return (f"📊 Comparación {proveedor.upper()}: {anios_str}", formatear_dataframe(df), None)
-
+            return (f"📊 Comparación {str(proveedor).upper()}: {anios_str}", formatear_dataframe(df), None)
 
         if tipo == "comparar_articulo_meses":
             articulo = params.get("articulo")
@@ -485,12 +515,10 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             label2 = params.get("label2", mes2)
 
             df = get_comparacion_articulo_meses(mes1, mes2, label1, label2, [articulo])
-
             if df is None or df.empty:
                 return f"No encontré datos para comparar {articulo}.", None, None
 
-            return (f"📊 Comparación {articulo.upper()}: {label1} vs {label2}", formatear_dataframe(df), None)
-
+            return (f"📊 Comparación {str(articulo).upper()}: {label1} vs {label2}", formatear_dataframe(df), None)
 
         if tipo == "comparar_articulo_anios":
             articulo = params.get("articulo")
@@ -500,13 +528,11 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ Falta artículo o años.", None, None
 
             df = get_comparacion_articulo_anios(anios, articulo)
-
             if df is None or df.empty:
                 return f"No encontré datos para comparar {articulo}.", None, None
 
             anios_str = " vs ".join(map(str, anios))
-            return (f"📊 Comparación {articulo.upper()}: {anios_str}", formatear_dataframe(df), None)
-
+            return (f"📊 Comparación {str(articulo).upper()}: {anios_str}", formatear_dataframe(df), None)
 
         if tipo == "comparar_familia_meses":
             mes1 = params.get("mes1")
@@ -520,79 +546,47 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             label2 = params.get("label2", mes2)
 
             df = get_comparacion_familia_meses_moneda(mes1, mes2, label1, label2, moneda)
-
             if df is None or df.empty:
                 return "No encontré datos para comparar.", None, None
 
             return (f"📊 Comparación familias: {label1} vs {label2} ({moneda})", formatear_dataframe(df), None)
 
-
         if tipo == "comparar_familia_anios":
             anios = sorted(params.get("anios", []))
-
             if len(anios) < 2:
                 return "❌ Necesito al menos dos años para comparar.", None, None
 
             df = get_comparacion_familia_anios_monedas(anios)
-
             if df is None or df.empty:
                 return "No encontré datos para comparar.", None, None
 
             anios_str = " vs ".join(map(str, anios))
             return (f"📊 Comparación familias: {anios_str}", formatear_dataframe(df), None)
 
-
         # =========================================================
         # GASTOS
         # =========================================================
-
         if tipo == "gastos_familias_mes":
             mes = params.get("mes")
-
             if not mes:
                 return "❌ Falta especificar el mes.", None, None
 
             df = get_gastos_todas_familias_mes(mes)
-
             if df is None or df.empty:
                 return f"No encontré gastos en {mes}.", None, None
 
-            total_pesos = df["Total_Pesos"].sum() if "Total_Pesos" in df.columns else 0
-            total_usd = df["Total_USD"].sum() if "Total_USD" in df.columns else 0
-
-            total_pesos_fmt = f"${total_pesos:,.0f}".replace(",", ".")
-            total_usd_fmt = f"U$S {total_usd:,.0f}".replace(",", ".")
-
-            msg = f"📊 Gastos por familia en {mes} | 💰 **{total_pesos_fmt}**"
-            if total_usd > 0:
-                msg += f" | 💵 **{total_usd_fmt}**"
-
-            return msg + ":", formatear_dataframe(df), None
-
+            return f"📊 Gastos por familia en {mes}:", formatear_dataframe(df), None
 
         if tipo == "gastos_familias_anio":
             anio = params.get("anio")
-
             if not anio:
                 return "❌ Falta especificar el año.", None, None
 
             df = get_gastos_todas_familias_anio(anio)
-
             if df is None or df.empty:
                 return f"No encontré gastos en {anio}.", None, None
 
-            total_pesos = df["Total_Pesos"].sum() if "Total_Pesos" in df.columns else 0
-            total_usd = df["Total_USD"].sum() if "Total_USD" in df.columns else 0
-
-            total_pesos_fmt = f"${total_pesos:,.0f}".replace(",", ".")
-            total_usd_fmt = f"U$S {total_usd:,.0f}".replace(",", ".")
-
-            msg = f"📊 Gastos por familia en {anio} | 💰 **{total_pesos_fmt}**"
-            if total_usd > 0:
-                msg += f" | 💵 **{total_usd_fmt}**"
-
-            return msg + ":", formatear_dataframe(df), None
-
+            return f"📊 Gastos por familia en {anio}:", formatear_dataframe(df), None
 
         if tipo == "gastos_secciones":
             familias = params.get("familias", [])
@@ -602,24 +596,20 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ Falta especificar familias o mes.", None, None
 
             df = get_gastos_secciones_detalle_completo(familias, mes)
-
             if df is None or df.empty:
                 return f"No encontré gastos para esas familias en {mes}.", None, None
 
             return f"📊 Gastos de familias {', '.join(familias)} en {mes}:", formatear_dataframe(df), None
 
-
         # =========================================================
         # TOP PROVEEDORES
         # =========================================================
-
         if tipo == "top_proveedores":
             moneda = params.get("moneda")
             anio = params.get("anio")
             mes = params.get("mes")
 
             df = get_top_10_proveedores_chatbot(moneda, anio, mes)
-
             if df is None or df.empty:
                 return "No encontré datos de proveedores.", None, None
 
@@ -633,17 +623,14 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
 
             return titulo + ":", formatear_dataframe(df), None
 
-
         # =========================================================
         # STOCK
         # =========================================================
-
         if tipo == "stock_total":
             df = get_stock_total()
             if df is not None and not df.empty:
                 return "📦 **Resumen de stock total:**", formatear_dataframe(df), None
             return "No pude obtener el stock total.", None, None
-
 
         if tipo == "stock_articulo":
             articulo = params.get("articulo")
@@ -651,25 +638,10 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ ¿De qué artículo querés ver el stock?", None, None
 
             df = get_stock_articulo(articulo)
-
             if df is None or df.empty:
                 return f"No encontré stock de '{articulo}'.", None, None
 
-            total = 0
-            if "STOCK" in df.columns:
-                try:
-                    total = df["STOCK"].apply(
-                        lambda x: float(str(x).replace(",", ".").replace(" ", "")) if pd.notna(x) else 0
-                    ).sum()
-                except Exception:
-                    pass
-
-            msg = f"📦 **Stock de '{articulo.upper()}'**"
-            if total > 0:
-                msg += f" (Total: {total:,.0f} unidades)".replace(",", ".")
-
-            return msg + ":", formatear_dataframe(df), None
-
+            return f"📦 **Stock de '{str(articulo).upper()}':**", formatear_dataframe(df), None
 
         if tipo == "stock_familia":
             familia = params.get("familia")
@@ -677,12 +649,10 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ ¿De qué familia querés ver el stock?", None, None
 
             df = get_stock_familia(familia)
-
             if df is None or df.empty:
                 return f"No encontré stock de la familia '{familia}'.", None, None
 
-            return f"📦 **Stock de familia {familia.upper()}:**", formatear_dataframe(df), None
-
+            return f"📦 **Stock de familia {str(familia).upper()}:**", formatear_dataframe(df), None
 
         if tipo == "stock_por_familia":
             df = get_stock_por_familia()
@@ -690,22 +660,18 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "📦 **Stock por familia:**", formatear_dataframe(df), None
             return "No encontré datos de stock por familia.", None, None
 
-
         if tipo == "stock_por_deposito":
             df = get_stock_por_deposito()
             if df is not None and not df.empty:
                 return "📦 **Stock por depósito:**", formatear_dataframe(df), None
             return "No encontré datos de stock por depósito.", None, None
 
-
         if tipo == "stock_lotes_vencer":
             dias = params.get("dias", 90)
             df = get_lotes_por_vencer(dias)
-
             if df is not None and not df.empty:
                 return f"⚠️ **Lotes que vencen en los próximos {dias} días:**", formatear_dataframe(df), None
             return f"No hay lotes que venzan en los próximos {dias} días.", None, None
-
 
         if tipo == "stock_lotes_vencidos":
             df = get_lotes_vencidos()
@@ -713,15 +679,12 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "🚨 **Lotes VENCIDOS:**", formatear_dataframe(df), None
             return "No hay lotes vencidos con stock.", None, None
 
-
         if tipo == "stock_bajo":
             minimo = params.get("minimo", 10)
             df = get_stock_bajo(minimo)
-
             if df is not None and not df.empty:
                 return f"📉 **Artículos con stock bajo (≤{minimo}):**", formatear_dataframe(df), None
             return "No hay artículos con stock bajo.", None, None
-
 
         if tipo == "stock_lote":
             lote = params.get("lote")
@@ -729,35 +692,28 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 return "❌ ¿Qué lote querés buscar?", None, None
 
             df = get_stock_lote_especifico(lote)
-
             if df is None or df.empty:
                 return f"No encontré el lote '{lote}'.", None, None
 
-            return f"📦 **Lote {lote.upper()}:**", formatear_dataframe(df), None
-
+            return f"📦 **Lote {str(lote).upper()}:**", formatear_dataframe(df), None
 
         # =========================================================
         # TIPO NO RECONOCIDO
         # =========================================================
-
         return f"❌ Tipo de consulta '{tipo}' no implementado.", None, None
 
     except Exception as e:
         print(f"❌ Error ejecutando consulta: {e}")
         import traceback
         traceback.print_exc()
-        return f"❌ Error: {str(e)[:100]}", None, None
+        return f"❌ Error: {str(e)[:150]}", None, None
 
 
 # =====================================================================
-# FUNCIÓN DE COMPATIBILIDAD CON SISTEMA ANTERIOR
+# COMPAT CON SISTEMA ANTERIOR
 # =====================================================================
 
 def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
-    """
-    Función de compatibilidad con el sistema anterior.
-    Ignora las sugerencias y solo devuelve mensaje + df.
-    """
     mensaje, df, sugerencia = procesar_pregunta_v2(pregunta)
 
     if sugerencia:
@@ -769,9 +725,7 @@ def procesar_pregunta(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
 
 
 def procesar_pregunta_router(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]]:
-    """
-    Alias de procesar_pregunta para compatibilidad con ui_compras.py
-    """
+    """Alias para compatibilidad con ui_compras.py"""
     return procesar_pregunta(pregunta)
 
 
@@ -782,58 +736,8 @@ def procesar_pregunta_router(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]
 if __name__ == "__main__":
     print("=" * 60)
     print("🛠 Verificando estado del orquestador...")
-    print(f"ORQUESTADOR_CARGADO: {st.session_state.get('ORQUESTADOR_CARGADO', None)}")
-    print("=" * 60)
-
-def prueba_sql_streamlit():
-    """
-    Muestra los resultados de la consulta SQL en la interfaz de Streamlit.
-    """
-
-    # Parámetros para la prueba
-    proveedores = ["roche"]
-    anios = [2025]
-    meses = None  # Deja meses como None, o pásalos según desees
-    limite = 500
-
     try:
-        st.write("🛠 Ejecutando prueba de SQL para `get_facturas_proveedor_detalle` con Streamlit...")
-
-        # Ejecutar la consulta SQL directamente
-        df = get_facturas_proveedor_detalle(
-            proveedores=proveedores,
-            anios=anios,
-            meses=meses,
-            limite=limite
-        )
-
-        # Mostrar resultados en la interfaz Streamlit
-        if df is not None and not df.empty:
-            st.success(f"✅ Resultados obtenidos desde SQL: {len(df)} filas")
-            st.dataframe(df)  # Mostrar DataFrame en la UI
-        else:
-            st.error("❌ No se encontraron resultados para los parámetros dados.")
-
-    except Exception as e:
-        st.error(f"❌ Error en prueba SQL: {str(e)}")
-    
-    pruebas = [
-        "compras 2025",
-        "compras roche enero 2026",
-        "ultimo vitek",
-        "cuando vino vitek",
-        "comparar roche 2024 2025",
-        "stock vitek",
-        "cuanto gastamos",
-        "detalle factura 273279",
-        "detalle factura A00273279",
-    ]
-
-    for p in pruebas:
-        print(f"\n📝 Pregunta: {p}")
-        msg, df, sug = procesar_pregunta_v2(p)
-        print(f"   Mensaje: {msg[:100]}...")
-        if df is not None:
-            print(f"   DataFrame: {len(df)} filas")
-        if sug:
-            print(f"   Sugerencia: {sug.get('sugerencia')}")
+        print(f"ORQUESTADOR_CARGADO (session): {st.session_state.get('ORQUESTADOR_CARGADO', None)}")
+    except Exception:
+        print("ORQUESTADOR_CARGADO (session): n/a")
+    print("=" * 60)
