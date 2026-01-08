@@ -463,8 +463,8 @@ def _get_system_prompt() -> str:
     hoy = datetime.now()
     mes_actual = hoy.strftime("%Y-%m")
     anio_actual = hoy.year
-    return f"""
-Eres un intérprete de consultas.
+    fecha_str = hoy.strftime("%Y-%m-%d")
+    return f"""Eres un intérprete de consultas.
 - Mes SIEMPRE YYYY-MM.
 - Años válidos: 2023–2026.
 - Devuelve SOLO JSON: tipo, parametros, debug/sugerencia si aplica.
@@ -475,8 +475,7 @@ TABLA TIPOS:
 CANÓNICA:
 {TABLA_CANONICA_50}
 
-FECHA: {hoy.strftime("%Y-%m-%d")} (mes actual {mes_actual}, año {anio_actual})
-""".strip()
+FECHA: {fecha_str} (mes actual {mes_actual}, año {anio_actual})""".strip()
 
 # =====================================================================
 # OPENAI (opcional)
