@@ -760,6 +760,7 @@ def mostrar_baja_stock():
                                 st.caption(f"Resta en {deposito_sel}: **{_fmt_num(res.get('total_deposito', 0.0))}**")
                                 st.caption(f"Resta en Casa Central: **{_fmt_num(res.get('total_casa_central', 0.0))}**")
 
+                            st.session_state["ULTIMA_BAJA_OK"] = True
                             del st.session_state["item_seleccionado_stock"]
                             st.rerun()
 
@@ -808,3 +809,4 @@ def mostrar_baja_stock():
 
     except Exception as e:
         st.warning(f"No se pudo cargar el historial: {str(e)}")
+
