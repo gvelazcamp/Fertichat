@@ -361,6 +361,14 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
     return out
 
 # =====================================================================
+# Normalizamos mes a meses en parámetros
+# =====================================================================
+    
+    if "mes" in params:
+    mes = params.get("mes")
+    params["meses"] = [mes] if isinstance(mes, str) else mes
+    
+# =====================================================================
 # NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA + LIMITE
 # =====================================================================
 def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
