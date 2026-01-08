@@ -515,48 +515,41 @@ def get_total_facturas_proveedor(
 
     return ejecutar_consulta(query, tuple(params))
 
+
+# =========================
+# FACTURAS PROVEEDOR (DETALLE)  ✅ CORREGIDO A LIKE %...%
 # =========================
 def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, articulo, moneda, limite):
-    # Construcción del SQL...
-    query = f"""
-        SELECT
-            "Fecha",
-            "Cliente / Proveedor",
-            "Articulo",
-            "Moneda",
-            "Total"
-        FROM chatbot_raw
-        WHERE LOWER(TRIM("Cliente / Proveedor")) IN ({', '.join(['%s'] * len(proveedores))})
+    """
+    Listado/detalle de facturas para proveedor(es) con filtros opcionales.
+    Clave: proveedor se filtra por LIKE %texto% (no IN exacto).
     """
 
-    if anios:
-        query += f' AND "Año" IN ({", ".join(["%s"] * len(anios))})'
-    if meses:
-        query += f' AND "Mes" IN ({", ".join(["%s"] * len(meses))})'
-    if desde and hasta:
-        query += ' AND "Fecha" BETWEEN %s AND %s'
-    if limite:
-        query += f" LIMIT {limite}"
+    total_expr = _sql_total_num_expr_general()
 
-    # Generar parámetros para el SQL
-    params = [
-        *proveedores,
-        *(anios or []),
-        *(meses or []),
-        *( [desde, hasta] if desde and hasta else [] ),
+    # Limite seguro
+    if limite is None:
+        limite = 5000
+    try:
+        limite = int(limite)
+    except Exception:
+        limite = 5000
+    if limite <= 0:
+        limite = 5000
+
+    # -------------------------
+    # WHERE base
+    # -------------------------
+    where_parts = [
+        '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'
     ]
+    params: List[Any] = []
 
-    # 🚨 Imprime el SQL y los parámetros para depurar
-    print(f"\n🛠 SQL generado: {query}")
-    print(f"🛠 Parámetros: {params}")
-
-    # Ejecutar la consulta con los datos generados (es una simplificación)
-    return ejecutar_consulta(query, params)
     # -------------------------
     # FILTRO POR PROVEEDORES (LIKE)
     # -------------------------
     prov_clauses = []
-    for p in proveedores:
+    for p in (proveedores or []):
         p = str(p).strip().lower()
         if not p:
             continue
@@ -565,6 +558,9 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
 
     if prov_clauses:
         where_parts.append("(" + " OR ".join(prov_clauses) + ")")
+    else:
+        # sin proveedor no hacemos nada (evita traer todo)
+        return pd.DataFrame()
 
     # -------------------------
     # FILTRO POR ARTÍCULO (LIKE)
@@ -584,43 +580,54 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
             where_parts.append('TRIM("Moneda") = \'$\'')
 
     # -------------------------
-    # FILTROS DE TIEMPO
+    # FILTROS DE TIEMPO (prioridad: rango > meses > años)
     # -------------------------
     if desde and hasta:
         where_parts.append('"Fecha"::date BETWEEN %s AND %s')
         params.extend([desde, hasta])
+
     elif meses:
-        meses_ok = [m for m in meses if m]
+        meses_ok = [m for m in (meses or []) if m]
         if meses_ok:
             ph = ", ".join(["%s"] * len(meses_ok))
             where_parts.append(f'TRIM("Mes") IN ({ph})')
             params.extend(meses_ok)
+
     elif anios:
-        anios_ok = [int(a) for a in anios if a]
+        anios_ok: List[int] = []
+        for a in (anios or []):
+            try:
+                anios_ok.append(int(a))
+            except Exception:
+                pass
         if anios_ok:
             ph = ", ".join(["%s"] * len(anios_ok))
-            where_parts.append(f'"Año" IN ({ph})')
+            where_parts.append(f'"Año"::int IN ({ph})')
             params.extend(anios_ok)
 
     # -------------------------
-    # GENERAR QUERY FINAL
+    # QUERY FINAL (mismo estilo que compras_proveedor_mes)
     # -------------------------
     query = f"""
         SELECT
-            "Fecha",
             TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Nro. Comprobante") AS NroFactura,
-            TRIM("Tipo Comprobante") AS Tipo,
             TRIM("Articulo") AS Articulo,
+            TRIM("Nro. Comprobante") AS Nro_Factura,
+            "Fecha",
+            "Cantidad",
             "Moneda",
-            "Total"
+            {total_expr} AS Total
         FROM chatbot_raw
         WHERE {" AND ".join(where_parts)}
         ORDER BY "Fecha" DESC NULLS LAST
-        LIMIT {limite}
+        LIMIT %s
     """
+    params.append(limite)
 
-    # Ejecutar consulta
+    # Debug opcional
+    print(f"\n🛠 SQL generado (facturas_proveedor_detalle): {query}")
+    print(f"🛠 Parámetros: {params}")
+
     return ejecutar_consulta(query, tuple(params))
 
 # =====================================================================
