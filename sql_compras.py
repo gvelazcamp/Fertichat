@@ -541,8 +541,8 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     # Generar parámetros para el SQL
     params = [
         *proveedores,
-        *anios or [],
-        *meses or [],
+        *(anios or []),
+        *(meses or []),
         *( [desde, hasta] if desde and hasta else [] ),
     ]
 
