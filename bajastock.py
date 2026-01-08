@@ -533,50 +533,50 @@ def mostrar_baja_stock():
         st.markdown("<br>", unsafe_allow_html=True)
         btn_buscar = st.button("Buscar", type="primary", use_container_width=True)
 
-    # =========================
-    # RESULTADOS DE BÚSQUEDA
-    # =========================
-    if busqueda and btn_buscar:
-        with st.spinner("Buscando en stock..."):
-            try:
-                items = buscar_items_stock(busqueda)
+# =========================
+# RESULTADOS DE BÚSQUEDA
+# =========================
+if busqueda and (btn_buscar or "item_seleccionado_stock" in st.session_state):
+    with st.spinner("Buscando en stock..."):
+        try:
+            items = buscar_items_stock(busqueda)
 
-                if items:
-                    st.success(f"Se encontraron {len(items)} artículo(s)")
+            if items:
+                st.success(f"Se encontraron {len(items)} artículo(s)")
 
-                    for i, it in enumerate(items):
-                        codigo = it.get("CODIGO", "N/A")
-                        articulo = it.get("ARTICULO", "Sin artículo")
-                        familia = it.get("FAMILIA", "")
-                        stock_total = float(it.get("STOCK_TOTAL", 0.0) or 0.0)
-                        depositos = sorted(list(it.get("DEPOSITOS", set())))
+                for i, it in enumerate(items):
+                    codigo = it.get("CODIGO", "N/A")
+                    articulo = it.get("ARTICULO", "Sin artículo")
+                    familia = it.get("FAMILIA", "")
+                    stock_total = float(it.get("STOCK_TOTAL", 0.0) or 0.0)
+                    depositos = sorted(list(it.get("DEPOSITOS", set())))
 
-                        with st.container():
-                            col_info, col_btn = st.columns([4, 1])
+                    with st.container():
+                        col_info, col_btn = st.columns([4, 1])
 
-                            with col_info:
-                                st.markdown(
-                                    f"**{codigo}** - {articulo}  \n"
-                                    f"🏷️ Familia: **{familia or '—'}**  \n"
-                                    f"📦 Stock total (todas las ubicaciones): **{_fmt_num(stock_total)}**  \n"
-                                    f"🏠 Depósitos: {', '.join(depositos) if depositos else '—'}"
-                                )
+                        with col_info:
+                            st.markdown(
+                                f"**{codigo}** - {articulo}  \n"
+                                f"🏷️ Familia: **{familia or '—'}**  \n"
+                                f"📦 Stock total (todas las ubicaciones): **{_fmt_num(stock_total)}**  \n"
+                                f"🏠 Depósitos: {', '.join(depositos) if depositos else '—'}"
+                            )
 
-                            with col_btn:
-                                if st.button("Seleccionar", key=f"sel_item_{i}"):
-                                    st.session_state["item_seleccionado_stock"] = {
-                                        "CODIGO": codigo,
-                                        "ARTICULO": articulo,
-                                        "FAMILIA": familia
-                                    }
-                                    st.rerun()
+                        with col_btn:
+                            if st.button("Seleccionar", key=f"sel_item_{i}"):
+                                st.session_state["item_seleccionado_stock"] = {
+                                    "CODIGO": codigo,
+                                    "ARTICULO": articulo,
+                                    "FAMILIA": familia
+                                }
+                                st.rerun()
 
-                            st.markdown("---")
-                else:
-                    st.warning("No se encontraron artículos con ese criterio en la tabla stock.")
+                        st.markdown("---")
+            else:
+                st.warning("No se encontraron artículos con ese criterio en la tabla stock.")
 
-            except Exception as e:
-                st.error(f"Error al buscar: {str(e)}")
+        except Exception as e:
+            st.error(f"Error al buscar: {str(e)}")
 
     # =========================
     # FORMULARIO DE BAJA (con lotes/vencimientos + aviso FIFO)
@@ -841,4 +841,5 @@ def mostrar_baja_stock():
 
     except Exception as e:
         st.warning(f"No se pudo cargar el historial: {str(e)}")
+
 
