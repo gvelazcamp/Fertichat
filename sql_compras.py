@@ -588,14 +588,17 @@ def get_facturas_proveedor_detalle(
                 ph = ", ".join(["%s"] * len(meses_ok))
                 where_parts.append(f'TRIM("Mes") IN ({ph})')
                 params.extend(meses_ok)
-
-        # Años (solo si NO hay meses)
+        
+        # Años (solo si NO hay meses) - CORREGIDO: usar EXTRACT en lugar de "Año"::int
         if (not meses) and anios:
             anios_ok = [int(a) for a in (anios or []) if a]
             if anios_ok:
-                ph = ", ".join(["%s"] * len(anios_ok))
-                where_parts.append(f'"Año"::int IN ({ph})')
-                params.extend(anios_ok)
+                # Usar EXTRACT(YEAR FROM "Fecha") para compatibilidad
+                anio_clauses = []
+                for anio in anios_ok:
+                    anio_clauses.append('EXTRACT(YEAR FROM "Fecha"::date) = %s')
+                    params.append(anio)
+                where_parts.append(f'({" OR ".join(anio_clauses)})')
 
     where_clause_str = " AND ".join(where_parts)
     query = """
