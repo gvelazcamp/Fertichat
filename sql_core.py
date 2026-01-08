@@ -76,6 +76,23 @@ COL_MONTO     = '"Monto Neto"'
 # HELPERS SQL (POSTGRES)
 # =====================================================================
 
+def _safe_ident(col_name: str) -> str:
+    """
+    Escapa un nombre de columna para usar en SQL de forma segura.
+    Envuelve el nombre en comillas dobles para Postgres.
+    
+    Parámetros:
+    - col_name: str, nombre de la columna
+    
+    Retorna:
+    - str con el nombre escapado entre comillas dobles
+    """
+    # Remover comillas existentes y espacios en blanco
+    clean = str(col_name).strip().strip('"')
+    # Envolver en comillas dobles para Postgres
+    return f'"{clean}"'
+
+
 def _sql_fecha_expr() -> str:
     return '"Fecha"'
 
