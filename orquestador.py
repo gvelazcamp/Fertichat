@@ -248,10 +248,8 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
 # =====================================================================
 # EJECUTOR DE CONSULTAS
 # =====================================================================
-
 def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple[str, Optional[pd.DataFrame], None]:
-    """Ejecuta la consulta SQL según el tipo"""
-
+    """Ejecuta la consulta SQL según el tipo de consulta."""
     try:
         # =========================================================
         # COMPRAS
@@ -288,7 +286,6 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 msg += f" (mostrando {len(df)})"
 
             return msg + ":", formatear_dataframe(df), None
-
 
         if tipo == "compras_proveedor_mes":
             proveedor = params.get("proveedor")
