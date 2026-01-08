@@ -232,7 +232,7 @@ def registrar_baja(
     usuario,
     codigo_interno,
     articulo,
-    cantidad,
+    cantidadsantidad,
     motivo,
     deposito=None,
     lote=None,
@@ -261,7 +261,8 @@ def registrar_baja(
                 %s, %s,
                 %s, %s, %s)
     """, (
-        usuario, ahora.date(), ahora.time(), str(codigo_interno), str(articulo), cantidad, motivo,
+        usuario, ahora.date(), ahora.time(), str(codigo_interno), str(articulo), float(Red),
+        motivo,
         deposito, lote, vencimiento,
         stock_antes_lote, stock_despues_lote,
         stock_total_articulo, stock_total_deposito, stock_casa_central
@@ -490,8 +491,12 @@ def mostrar_baja_stock():
         pass
 
     st.markdown("## 🧾 Baja de Stock")
-    st.markdown("Buscá por **CODIGO** o por **ARTICULO**, elegí lote/vencimiento y registrá la baja con historial.")
+    st.markdown("Buscá por **CODIGO** o por **ARTICULO**, elegí depósito/lote/cantidad y confirmá la baja con historial.")
     st.markdown("---")
+
+    # Mensaje persistente luego de confirmar
+    if st.session_state.pop("ULTIMA_BAJA_OK", False):
+        st.success("✅ Baja registrada correctamente. Historial actualizado.")
 
     user = st.session_state.get("user", {})
     usuario_actual = user.get("nombre", user.get("Usuario", "Usuario"))
@@ -512,56 +517,76 @@ def mostrar_baja_stock():
         st.markdown("<br>", unsafe_allow_html=True)
         btn_buscar = st.button("Buscar", type="primary", use_container_width=True)
 
+    # Si cambia la búsqueda y no apretó buscar, limpiamos resultados anteriores
+    last_q = st.session_state.get("BAJA_LAST_QUERY")
+    if busqueda and last_q and busqueda != last_q and not btn_buscar:
+        st.session_state.pop("BAJA_LAST_ITEMS", None)
+        st.session_state.pop("BAJA_LAST_QUERY", None)
+
     # =========================
-    # RESULTADOS DE BÚSQUEDA
-    # (IMPORTANTE: SOLO SE MUESTRAN CUANDO APRETÁS BUSCAR)
+    # RESULTADOS DE BÚSQUEDA (PERSISTENTES)
+    # - Se muestran al apretar Buscar
+    # - Y se mantienen visibles luego de "Seleccionar"
     # =========================
     if busqueda and btn_buscar:
         with st.spinner("Buscando en stock..."):
             try:
                 items = buscar_items_stock(busqueda)
-
-                if items:
-                    st.success(f"Se encontraron {len(items)} artículo(s)")
-
-                    for i, it in enumerate(items):
-                        codigo = it.get("CODIGO", "N/A")
-                        articulo = it.get("ARTICULO", "Sin artículo")
-                        familia = it.get("FAMILIA", "")
-                        stock_total = float(it.get("STOCK_TOTAL", 0.0) or 0.0)
-                        depositos = sorted(list(it.get("DEPOSITOS", set())))
-
-                        with st.container():
-                            col_info, col_btn = st.columns([4, 1])
-
-                            with col_info:
-                                st.markdown(
-                                    f"**{codigo}** - {articulo}  \n"
-                                    f"🏷️ Familia: **{familia or '—'}**  \n"
-                                    f"📦 Stock total (todas las ubicaciones): **{_fmt_num(stock_total)}**  \n"
-                                    f"🏠 Depósitos: {', '.join(depositos) if depositos else '—'}"
-                                )
-
-                            with col_btn:
-                                if st.button("Seleccionar", key=f"sel_item_{i}"):
-                                    st.session_state["item_seleccionado_stock"] = {
-                                        "CODIGO": codigo,
-                                        "ARTICULO": articulo,
-                                        "FAMILIA": familia
-                                    }
-                                    st.rerun()
-
-                            st.markdown("---")
-                else:
-                    st.warning("No se encontraron artículos con ese criterio en la tabla stock.")
-
+                st.session_state["BAJA_LAST_QUERY"] = busqueda
+                st.session_state["BAJA_LAST_ITEMS"] = items
             except Exception as e:
                 st.error(f"Error al buscar: {str(e)}")
+                items = []
+                st.session_state["BAJA_LAST_QUERY"] = busqueda
+                st.session_state["BAJA_LAST_ITEMS"] = []
+
+    items_to_show = []
+    if busqueda and st.session_state.get("BAJA_LAST_QUERY") == busqueda:
+        items_to_show = st.session_state.get("BAJA_LAST_ITEMS", []) or []
+
+    if busqueda and items_to_show:
+        st.success(f"Se encontraron {len(items_to_show)} artículo(s)")
+
+        for i, it in enumerate(items_to_show):
+            codigo = it.get("CODIGO", "N/A")
+            articulo = it.get("ARTICULO", "Sin artículo")
+            familia = it.get("FAMILIA", "")
+            stock_total = float(it.get("STOCK_TOTAL", 0.0) or 0.0)
+            depositos = sorted(list(it.get("DEPOSITOS", set())))
+
+            with st.container():
+                col_info, col_btn = st.columns([4, 1])
+
+                with col_info:
+                    st.markdown(
+                        f"**{codigo}** - {articulo}  \n"
+                        f"🏷️ Familia: **{familia or '—'}**  \n"
+                        f"📦 Stock total (todas las ubicaciones): **{_fmt_num(stock_total)}**  \n"
+                        f"🏠 Depósitos: {', '.join(depositos) if depositos else '—'}"
+                    )
+
+                with col_btn:
+                    if st.button("Seleccionar", key=f"sel_item_{i}"):
+                        st.session_state["item_seleccionado_stock"] = {
+                            "CODIGO": codigo,
+                            "ARTICULO": articulo,
+                            "FAMILIA": familia
+                        }
+                        st.session_state["BAJA_HINT_FORM"] = True
+                        st.rerun()
+
+                st.markdown("---")
+
+    elif busqueda and btn_buscar and not items_to_show:
+        st.warning("No se encontraron artículos con ese criterio en la tabla stock.")
 
     # =========================
     # FORMULARIO DE BAJA (APARECE CUANDO YA HAY SELECCIÓN)
     # =========================
     if "item_seleccionado_stock" in st.session_state:
+        if st.session_state.pop("BAJA_HINT_FORM", False):
+            st.info("Completá Depósito / Lote / Cantidad y tocá ✅ Confirmar Baja para que se registre y aparezca en el historial.")
+
         it = st.session_state["item_seleccionado_stock"]
 
         codigo = _norm_str(it.get("CODIGO"))
@@ -809,4 +834,3 @@ def mostrar_baja_stock():
 
     except Exception as e:
         st.warning(f"No se pudo cargar el historial: {str(e)}")
-
