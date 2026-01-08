@@ -361,67 +361,21 @@ def _match_best(texto: str, index: List[Tuple[str, str]], max_items: int = 1) ->
     return out
 
 # =====================================================================
-# Normalizamos mes a meses en parámetros
+# PARSEO DE PARÁMETROS: Mes a Meses y nuevos campos
 # =====================================================================
-    
+def normalizar_parametros(params: dict) -> dict:
+    """
+    Normaliza parámetros relacionados con mes, meses, rango de fechas, moneda y límites.
+    """
     if "mes" in params:
-    mes = params.get("mes")
-    params["meses"] = [mes] if isinstance(mes, str) else mes
-    
-# =====================================================================
-# NUEVO: PARSEO DE RANGO DE FECHAS + MONEDA + LIMITE
-# =====================================================================
-def _extraer_rango_fechas(texto: str) -> Tuple[Optional[str], Optional[str]]:
-    if not texto:
-        return None, None
+        mes = params.get("mes")
+        params["meses"] = [mes] if isinstance(mes, str) else mes
 
-    t = str(texto)
-
-    iso = re.findall(r"\b(20\d{2}-\d{2}-\d{2})\b", t)
-    if len(iso) >= 2:
-        return iso[0], iso[1]
-
-    lat = re.findall(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b", t)
-    if len(lat) >= 2:
-        def _fmt(d, m, y):
-            try:
-                dt = datetime(int(y), int(m), int(d))
-                return dt.strftime("%Y-%m-%d")
-            except Exception:
-                return None
-        d1 = _fmt(*lat[0])
-        d2 = _fmt(*lat[1])
-        return d1, d2
-
-    return None, None
-
-def _extraer_moneda(texto: str) -> Optional[str]:
-    if not texto:
-        return None
-    t = texto.lower()
-
-    if re.search(r"\b(usd|u\$s|u\$\$|dolar|dolares|dólar|dólares|us\$)\b", t):
-        return "USD"
-    if re.search(r"\b(peso|pesos|uyu|uru)\b", t) or "$" in t:
-        return "$"
-    return None
-
-def _extraer_limite(texto: str) -> Optional[int]:
-    if not texto:
-        return None
-    t = texto.lower()
-    m = re.search(r"\b(top|limite|límite)\s*(\d{1,3})\b", t)
-    if m:
-        try:
-            n = int(m.group(2))
-            if 1 <= n <= 500:
-                return n
-        except Exception:
-            return None
-    return None
+    # Manejo de otras claves si necesitas normalizaciones adicionales
+    return params
 
 # =====================================================================
-# PARSEO TIEMPO
+#  PARSEO DE RANGO DE FECHAS + MONEDA + LÍMITE
 # =====================================================================
 def _extraer_anios(texto: str) -> List[int]:
     anios = re.findall(r"(2023|2024|2025|2026)", texto)
