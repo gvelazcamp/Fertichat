@@ -598,6 +598,7 @@ def es_tipo_valido(tipo: str) -> bool:
 # =====================================================================
 # INTERPRETADOR PRINCIPAL
 # =====================================================================
+
 def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     """
     Interpretador canónico:
@@ -766,6 +767,11 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         if anios:
             return {"tipo": "compras_anio", "parametros": {"anio": anios[0]}, "debug": "compras año"}
 
+    # =========================
+    # No entendido
+    # =========================
+    return {"tipo": "no_entendido", "parametros": {}, "debug": "sin coincidencias"}
+    
     # =========================
     # COMPARAR COMPRAS
     # =========================
