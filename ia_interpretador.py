@@ -575,10 +575,6 @@ MAPEO_FUNCIONES = {
         "funcion": "get_stock_articulo",
         "params": ["articulo"],
     },
-
-    # =========================
-    # CANÓNICO: FACTURAS PROVEEDOR (DETALLE / LISTADO) - separado de "compras"
-    # =========================
     "facturas_proveedor": {
         "funcion": "get_facturas_proveedor_detalle",
         "params": ["proveedores", "meses", "anios", "desde", "hasta", "articulo", "moneda", "limite"],
@@ -727,4 +723,136 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 "hasta": hasta,
                 "articulo": articulo,
                 "moneda": moneda,
-                "limite
+                "limite": limite,
+            },
+            "debug": "facturas proveedor (canónico)",
+        }
+
+    # =========================
+    # COMPRAS (no comparar)
+    # =========================
+    if contiene_compras(texto_lower_original) and not contiene_comparar(texto_lower_original):
+        # Compras proveedor (mes)
+        if provs and (meses_yyyymm or (meses_nombre and anios)):
+            proveedor = _alias_proveedor(provs[0])
+            if meses_yyyymm:
+                mes = meses_yyyymm[0]
+            else:
+                mes = _to_yyyymm(anios[0], meses_nombre[0]) if anios and meses_nombre else None
+
+            if mes:
+                return {
+                    "tipo": "compras_proveedor_mes",
+                    "parametros": {"proveedor": proveedor, "mes": mes},
+                    "debug": "compras proveedor mes",
+                }
+
+        # Compras proveedor (año)
+        if provs and anios:
+            proveedor = _alias_proveedor(provs[0])
+            return {
+                "tipo": "compras_proveedor_anio",
+                "parametros": {"proveedor": proveedor, "anio": anios[0]},
+                "debug": "compras proveedor año",
+            }
+
+        # Compras mes
+        if meses_yyyymm:
+            return {"tipo": "compras_mes", "parametros": {"mes": meses_yyyymm[0]}, "debug": "compras mes (yyyymm)"}
+        if meses_nombre and anios:
+            mes = _to_yyyymm(anios[0], meses_nombre[0])
+            return {"tipo": "compras_mes", "parametros": {"mes": mes}, "debug": "compras mes (nombre+año)"}
+
+        # Compras año
+        if anios:
+            return {"tipo": "compras_anio", "parametros": {"anio": anios[0]}, "debug": "compras año"}
+
+    # =========================
+    # COMPARAR COMPRAS
+    # =========================
+    if contiene_comparar(texto_lower_original):
+        meses_cmp: List[str] = []
+        if meses_yyyymm:
+            meses_cmp = meses_yyyymm[:2]
+        elif meses_nombre and anios:
+            for mn in meses_nombre[:2]:
+                meses_cmp.append(_to_yyyymm(anios[0], mn))
+
+        if len(meses_cmp) == 2:
+            if len(provs) >= 2:
+                return {
+                    "tipo": "comparar_proveedores_meses",
+                    "parametros": {
+                        "proveedores": [_alias_proveedor(p) for p in provs[:MAX_PROVEEDORES]],
+                        "mes1": meses_cmp[0],
+                        "mes2": meses_cmp[1],
+                        "label1": meses_cmp[0],
+                        "label2": meses_cmp[1],
+                    },
+                    "debug": "comparar proveedores meses",
+                }
+            if len(provs) == 1:
+                return {
+                    "tipo": "comparar_proveedor_meses",
+                    "parametros": {
+                        "proveedor": _alias_proveedor(provs[0]),
+                        "mes1": meses_cmp[0],
+                        "mes2": meses_cmp[1],
+                        "label1": meses_cmp[0],
+                        "label2": meses_cmp[1],
+                    },
+                    "debug": "comparar proveedor meses",
+                }
+
+        if len(anios) >= 2:
+            if len(provs) >= 2:
+                return {
+                    "tipo": "comparar_proveedores_anios",
+                    "parametros": {
+                        "proveedores": [_alias_proveedor(p) for p in provs[:MAX_PROVEEDORES]],
+                        "anios": anios[:2],
+                        "label1": str(anios[0]),
+                        "label2": str(anios[1]),
+                    },
+                    "debug": "comparar proveedores años",
+                }
+            if len(provs) == 1:
+                return {
+                    "tipo": "comparar_proveedor_anios",
+                    "parametros": {
+                        "proveedor": _alias_proveedor(provs[0]),
+                        "anios": anios[:2],
+                        "label1": str(anios[0]),
+                        "label2": str(anios[1]),
+                    },
+                    "debug": "comparar proveedor años",
+                }
+
+        return {
+            "tipo": "no_entendido",
+            "parametros": {},
+            "sugerencia": "Ej: comparar compras roche junio julio 2025 | comparar compras roche 2024 2025",
+            "debug": "comparar: faltan 2 meses o 2 años (o proveedor)",
+        }
+
+    # =========================
+    # STOCK
+    # =========================
+    if "stock" in texto_lower_original:
+        if arts:
+            return {"tipo": "stock_articulo", "parametros": {"articulo": arts[0]}, "debug": "stock articulo"}
+        return {"tipo": "stock_total", "parametros": {}, "debug": "stock total"}
+
+    # =========================
+    # DEFAULT: OpenAI (si está habilitado)
+    # =========================
+    out_ai = _interpretar_con_openai(texto_original)
+    if out_ai:
+        return out_ai
+
+    return {
+        "tipo": "no_entendido",
+        "parametros": {},
+        "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279 | todas las facturas roche 2025",
+        "debug": "no match",
+    }
