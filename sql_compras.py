@@ -107,40 +107,66 @@ def get_detalle_compras_proveedor_mes(proveedor_like: str, mes_key: str) -> pd.D
 # DETALLE COMPRAS: PROVEEDOR + AÑO
 # =====================================================================
 
-def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, moneda: str = None) -> pd.DataFrame:
-    """Detalle de compras de un proveedor en un año."""
-    proveedor_like = (proveedor_like or "").split("(")[0].strip().lower()
+def get_detalle_facturas_proveedor_anio(
+    proveedores: List[str], 
+    anios: List[int], 
+    moneda: Optional[str] = None, 
+    limite: int = 5000
+) -> pd.DataFrame:
+    """Detalle de facturas de un proveedor en uno o varios años."""
+    
+    # Ordenar y preparar listado de años
+    anios = sorted(anios)
+    anios_sql = ", ".join(map(str, anios))  # Combinación de años en una sola cadena SQL
+    
     total_expr = _sql_total_num_expr_general()
 
+    # Manejo de moneda (opcional)
     moneda_sql = ""
-    if moneda and str(moneda).strip().upper() in ("U$S", "USD", "U$$"):
-        moneda_sql = "AND TRIM(\"Moneda\") IN ('U$S','U$$')"
-    elif moneda and str(moneda).strip() in ("$", "UYU"):
-        moneda_sql = "AND TRIM(\"Moneda\") = '$'"
+    if moneda:
+        moneda = moneda.strip().upper()
+        if moneda in ("U$S", "USD", "U$$"):
+            moneda_sql = "AND TRIM(\"Moneda\") IN ('U$S', 'U$$', 'USD')"
+        elif moneda in ("$", "UYU"):
+            moneda_sql = "AND TRIM(\"Moneda\") = '$'"
 
+    # Manejo de proveedores
+    prov_where = ""
+    prov_params = []
+    if proveedores:
+        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
+        prov_params = [f"%{p.lower()}%" for p in proveedores]
+        prov_where = f"AND ({' OR '.join(parts)})"
+
+    # Consulta SQL
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
             TRIM("Articulo") AS Articulo,
             TRIM("Nro. Comprobante") AS Nro_Factura,
             "Fecha",
-            "Cantidad",
+            "Año",
             "Moneda",
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
-          AND "Año"::int = %s
+          AND "Año"::int IN ({anios_sql})
+          {prov_where}
           {moneda_sql}
         ORDER BY "Fecha" DESC NULLS LAST
+        LIMIT {limite}
     """
-    return ejecutar_consulta(sql, (f"%{proveedor_like}%", anio))
+    return ejecutar_consulta(sql, tuple(prov_params))
 
 
-def get_total_compras_proveedor_anio(proveedor_like: str, anio: int) -> dict:
-    """Total de compras de un proveedor en un año."""
+def get_total_compras_proveedor_anio(
+    proveedor_like: str, 
+    anio: int
+) -> dict:
+    """Resumen total de compras de un proveedor en un solo año."""
     proveedor_like = (proveedor_like or "").split("(")[0].strip().lower()
     total_expr = _sql_total_num_expr_general()
+
     sql = f"""
         SELECT
             COUNT(*) AS registros,
@@ -157,36 +183,6 @@ def get_total_compras_proveedor_anio(proveedor_like: str, anio: int) -> dict:
             "total": float(df["total"].iloc[0] or 0)
         }
     return {"registros": 0, "total": 0.0}
-
-
-def get_detalle_compras_proveedor_anios(anios: List[int], proveedores: List[str] = None) -> pd.DataFrame:
-    """Detalle de compras por proveedor en varios años."""
-    total_expr = _sql_total_num_expr_general()
-    anios = sorted(anios)
-    anios_sql = ", ".join(str(y) for y in anios)
-
-    prov_where = ""
-    prov_params = []
-    if proveedores:
-        parts = [f"LOWER(TRIM(\"Cliente / Proveedor\")) LIKE %s" for _ in proveedores]
-        prov_params = [f"%{p.lower()}%" for p in proveedores]
-        prov_where = f"AND ({' OR '.join(parts)})"
-
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Articulo") AS Articulo,
-            "Año",
-            "Moneda",
-            {total_expr} AS Total
-        FROM chatbot_raw
-        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int IN ({anios_sql})
-          {prov_where}
-        ORDER BY "Año" DESC, TRIM("Cliente / Proveedor"), TRIM("Articulo")
-        LIMIT 500
-    """
-    return ejecutar_consulta(sql, tuple(prov_params) if prov_params else None)
 
 
 # =====================================================================
