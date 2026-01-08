@@ -783,6 +783,11 @@ def procesar_pregunta_router(pregunta: str) -> Tuple[str, Optional[pd.DataFrame]
 # =====================================================================
 
 if __name__ == "__main__":
+    print("=" * 60)
+    print("🛠 Verificando estado del orquestador...")
+    print(f"ORQUESTADOR_CARGADO: {st.session_state.get('ORQUESTADOR_CARGADO', None)}")
+    print("=" * 60)
+    
     pruebas = [
         "compras 2025",
         "compras roche enero 2026",
@@ -795,9 +800,6 @@ if __name__ == "__main__":
         "detalle factura A00273279",
     ]
 
-    print("=" * 60)
-    print("PRUEBAS DEL ORQUESTADOR V2")
-    print("=" * 60)
 
     for p in pruebas:
         print(f"\n📝 Pregunta: {p}")
