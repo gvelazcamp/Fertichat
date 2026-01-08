@@ -48,6 +48,7 @@ from sql_compras import (
     get_facturas_de_articulo,
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
+    get_total_factura_proveedor,
     # Top
     get_top_10_proveedores_chatbot,
 )
