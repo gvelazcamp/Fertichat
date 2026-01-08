@@ -11,12 +11,16 @@ from psycopg2.extras import RealDictCursor
 # =========================
 # CONEXIÓN A POSTGRESQL
 # =========================
-DATABASE_URL = "postgresql://postgres.ytmpjhdjecocoitptvjn:TU_PASSWORD_ACA@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
-
-
 def get_connection():
-    """Obtiene conexión a PostgreSQL"""
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(
+        host=st.secrets["DB_HOST"],
+        port=st.secrets["DB_PORT"],
+        dbname=st.secrets["DB_NAME"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASSWORD"],
+        sslmode="require"
+    )
+
 
 
 # =========================
@@ -837,3 +841,4 @@ def mostrar_baja_stock():
 
     except Exception as e:
         st.warning(f"No se pudo cargar el historial: {str(e)}")
+
