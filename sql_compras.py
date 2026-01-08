@@ -516,45 +516,42 @@ def get_total_facturas_proveedor(
     return ejecutar_consulta(query, tuple(params))
 
 # =========================
-# TODAS LAS FACTURAS DE PROVEEDOR (DETALLE) - CANÓNICO DEFINITIVO
-# =========================
-def get_facturas_proveedor_detalle(
-    proveedores: List[str],
-    meses: Optional[List[str]] = None,
-    anios: Optional[List[int]] = None,
-    desde: Optional[str] = None,
-    hasta: Optional[str] = None,
-    articulo: Optional[str] = None,
-    moneda: Optional[str] = None,
-    limite: int = 5000,
-) -> pd.DataFrame:
+def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, articulo, moneda, limite):
+    # Construcción del SQL...
+    query = f"""
+        SELECT
+            "Fecha",
+            "Cliente / Proveedor",
+            "Articulo",
+            "Moneda",
+            "Total"
+        FROM chatbot_raw
+        WHERE LOWER(TRIM("Cliente / Proveedor")) IN ({', '.join(['%s'] * len(proveedores))})
     """
-    Retorna el detalle de facturas de un conjunto de proveedores con filtros flexibles.
-    Parámetros:
-        - proveedores: Lista de nombres o patrones para clientes/proveedores.
-        - meses: Lista de meses (como "01", "02") para filtro.
-        - anios: Lista de años (como 2025) para filtro.
-        - desde, hasta: Fechas inicial y final para rango temporal.
-        - articulo: Patrón de coincidencia para artículo.
-        - moneda: Filtra por tipo de moneda ("USD", "$").
-        - limite: Número máximo de registros a devolver.
-    Retorna:
-        - Un DataFrame con las columnas:
-          Fecha, Proveedor, NroFactura, Tipo, Articulo, Moneda, Total.
-    """
-    if not proveedores:
-        return pd.DataFrame()
 
-    # Validar límite de resultados
-    limite = int(limite or 5000)
-    limite = max(limite, 500)  # 500 como límite mínimo
+    if anios:
+        query += f' AND "Año" IN ({", ".join(["%s"] * len(anios))})'
+    if meses:
+        query += f' AND "Mes" IN ({", ".join(["%s"] * len(meses))})'
+    if desde and hasta:
+        query += ' AND "Fecha" BETWEEN %s AND %s'
+    if limite:
+        query += f" LIMIT {limite}"
 
-    # Inicializar filtros
-    where_parts = [
-        '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'
+    # Generar parámetros para el SQL
+    params = [
+        *proveedores,
+        *anios or [],
+        *meses or [],
+        *( [desde, hasta] if desde and hasta else [] ),
     ]
-    params: List[Any] = []
 
+    # 🚨 Imprime el SQL y los parámetros para depurar
+    print(f"\n🛠 SQL generado: {query}")
+    print(f"🛠 Parámetros: {params}")
+
+    # Ejecutar la consulta con los datos generados (es una simplificación)
+    return ejecutar_consulta(query, params)
     # -------------------------
     # FILTRO POR PROVEEDORES (LIKE)
     # -------------------------
