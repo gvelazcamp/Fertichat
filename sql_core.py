@@ -5,7 +5,7 @@
 import os
 import re
 import pandas as pd
-from typing import Optional
+from typing import Optional, List
 import streamlit as st
 
 try:
@@ -219,6 +219,7 @@ def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
 # =====================================================================
 
 def get_lista_proveedores() -> list:
+    """Obtiene lista de proveedores únicos."""
     sql = """
         SELECT DISTINCT TRIM("Cliente / Proveedor") AS proveedor
         FROM chatbot_raw
@@ -232,7 +233,101 @@ def get_lista_proveedores() -> list:
         return ["Todos"]
     return ["Todos"] + df['proveedor'].tolist()
 
+
+def get_lista_articulos() -> list:
+    """Obtiene lista de artículos únicos de chatbot_raw."""
+    sql = """
+        SELECT DISTINCT TRIM("Articulo") AS articulo
+        FROM chatbot_raw
+        WHERE "Articulo" IS NOT NULL AND TRIM("Articulo") <> ''
+        ORDER BY articulo
+        LIMIT 500
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron artículos en la base de datos.")
+        return ["Todos"]
+    return ["Todos"] + df['articulo'].tolist()
+
+
+def get_lista_familias() -> list:
+    """Obtiene lista de familias únicas de chatbot_raw."""
+    sql = """
+        SELECT DISTINCT TRIM("Familia") AS familia
+        FROM chatbot_raw
+        WHERE "Familia" IS NOT NULL AND TRIM("Familia") <> ''
+        ORDER BY familia
+        LIMIT 500
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron familias en la base de datos.")
+        return ["Todos"]
+    return ["Todos"] + df['familia'].tolist()
+
+
+def get_lista_tipos_comprobante() -> list:
+    """Obtiene lista de tipos de comprobante únicos."""
+    sql = """
+        SELECT DISTINCT TRIM("Tipo Comprobante") AS tipo
+        FROM chatbot_raw
+        WHERE "Tipo Comprobante" IS NOT NULL AND TRIM("Tipo Comprobante") <> ''
+        ORDER BY tipo
+        LIMIT 100
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron tipos de comprobante.")
+        return ["Todos"]
+    return ["Todos"] + df['tipo'].tolist()
+
+
+def get_lista_monedas() -> list:
+    """Obtiene lista de monedas únicas."""
+    sql = """
+        SELECT DISTINCT TRIM("Moneda") AS moneda
+        FROM chatbot_raw
+        WHERE "Moneda" IS NOT NULL AND TRIM("Moneda") <> ''
+        ORDER BY moneda
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        return ["Todas", "$", "U$S"]
+    return ["Todas"] + df['moneda'].tolist()
+
+
+def get_lista_anios() -> list:
+    """Obtiene lista de años disponibles."""
+    sql = """
+        SELECT DISTINCT "Año"::int AS anio
+        FROM chatbot_raw
+        WHERE "Año" IS NOT NULL AND "Año" <> ''
+        ORDER BY anio DESC
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron años en la base de datos.")
+        return []
+    return df['anio'].tolist()
+
+
+def get_lista_meses() -> list:
+    """Obtiene lista de meses disponibles ordenados."""
+    sql = """
+        SELECT DISTINCT TRIM("Mes") AS mes
+        FROM chatbot_raw
+        WHERE "Mes" IS NOT NULL AND TRIM("Mes") <> ''
+        ORDER BY mes
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron meses en la base de datos.")
+        return []
+    return df['mes'].tolist()
+
+
 def get_lista_articulos_stock() -> list:
+    """Obtiene lista de artículos únicos de stock_raw."""
     sql = """
         SELECT DISTINCT TRIM("Articulo") AS articulo
         FROM stock_raw
@@ -246,7 +341,9 @@ def get_lista_articulos_stock() -> list:
         return ["Todos"]
     return ["Todos"] + df['articulo'].tolist()
 
+
 def get_lista_familias_stock() -> list:
+    """Obtiene lista de familias únicas de stock_raw."""
     sql = """
         SELECT DISTINCT TRIM("Familia") AS familia
         FROM stock_raw
@@ -305,8 +402,12 @@ def get_ultimo_mes_disponible_hasta(mes_key: str) -> Optional[str]:
 # =====================================================================
 
 def get_lotes_por_vencer(dias: int) -> pd.DataFrame:
+    """Obtiene lotes que vencen dentro de X días."""
     sql = """
-        SELECT TRIM("Articulo") AS articulo, TRIM("Lote") AS lote, TRIM("Vencimiento") AS vencimiento, TRIM("STOCK") AS stock,
+        SELECT TRIM("Articulo") AS articulo, 
+               TRIM("Lote") AS lote, 
+               TRIM("Vencimiento") AS vencimiento, 
+               TRIM("STOCK") AS stock,
                DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) AS dias_restantes
         FROM stock_raw
         WHERE DATE_PART('day', TRIM("Vencimiento")::date - NOW()::date) <= %s
