@@ -392,116 +392,45 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
         # FACTURAS
         # =========================================================
 
-        if tipo == "ultima_factura":
-            patron = params.get("patron")
-
-            if not patron:
-                return "❌ ¿De qué artículo o proveedor querés la última factura?", None, None
-
-            df = get_ultima_factura_inteligente(patron)
-
-            if df is None or df.empty:
-                return f"No encontré facturas de '{patron}'.", None, None
-
-            return f"🧾 Última factura de **{patron.upper()}**:", formatear_dataframe(df), None
-
-
-        if tipo == "facturas_articulo":
-            articulo = params.get("articulo")
-
-            if not articulo:
-                return "❌ ¿De qué artículo querés ver las facturas?", None, None
-
-            df = get_facturas_de_articulo(articulo, solo_ultima=False)
-
-            if df is None or df.empty:
-                return f"No encontré facturas de '{articulo}'.", None, None
-
-            return f"🧾 Facturas de **{articulo.upper()}** ({len(df)} registros):", formatear_dataframe(df), None
-
-
-        # ✅ SOPORTE NUEVO: detalle_factura_numero
-        if tipo in ("detalle_factura", "detalle_factura_numero"):
-            nro = params.get("nro_factura") or params.get("nro")
-
-            if not nro:
-                return "❌ Falta el número de factura.", None, None
-
-            nro_clean = _normalizar_nro_factura(nro)
-            if not nro_clean:
-                return "❌ Número de factura inválido.", None, None
-
-            df = get_detalle_factura_por_numero(nro_clean)
-
-            if df is None or df.empty:
-                return f"No encontré la factura {nro_clean}.", None, None
-
-            return f"🧾 Detalle de factura {nro_clean}:", formatear_dataframe(df), None
-
-
-        # ✅ Facturas por proveedor (DETALLE)
-        if tipo in (
-            "facturas_proveedor",
-            "facturas_proveedor_detalle",
-            "compras_Todas las facturas de un Proveedor",
-        ):
-            proveedores = params.get("proveedores")
-            if not proveedores:
-                p = params.get("proveedor")
-                if p:
-                    proveedores = [p]
+        if tipo in ("facturas_proveedor", "facturas_proveedor_detalle"):
+            proveedores = params.get("proveedores", [])
             if isinstance(proveedores, str):
                 proveedores = [proveedores]
+
+            # Convertir a patrón inclusivo para LIKE
+            proveedores = [f"%{p.strip().lower()}%" for p in proveedores]
 
             if not proveedores:
                 return "❌ Indicá el proveedor. Ej: todas las facturas roche 2025", None, None
 
-            # tiempo
-            meses = params.get("meses")
-            anios = params.get("anios")
-
-            if not meses:
-                mes = params.get("mes")
-                if mes:
-                    meses = [mes] if isinstance(mes, str) else mes
-
-            if not anios:
-                anio = params.get("anio")
-                if anio:
-                    anios = [anio] if isinstance(anio, int) else anio
-
-            desde = params.get("desde")
-            hasta = params.get("hasta")
-            articulo = params.get("articulo")
-            moneda = params.get("moneda")
-            limite = params.get("limite", 5000)
-
+            # Ejecutar consulta SQL
             df = get_facturas_proveedor_detalle(
-                proveedores=proveedores,
-                meses=meses,
-                anios=anios,
-                desde=desde,
-                hasta=hasta,
-                articulo=articulo,
-                moneda=moneda,
-                limite=limite,
+                proveedores=proveedores,  # Aquí ya tenemos '%roche%'
+                meses=params.get("meses"),
+                anios=params.get("anios"),
+                desde=params.get("desde"),
+                hasta=params.get("hasta"),
+                articulo=params.get("articulo"),
+                moneda=params.get("moneda"),
+                limite=params.get("limite", 5000),
             )
 
             if df is None or df.empty:
                 tiempo_lbl = ""
-                if desde and hasta:
-                    tiempo_lbl = f" ({desde} a {hasta})"
-                elif meses:
-                    tiempo_lbl = f" ({', '.join(meses)})"
-                elif anios:
-                    tiempo_lbl = f" ({', '.join(str(a) for a in anios)})"
+                if params.get("meses"):
+                    tiempo_lbl = f" en {', '.join(params.get('meses'))}"
+                elif params.get("anios"):
+                    tiempo_lbl = f" en {', '.join(map(str, params.get('anios')))}"
 
-                prov_lbl = ", ".join([str(p).upper() for p in proveedores[:3]])
-                return f"No encontré facturas de **{prov_lbl}**{tiempo_lbl}.", None, None
+                return f"No encontré facturas de **{' '.join(proveedores)}**{tiempo_lbl}.", None, None
 
             prov_lbl = ", ".join([str(p).upper() for p in proveedores[:3]])
             return f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):", formatear_dataframe(df), None
-            
+
+    except Exception as e:
+        print(f"❌ Error ejecutando consulta: {e}")
+        return f"❌ Error: {str(e)}", None, None
+        
         # =========================================================
         # COMPARACIONES
         # =========================================================
