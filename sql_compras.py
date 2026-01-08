@@ -614,7 +614,7 @@ def get_facturas_proveedor_detalle(
         LIMIT {limite}
     """
 
-    return ejecutar_consulta(query, tuple(params)
+    return ejecutar_consulta(query, tuple(params))
 
 # =====================================================================
 # SERIES TEMPORALES Y DATASET COMPLETO
