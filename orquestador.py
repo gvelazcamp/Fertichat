@@ -524,7 +524,19 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                     tiempo_lbl = f" en {', '.join(params.get('meses'))}"
                 elif params.get("anios"):
                     tiempo_lbl = f" en {', '.join(map(str, params.get('anios')))}"
-                return f"No encontré facturas de **{', '.join([p.upper() for p in proveedores_raw])}**{tiempo_lbl}.", None, None
+                # DEBUG POTENTE: Mostrar params y detalles cuando no hay resultados
+                debug_msg = f"⚠️ **DEBUG DETALLADO:** No se encontraron resultados para '{pregunta_original}'.\n\n"
+                debug_msg += f"**Tipo detectado:** {tipo}\n"
+                debug_msg += f"**Parámetros extraídos:**\n"
+                for k, v in params.items():
+                    debug_msg += f"- {k}: {v}\n"
+                debug_msg += f"\n**Posibles causas:**\n"
+                debug_msg += f"- No hay datos en la BD para el proveedor '{', '.join(proveedores_raw)}' en el año {', '.join(map(str, params.get('anios', [])))}.\n"
+                debug_msg += f"- Verifica que la tabla 'chatbot_raw' tenga registros con 'Tipo Comprobante' como 'Compra Contado', 'Compra Crédito', 'Factura de Compra', etc.\n"
+                debug_msg += f"- El LIKE en proveedor usa LOWER, así que 'roche' debería coincidir con 'Roche' o 'ROCHE'.\n"
+                debug_msg += f"- Si el año es 2025, confirma que haya datos en ese año.\n"
+                debug_msg += f"- Revisa la consola del servidor para ver el SQL impreso (DEBUG SQL FACTURAS_PROVEEDOR).\n"
+                return debug_msg, None, None
 
             prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
             return f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):", formatear_dataframe(df), None
