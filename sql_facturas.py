@@ -633,4 +633,4 @@ def get_facturas_por_rango_monto(
     """
 
     params.extend([monto_min, monto_max])
-    return ejecutar_consulta(sql, tuple(params))```
+    return ejecutar_consulta(sql, tuple(params))
