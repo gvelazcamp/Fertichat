@@ -5,6 +5,8 @@
 import re
 import pandas as pd
 from typing import List, Optional, Any
+import streamlit as st
+
 from sql_core import (
     ejecutar_consulta,
     _sql_total_num_expr,
@@ -510,7 +512,6 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
 
     total_expr = _sql_total_num_expr_general()
 
-    # 🔍 DEBUG ENTRADA
     print("\n[SQL_COMPRAS] get_facturas_proveedor_detalle() llamado con:")
     print(f"  proveedores = {proveedores}")
     print(f"  meses       = {meses}")
@@ -601,10 +602,29 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     print(f"\n🛠 SQL generado (facturas_proveedor_detalle): {query}")
     print(f"🛠 Parámetros: {params}")
 
+    try:
+        st.session_state["DBG_SQL_FACT_PROV"] = {
+            "funcion": "get_facturas_proveedor_detalle",
+            "params_entrada": {
+                "proveedores": proveedores,
+                "meses": meses,
+                "anios": anios,
+                "desde": desde,
+                "hasta": hasta,
+                "articulo": articulo,
+                "moneda": moneda,
+                "limite": limite,
+            },
+            "sql": query,
+            "sql_params": params,
+        }
+    except Exception:
+        pass
+
     return ejecutar_consulta(query, tuple(params))
 
 # =====================================================================
-# SERIES / DASHBOARD (igual que antes)
+# SERIES / DASHBOARD (resto igual que antes)
 # =====================================================================
 
 def get_serie_compras_agregada(where_clause: str, params: tuple) -> pd.DataFrame:
