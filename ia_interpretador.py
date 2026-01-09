@@ -193,7 +193,6 @@ def _extraer_proveedor_libre(texto_lower_original: str) -> Optional[str]:
             "todas", "todoas", "toda", "todaslas",
             "factura", "facturas", "comprobante", "comprobantes",
             "compra", "compras",
-            # sinónimos adicionales
             "gasto", "gastos", "documento", "documentos",
             "comparar", "comparame", "compara",
             "detalle", "nro", "numero",
@@ -627,6 +626,15 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         nro = _extraer_nro_factura(texto_original)
         if nro:
             print(f"\n[INTÉRPRETE] DETALLE FACTURA NRO={nro}")
+            try:
+                st.session_state["DBG_INT_LAST"] = {
+                    "pregunta": texto_original,
+                    "tipo": "detalle_factura_numero",
+                    "parametros": {"nro_factura": nro},
+                    "debug": f"factura nro={nro}",
+                }
+            except Exception:
+                pass
             return {
                 "tipo": "detalle_factura_numero",
                 "parametros": {"nro_factura": nro},
@@ -719,6 +727,25 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         print(f"  Artículo    : {articulo}")
         print(f"  Límite      : {limite}")
 
+        try:
+            st.session_state["DBG_INT_LAST"] = {
+                "pregunta": texto_original,
+                "tipo": "facturas_proveedor",
+                "parametros": {
+                    "proveedores": proveedores_lista,
+                    "meses": meses_out or None,
+                    "anios": anios or None,
+                    "desde": desde,
+                    "hasta": hasta,
+                    "articulo": articulo,
+                    "moneda": moneda,
+                    "limite": limite,
+                },
+                "debug": f"facturas/compras proveedor(es): {', '.join(proveedores_lista)} | meses: {meses_out} | años: {anios}",
+            }
+        except Exception:
+            pass
+
         return {
             "tipo": "facturas_proveedor",
             "parametros": {
@@ -742,6 +769,21 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
             print(f"  Pregunta    : {texto_original}")
             print(f"  Proveedores : {provs}")
             print(f"  Años        : {anios}")
+
+            try:
+                st.session_state["DBG_INT_LAST"] = {
+                    "pregunta": texto_original,
+                    "tipo": "facturas_proveedor",
+                    "parametros": {
+                        "proveedores": [proveedor],
+                        "anios": [anios[0]],
+                        "limite": 5000,
+                    },
+                    "debug": "compras proveedor año (fusionado con facturas_proveedor)",
+                }
+            except Exception:
+                pass
+
             return {
                 "tipo": "facturas_proveedor",
                 "parametros": {
@@ -764,6 +806,15 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 print(f"  Pregunta : {texto_original}")
                 print(f"  Prov     : {proveedor}")
                 print(f"  Mes      : {mes}")
+                try:
+                    st.session_state["DBG_INT_LAST"] = {
+                        "pregunta": texto_original,
+                        "tipo": "compras_proveedor_mes",
+                        "parametros": {"proveedor": proveedor, "mes": mes},
+                        "debug": "compras proveedor mes",
+                    }
+                except Exception:
+                    pass
                 return {
                     "tipo": "compras_proveedor_mes",
                     "parametros": {"proveedor": proveedor, "mes": mes},
@@ -771,10 +822,11 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 }
 
         if meses_yyyymm:
+            mes0 = meses_yyyymm[0]
             print("\n[INTÉRPRETE] COMPRAS_MES")
             print(f"  Pregunta : {texto_original}")
-            print(f"  Mes      : {meses_yyyymm[0]}")
-            return {"tipo": "compras_mes", "parametros": {"mes": meses_yyyymm[0]}, "debug": "compras mes (yyyymm)"}
+            print(f"  Mes      : {mes0}")
+            return {"tipo": "compras_mes", "parametros": {"mes": mes0}, "debug": "compras mes (yyyymm)"}
         if meses_nombre and anios:
             mes = _to_yyyymm(anios[0], meses_nombre[0])
             print("\n[INTÉRPRETE] COMPRAS_MES nombre+año")
