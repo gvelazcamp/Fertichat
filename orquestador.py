@@ -368,16 +368,23 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             if not proveedor or not mes:
                 return "❌ Falta proveedor o mes.", None, None
 
-            df = get_detalle_compras_proveedor_mes(proveedor, mes)
+            # FUSIONAR: Usar get_facturas_proveedor_detalle en lugar de get_detalle_compras_proveedor_mes
+            # Esto hace que "compras roche noviembre 2025" traiga listado agrupado de facturas en ese mes
+            df = get_facturas_proveedor_detalle(
+                proveedores=[proveedor],
+                meses=[mes],
+                limite=5000
+            )
 
             if df is None or df.empty:
                 return f"No encontré compras de {str(proveedor).upper()} en {mes}.", None, None
 
-            total = df["Total"].sum() if "Total" in df.columns else 0
+            # Ajustar el mensaje para que diga "facturas" o "compras", pero mantener como compras para compat
+            total = df["monto_neto"].sum() if "monto_neto" in df.columns else 0
             total_fmt = f"${total:,.0f}".replace(",", ".")
 
             return (
-                f"📋 Compras de **{str(proveedor).upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} registros:",
+                f"🧾 Compras de **{str(proveedor).upper()}** en {mes} | 💰 **{total_fmt}** | {len(df)} facturas:",
                 formatear_dataframe(df),
                 None
             )
