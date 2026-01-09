@@ -193,6 +193,8 @@ def _extraer_proveedor_libre(texto_lower_original: str) -> Optional[str]:
             "todas", "todoas", "toda", "todaslas",
             "factura", "facturas", "comprobante", "comprobantes",
             "compra", "compras",
+            # ✅ NUEVO: sinónimos adicionales
+            "gasto", "gastos", "documento", "documentos",
             "comparar", "comparame", "compara",
             "detalle", "nro", "numero",
             "total", "totales",
@@ -234,6 +236,13 @@ def contiene_comparar(texto: str) -> bool:
         return False
     t = texto.lower()
     return bool(re.search(r"\b(comparar|comparame|compara)\b", t))
+
+# ✅ NUEVO: "gastos/documentos" como sinónimo de listado facturas (solo con proveedor)
+def contiene_gastos_o_documentos(texto: str) -> bool:
+    if not texto:
+        return False
+    t = texto.lower()
+    return bool(re.search(r"\b(gastos?|documentos?)\b", t))
 
 # =====================================================================
 # FACTURAS
@@ -714,6 +723,15 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     if (
         re.search(r"\b(todas|todoas)\b", texto_lower_original)
         and re.search(r"\b(compras?|facturas?|comprobantes?)\b", texto_lower_original)
+        and (_extraer_nro_factura(texto_original) is None)
+    ):
+        dispara_facturas_listado = True
+
+    # ✅ NUEVO: "gastos/documentos + proveedor" -> listado facturas_proveedor (sin romper compras proveedor mes)
+    if (
+        (not contiene_comparar(texto_lower_original))
+        and provs
+        and contiene_gastos_o_documentos(texto_lower_original)
         and (_extraer_nro_factura(texto_original) is None)
     ):
         dispara_facturas_listado = True
