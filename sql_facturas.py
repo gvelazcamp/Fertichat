@@ -30,14 +30,11 @@ def _factura_variantes(nro_factura: str) -> List[str]:
     variantes = [s]
 
     if s.isdigit():
-        # A + zfill(8)
         if len(s) <= 8:
             variantes.append("A" + s.zfill(8))
-        # zfill(8) sin A
         if len(s) < 8:
             variantes.append(s.zfill(8))
     else:
-        # separar prefijo letras + parte numérica
         i = 0
         while i < len(s) and s[i].isalpha():
             i += 1
@@ -50,7 +47,6 @@ def _factura_variantes(nro_factura: str) -> List[str]:
             if pref and len(dig) < 8:
                 variantes.append(pref + dig.zfill(8))
 
-    # dedup preservando orden
     out: List[str] = []
     seen = set()
     for v in variantes:
@@ -61,7 +57,7 @@ def _factura_variantes(nro_factura: str) -> List[str]:
 
 
 # =====================================================================
-# EXPRESIÓN CANÓNICA: MONTO NETO A NUMERIC (misma lógica que tu SQL)
+# EXPRESIÓN CANÓNICA: MONTO NETO A NUMERIC
 # =====================================================================
 
 def _sql_monto_neto_num_expr() -> str:
@@ -117,12 +113,10 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
     if not variantes:
         return ejecutar_consulta(sql, ("",))
 
-    # 1) intento exacto
     df = ejecutar_consulta(sql, (variantes[0],))
     if df is not None and not df.empty:
         return df
 
-    # 2) fallback por variantes
     for alt in variantes[1:]:
         df2 = ejecutar_consulta(sql, (alt,))
         if df2 is not None and not df2.empty:
@@ -156,7 +150,6 @@ def get_total_factura_por_numero(nro_factura: str) -> dict:
 
     df = ejecutar_consulta(sql, (variantes[0],))
     if df is None or df.empty:
-        # fallback
         for alt in variantes[1:]:
             df2 = ejecutar_consulta(sql, (alt,))
             if df2 is not None and not df2.empty:
@@ -174,7 +167,7 @@ def get_total_factura_por_numero(nro_factura: str) -> dict:
 
 
 # =====================================================================
-# FACTURAS POR PROVEEDOR (MISMA LÓGICA QUE TU SQL DE SUPABASE)
+# FACTURAS POR PROVEEDOR
 # =====================================================================
 
 def get_facturas_proveedor(
@@ -188,12 +181,11 @@ def get_facturas_proveedor(
     limite: int = 5000,
 ) -> pd.DataFrame:
     """
-    Lista facturas por proveedor(es) con la misma lógica que el SQL que probaste:
+    Lista facturas por proveedor(es) con la lógica:
     - Tipo Comprobante: Compra Contado OR ILIKE 'Compra%' OR ILIKE 'Factura%'
-    - Año: "Año" = %s (sin casts raros)
+    - Año: "Año" = %s (sin cast)
     - Proveedor: LOWER("Cliente / Proveedor") LIKE %s
     - Monto: SUM(conversión de "Monto Neto")
-    - Agrupado por (Proveedor, Fecha, Tipo, Nro, Moneda)
     """
 
     if not proveedores:
@@ -214,7 +206,6 @@ def get_facturas_proveedor(
     ]
     params: List[Any] = []
 
-    # Proveedores (OR)
     prov_clauses: List[str] = []
     for p in [str(x).strip() for x in proveedores if str(x).strip()]:
         p_clean = p.lower().strip()
@@ -222,12 +213,10 @@ def get_facturas_proveedor(
         params.append(f"%{p_clean}%")
     where_parts.append("(" + " OR ".join(prov_clauses) + ")")
 
-    # Filtro artículo (opcional)
     if articulo and str(articulo).strip():
         where_parts.append('LOWER(TRIM("Articulo")) LIKE %s')
         params.append(f"%{str(articulo).lower().strip()}%")
 
-    # Filtro moneda (opcional) - sin inventar reglas nuevas
     if moneda and str(moneda).strip():
         m = str(moneda).strip().upper()
         if m in ("USD", "U$S", "U$$", "US$"):
@@ -238,12 +227,10 @@ def get_facturas_proveedor(
             where_parts.append('UPPER(TRIM("Moneda")) LIKE %s')
             params.append(f"%{m}%")
 
-    # Tiempo (prioridad: rango exacto)
     if desde and hasta:
         where_parts.append('"Fecha"::date BETWEEN %s AND %s')
         params.extend([desde, hasta])
     else:
-        # Meses (tu formato tipo 11-06 / 20-05 / etc lo respeta tal cual venga en "Mes")
         if meses:
             meses_ok = [m for m in (meses or []) if m]
             if meses_ok:
@@ -251,7 +238,6 @@ def get_facturas_proveedor(
                 where_parts.append(f'TRIM("Mes") IN ({ph})')
                 params.extend(meses_ok)
 
-        # Años (si NO hay meses)
         if (not meses) and anios:
             anios_ok = [int(a) for a in (anios or []) if a]
             if anios_ok:
@@ -287,74 +273,20 @@ def get_facturas_proveedor(
         LIMIT {limite};
     """
 
-    # ✅ DEBUG POTENTE
-    print("\n" + "="*80)
-    print("🔍 DEBUG SQL_FACTURAS - get_facturas_proveedor")
-    print("="*80)
-    print(f"📋 Proveedores buscados: {proveedores}")
-    print(f"📅 Años: {anios}")
-    print(f"📅 Meses: {meses}")
-    print(f"💰 Moneda: {moneda}")
-    print(f"🔢 Límite: {limite}")
-    print("\n📝 SQL generado:")
-    print(query)
-    print("\n🎯 Parámetros:")
-    print(tuple(params))
-    print("="*80)
+    # DEBUG tabla
+    df_test = ejecutar_consulta("SELECT COUNT(*) as total FROM chatbot_raw", ())
+    print(f"DEBUG: Total filas en chatbot_raw: {df_test.iloc[0]['total'] if df_test is not None and not df_test.empty else '0 o None'}")
 
-    # DEBUG: Verificar total filas en tabla
     try:
-        df_test = ejecutar_consulta("SELECT COUNT(*) as total FROM chatbot_raw", ())
-        total_filas = df_test.iloc[0]['total'] if (df_test is not None and not df_test.empty) else 0
-        print(f"\n📊 Total filas en chatbot_raw: {total_filas}")
-    except Exception as e:
-        print(f"\n❌ Error contando filas totales: {e}")
+        st.session_state["DEBUG_SQL_FACTURA_QUERY"] = query
+        st.session_state["DEBUG_SQL_FACTURA_PARAMS"] = tuple(params)
+    except Exception:
+        pass
 
-    # DEBUG: Verificar si existe el proveedor
-    if proveedores:
-        try:
-            prov_test = proveedores[0].lower()
-            sql_prov = f"SELECT COUNT(*) as total FROM chatbot_raw WHERE LOWER(\"Cliente / Proveedor\") LIKE '%{prov_test}%'"
-            df_prov = ejecutar_consulta(sql_prov, ())
-            total_prov = df_prov.iloc[0]['total'] if (df_prov is not None and not df_prov.empty) else 0
-            print(f"🏢 Registros con proveedor '{proveedores[0]}': {total_prov}")
-        except Exception as e:
-            print(f"❌ Error verificando proveedor: {e}")
+    print(f"DEBUG: Intentando consultar tabla 'chatbot_raw' con query: {query.strip()}")
+    print(f"DEBUG: Parámetros: {tuple(params)}")
 
-    # DEBUG: Verificar si existe el año
-    if anios:
-        try:
-            sql_anio = f"SELECT COUNT(*) as total FROM chatbot_raw WHERE \"Año\" = {anios[0]}"
-            df_anio = ejecutar_consulta(sql_anio, ())
-            total_anio = df_anio.iloc[0]['total'] if (df_anio is not None and not df_anio.empty) else 0
-            print(f"📅 Registros en año {anios[0]}: {total_anio}")
-        except Exception as e:
-            print(f"❌ Error verificando año: {e}")
-
-    # DEBUG: Verificar proveedor + año combinados
-    if proveedores and anios:
-        try:
-            prov_test = proveedores[0].lower()
-            sql_combo = f"SELECT COUNT(*) as total FROM chatbot_raw WHERE LOWER(\"Cliente / Proveedor\") LIKE '%{prov_test}%' AND \"Año\" = {anios[0]}"
-            df_combo = ejecutar_consulta(sql_combo, ())
-            total_combo = df_combo.iloc[0]['total'] if (df_combo is not None and not df_combo.empty) else 0
-            print(f"🎯 Registros con '{proveedores[0]}' en {anios[0]}: {total_combo}")
-        except Exception as e:
-            print(f"❌ Error verificando combo: {e}")
-
-    print("\n🚀 Ejecutando consulta principal...")
-    print("="*80 + "\n")
-
-    # Ejecutar consulta
-    df = ejecutar_consulta(query, tuple(params))
-
-    # DEBUG resultado
-    if df is not None and not df.empty:
-        print(f"✅ Consulta exitosa: {len(df)} filas obtenidas\n")
-    else:
-        print(f"⚠️ Consulta NO trajo resultados\n")
-
-    return df
+    return ejecutar_consulta(query, tuple(params))
 
 
 def get_total_facturas_proveedor(
@@ -366,9 +298,7 @@ def get_total_facturas_proveedor(
     articulo: Optional[str] = None,
     moneda: Optional[str] = None,
 ) -> dict:
-    """
-    Totales por proveedor(es) usando la misma conversión de Monto Neto.
-    """
+    """Totales por proveedor(es) usando la misma conversión de Monto Neto."""
     if not proveedores:
         return {"registros": 0, "total_pesos": 0, "total_usd": 0, "facturas": 0}
 
