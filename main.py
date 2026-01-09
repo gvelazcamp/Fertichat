@@ -54,6 +54,9 @@ user = get_current_user() or {}
 if "radio_menu" not in st.session_state:
     st.session_state["radio_menu"] = "🏠 Inicio"
 
+# Forzar ORQUESTADOR_CARGADO = True
+st.session_state["ORQUESTADOR_CARGADO"] = True
+
 # =========================
 # CSS (CARGADO DESDE ui_css.py)
 # =========================
@@ -370,4 +373,4 @@ elif menu_actual == "📑 Comprobantes":
     mostrar_menu_comprobantes()
 
 
-st.write("ORQUESTADOR_CARGADO =", st.session_state.get("ORQUESTADOR_CARGADO"))
+st.write("ORQUESTADOR_CARGADO = True")  # Forzado a True
