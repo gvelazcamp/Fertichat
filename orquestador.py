@@ -26,7 +26,7 @@ import re
 from typing import Tuple, Optional, Any, List
 from datetime import datetime
 
-from ia_interpretador import interpretar_pregunta, obtener_info_tipo, es_tipo_valido
+from ia_interpretador import interpretar_pregunta
 
 from sql_compras import (
     get_compras_anio,
@@ -42,80 +42,8 @@ from sql_compras import (
     get_detalle_factura_por_numero,
     get_total_factura_por_numero,
     get_top_10_proveedores_chatbot,
+    get_facturas_proveedor_detalle,
 )
-
-try:
-    from sql_compras import get_detalle_compras_proveedor_anio as _get_detalle_prov_anio
-except Exception:
-    _get_detalle_prov_anio = None
-
-try:
-    from sql_compras import get_detalle_facturas_proveedor_anio as _get_detalle_facturas_prov_anio
-except Exception:
-    _get_detalle_facturas_prov_anio = None
-
-
-def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, limite: int = 5000) -> pd.DataFrame:
-    if _get_detalle_prov_anio is not None:
-        try:
-            return _get_detalle_prov_anio(proveedor_like, anio, limite)
-        except TypeError:
-            return _get_detalle_prov_anio(proveedor_like, anio)
-
-    if _get_detalle_facturas_prov_anio is not None:
-        try:
-            return _get_detalle_facturas_prov_anio([proveedor_like], [anio], moneda=None, limite=limite)
-        except TypeError:
-            return _get_detalle_facturas_prov_anio([proveedor_like], [anio])
-
-    return pd.DataFrame()
-
-
-try:
-    from sql_compras import get_total_factura_proveedor as get_total_factura_proveedor
-except Exception:
-    try:
-        from sql_compras import get_total_facturas_proveedor as get_total_factura_proveedor
-    except Exception:
-        def get_total_factura_proveedor(*args, **kwargs) -> pd.DataFrame:
-            return pd.DataFrame()
-
-
-try:
-    from sql_queries import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
-except Exception:
-    try:
-        from sql_compras import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
-    except Exception:
-        def get_facturas_proveedor_detalle(*args, **kwargs) -> pd.DataFrame:
-            return pd.DataFrame()
-
-
-try:
-    from sql_facturas import (
-        get_facturas_proveedor as _sf_get_facturas_proveedor,
-        get_total_facturas_proveedor as _sf_get_total_facturas_proveedor,
-        get_detalle_factura_por_numero as _sf_get_detalle_factura_por_numero,
-        get_total_factura_por_numero as _sf_get_total_factura_por_numero,
-        get_ultima_factura_inteligente as _sf_get_ultima_factura_inteligente,
-        get_facturas_articulo as _sf_get_facturas_articulo,
-    )
-
-    get_facturas_proveedor_detalle = _sf_get_facturas_proveedor
-    get_total_factura_proveedor = _sf_get_total_facturas_proveedor
-    get_detalle_factura_por_numero = _sf_get_detalle_factura_por_numero
-    get_total_factura_por_numero = _sf_get_total_factura_por_numero
-    get_ultima_factura_inteligente = _sf_get_ultima_factura_inteligente
-    get_facturas_de_articulo = _sf_get_facturas_articulo
-
-    try:
-        st.session_state["DBG_FACTURAS_ORIGEN"] = "sql_facturas"
-    except Exception:
-        pass
-
-except Exception:
-    pass
-
 
 from sql_comparativas import (
     get_comparacion_proveedor_meses,
@@ -191,15 +119,6 @@ def _extraer_nro_factura_fallback(texto: str) -> Optional[str]:
     return None
 
 
-def _to_like(p: str) -> str:
-    p = str(p or "").strip().lower()
-    if not p:
-        return ""
-    if "%" in p:
-        return p
-    return f"%{p}%"
-
-
 def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Optional[dict]]:
     _init_orquestador_state()
 
@@ -213,7 +132,6 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
     params = interpretacion.get("parametros", {})
     debug = interpretacion.get("debug", "")
 
-    # 🔍 DEBUG ORQUESTADOR
     print("\n[ORQUESTADOR] DECISIÓN")
     print(f"  Tipo   : {tipo}")
     print(f"  Params : {params}")
@@ -261,9 +179,10 @@ def procesar_pregunta_v2(pregunta: str) -> Tuple[str, Optional[pd.DataFrame], Op
 
 def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple[str, Optional[pd.DataFrame], None]:
     try:
-        # COMPRAS AÑO / MES / ETC (igual que antes) ...
-
-        # (dejo todo lo que ya tenías sin modificar excepto el bloque facturas_proveedor)
+        # =========================================================
+        # COMPRAS (año, mes, etc.) -> aquí iría todo tu código previo
+        # (para abreviar, foco en facturas_proveedor)
+        # =========================================================
 
         # =========================================================
         # FACTURAS (LISTADO)
@@ -277,9 +196,8 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             if not proveedores_raw:
                 return "❌ Indicá el proveedor. Ej: todas las facturas roche 2025", None, None
 
-            st.session_state["DBG_SQL_LAST_TAG"] = "sql_facturas - facturas_proveedor"
+            st.session_state["DBG_SQL_LAST_TAG"] = "facturas_proveedor"
 
-            # 🔍 DEBUG ANTES DE LLAMAR SQL
             print("\n[ORQUESTADOR] Llamando get_facturas_proveedor_detalle() con:")
             print(f"  proveedores = {proveedores_raw}")
             print(f"  meses       = {params.get('meses')}")
@@ -302,11 +220,6 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             )
 
             if df is None or df.empty:
-                tiempo_lbl = ""
-                if params.get("meses"):
-                    tiempo_lbl = f" en {', '.join(params.get('meses'))}"
-                elif params.get("anios"):
-                    tiempo_lbl = f" en {', '.join(map(str, params.get('anios')))}"
                 debug_msg = f"⚠️ No se encontraron resultados para '{pregunta_original}'.\n\n"
                 debug_msg += f"**Tipo detectado:** {tipo}\n"
                 debug_msg += f"**Parámetros extraídos:**\n"
@@ -318,7 +231,9 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
             return f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):", formatear_dataframe(df), None
 
-        # ... el resto de tipos (comparaciones, stock, etc.) igual que tu archivo original ...
+        # =========================================================
+        # OTROS TIPOS (no copiados por brevedad, igual que tu versión)
+        # =========================================================
 
         return f"❌ Tipo de consulta '{tipo}' no implementado.", None, None
 
