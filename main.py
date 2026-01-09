@@ -230,70 +230,69 @@ with st.sidebar:
     st.radio("Ir a:", MENU_OPTIONS, key="radio_menu")
 
 # =========================
-# FUNCIÓN PARA MOSTRAR DEBUG (PANTALLA SEPARADA)
+# FUNCIÓN PARA MOSTRAR DEBUG SQL FACTURA (PESTAÑA APARTE)
 # =========================
-def mostrar_debug():
-    st.header("🔍 Pantalla de Debug Completa")
-    st.write("Aquí se muestra toda la información de debug para diagnosticar problemas en las consultas.")
+def mostrar_debug_sql_factura():
+    st.header("🔍 Debug SQL Factura")
     
-    # Última Interpretación
-    if "DBG_INT_LAST" in st.session_state:
-        st.subheader("🎯 Última Interpretación de Pregunta")
-        st.json(st.session_state["DBG_INT_LAST"])
+    # Base de datos conectada ok
+    try:
+        # Probar conexión con query simple
+        test_df = ejecutar_consulta("SELECT 1 as test", ())
+        if test_df is not None and not test_df.empty:
+            st.success("✅ Base de datos conectada ok")
+        else:
+            st.error("❌ Base de datos no responde")
+    except Exception as e:
+        st.error(f"❌ Error en base de datos: {str(e)[:100]}")
+    
+    # Orquestador funcionando ok
+    if st.session_state.get("ORQUESTADOR_CARGADO"):
+        st.success("✅ Orquestador funcionando ok")
     else:
-        st.write("No hay interpretación reciente.")
+        st.warning("⚠️ Orquestador no cargado")
     
-    # Origen de Facturas
-    if "DBG_FACTURAS_ORIGEN" in st.session_state:
-        st.subheader("📋 Origen de Funciones de Facturas")
-        st.write(f"**Usando:** {st.session_state['DBG_FACTURAS_ORIGEN']}")
-    
-    # Debug SQL
-    st.subheader("🛠 Debug SQL")
-    if st.checkbox("Mostrar detalles SQL (último)", key="show_sql_debug"):
-        st.write("**Tag:**", st.session_state.get("DBG_SQL_LAST_TAG", "N/A"))
-        st.write("**Query:**")
-        st.code(st.session_state.get("DBG_SQL_LAST_QUERY", "No query"), language="sql")
-        st.write("**Params:**", st.session_state.get("DBG_SQL_LAST_PARAMS", []))
-        st.write("**Resultado:**")
-        st.write("- Filas:", st.session_state.get("DBG_SQL_ROWS", 0))
-        st.write("- Columnas:", st.session_state.get("DBG_SQL_COLS", []))
+    # Interpretador trata de traer esto
+    if "DEBUG_SQL_FACTURA_PARAMS" in st.session_state:
+        st.subheader("🎯 Interpretador trata de traer esto:")
+        params = st.session_state["DEBUG_SQL_FACTURA_PARAMS"]
+        st.json(params)
+        st.write("Proveedores:", params.get("proveedores", []))
+        st.write("Años:", params.get("anios", []))
+        st.write("Meses:", params.get("meses", []))
+        st.write("Moneda:", params.get("moneda", "Ninguna"))
+        st.write("Límite:", params.get("limite", 5000))
     else:
-        st.write("Activa el checkbox para ver detalles SQL.")
+        st.info("ℹ️ No hay params de consulta reciente. Haz una consulta como 'todas las facturas roche 2025' primero.")
     
-    # Estado del Orquestador
-    st.subheader("🚀 Estado del Sistema")
-    st.write(f"**ORQUESTADOR_CARGADO:** {st.session_state.get('ORQUESTADOR_CARGADO', 'No')}")
-    st.write(f"**DEBUG_SQL activado:** {st.session_state.get('DEBUG_SQL', False)}")
+    # SQL trata de traer
+    if "DEBUG_SQL_FACTURA_QUERY" in st.session_state:
+        st.subheader("🛠 SQL trata de traer:")
+        query = st.session_state["DEBUG_SQL_FACTURA_QUERY"]
+        st.code(query, language="sql")
+        st.write("**Tabla objetivo:** chatbot_raw")
+        st.write("**Campos seleccionados:** nro, proveedor, Fecha, Tipo Comprobante, Nro. Comprobante, Moneda, monto_neto (SUM)")
+        st.write("**Filtros aplicados:** Tipo Comprobante (Compra/Factura), Proveedor LIKE, Año = 2025, etc.")
+    else:
+        st.info("ℹ️ No hay SQL reciente. Haz una consulta primero.")
     
-    # Logs Simulados (puedes agregar logs reales aquí)
-    st.subheader("📝 Logs Recientes")
-    logs = [
-        "2024-10-01 10:00: Consulta procesada: 'compras roche'",
-        "2024-10-01 10:05: Error en SQL: tabla no encontrada",
-        # Agrega logs dinámicos si tienes un sistema de logging
-    ]
-    for log in logs:
-        st.text(log)
-    
-    # Opciones de Debug
-    st.subheader("⚙️ Opciones de Debug")
-    if st.button("Limpiar Debug"):
-        keys_to_clear = ["DBG_INT_LAST", "DBG_SQL_LAST_TAG", "DBG_SQL_LAST_QUERY", "DBG_SQL_LAST_PARAMS", "DBG_SQL_ROWS", "DBG_SQL_COLS", "DBG_FACTURAS_ORIGEN"]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.success("Debug limpiado.")
-        st.rerun()
-    
-    # Espacio para más info
-    st.subheader("💡 Consejos para Debug")
-    st.markdown("""
-    - Activa "Debug SQL" en el sidebar para capturar consultas.
-    - Revisa la consola del servidor (logs de Streamlit) para prints adicionales.
-    - Si no hay resultados, verifica que la BD tenga datos para el filtro aplicado.
-    - Para facturas, asegúrate de que 'Tipo Comprobante' incluya 'Factura%' además de 'Compra%'.
-    """)
+    # Falta tal cosa
+    st.subheader("🔍 Falta tal cosa:")
+    if "DEBUG_SQL_FACTURA_PARAMS" in st.session_state and "DEBUG_SQL_FACTURA_QUERY" in st.session_state:
+        params = st.session_state["DEBUG_SQL_FACTURA_PARAMS"]
+        query = st.session_state["DEBUG_SQL_FACTURA_QUERY"]
+        
+        st.write("**Posibles razones por las que no trae datos:**")
+        st.markdown("- **Datos en BD:** Verifica que haya registros en `chatbot_raw` para el proveedor y año especificados.")
+        st.markdown("- **Proveedor exacto:** El LIKE '%roche%' busca proveedores que contengan 'roche' (case insensitive).")
+        st.markdown("- **Año:** Filtra por `\"Año\" = 2025`. Si no hay datos en 2025, no trae nada.")
+        st.markdown("- **Tipo Comprobante:** Solo trae 'Compra Contado', 'Compra%' o 'Factura%'.")
+        st.markdown("- **Moneda:** Si especificas, filtra por esa moneda.")
+        st.markdown("- **Prueba manual:** Copia la query arriba y ejecútala en Supabase para ver si trae datos.")
+        
+        st.write("**Si no trae, falta:** Datos en la BD para esos filtros, o ajustar los filtros.")
+    else:
+        st.write("Haz una consulta primero para ver el análisis.")
 
 # =========================
 # ROUTER
@@ -327,8 +326,8 @@ elif menu_actual == "🛒 Compras IA":
             st.write("Filas:", st.session_state.get("DBG_SQL_ROWS"))
             st.write("Columnas:", st.session_state.get("DBG_SQL_COLS", []))
 
-elif menu_actual == "🔍 Debug":
-    mostrar_debug()
+elif menu_actual == "🔍 Debug SQL factura":
+    mostrar_debug_sql_factura()
 
 elif menu_actual == "📦 Stock IA":
     mostrar_resumen_stock_rotativo()
