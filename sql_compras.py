@@ -32,7 +32,7 @@ def get_compras_anio(anio: int, limite: int = 5000) -> pd.DataFrame:
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int = %s
+          AND "Año" = %s
         ORDER BY "Fecha" DESC NULLS LAST
         LIMIT %s
     """
@@ -52,7 +52,7 @@ def get_total_compras_anio(anio: int) -> dict:
             COUNT(DISTINCT TRIM("Articulo")) AS articulos
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int = %s
+          AND "Año" = %s
     """
     df = ejecutar_consulta(sql, (anio,))
     if df is not None and not df.empty:
@@ -150,7 +150,7 @@ def get_detalle_facturas_proveedor_anio(
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int IN ({anios_sql})
+          AND "Año" IN ({anios_sql})
           {prov_where}
           {moneda_sql}
         ORDER BY "Fecha" DESC NULLS LAST
@@ -174,7 +174,7 @@ def get_total_compras_proveedor_anio(
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
           AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
-          AND "Año"::int = %s
+          AND "Año" = %s
     """
     df = ejecutar_consulta(sql, (f"%{proveedor_like}%", anio))
     if df is not None and not df.empty:
@@ -202,7 +202,7 @@ def get_detalle_compras_articulo_mes(articulo_like: str, mes_key: str) -> pd.Dat
             "Cantidad",
             "Moneda",
             {total_expr} AS Total
-        FROM chatbot_raw
+        FROM chatbot_raw 
         WHERE LOWER(TRIM("Articulo")) LIKE %s
           AND "Mes" = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
@@ -231,7 +231,7 @@ def get_detalle_compras_articulo_anio(articulo_like: str, anio: int, limite: int
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int = %s
+          AND "Año" = %s
           AND LOWER(TRIM("Articulo")) LIKE %s
         ORDER BY "Fecha" DESC NULLS LAST
         LIMIT %s
@@ -248,7 +248,7 @@ def get_total_compras_articulo_anio(articulo_like: str, anio: int) -> dict:
             COALESCE(SUM({total_expr}), 0) AS total
         FROM chatbot_raw
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año"::int = %s
+          AND "Año" = %s
           AND LOWER(TRIM("Articulo")) LIKE %s
     """
     df = ejecutar_consulta(sql, (anio, f"%{articulo_like.lower()}%"))
@@ -602,7 +602,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
                 pass
         if anios_ok:
             ph = ", ".join(["%s"] * len(anios_ok))
-            where_parts.append(f'"Año"::int IN ({ph})')
+            where_parts.append(f'"Año" IN ({ph})')
             params.extend(anios_ok)
 
     # -------------------------
@@ -727,7 +727,7 @@ def get_top_10_proveedores_chatbot(moneda: str = None, anio: int = None, mes: st
         condiciones.append("TRIM(\"Mes\") = %s")
         params.append(mes)
     elif anio:
-        condiciones.append("\"Año\"::int = %s")
+        condiciones.append("\"Año\" = %s")
         params.append(anio)
 
     where_sql = " AND ".join(condiciones)
@@ -762,7 +762,7 @@ def get_dashboard_totales(anio: int) -> dict:
             COUNT(DISTINCT "Cliente / Proveedor") AS proveedores,
             COUNT(DISTINCT "Nro. Comprobante") AS facturas
         FROM chatbot_raw
-        WHERE "Año"::int = %s
+        WHERE "Año" = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
     """
     df = ejecutar_consulta(sql, (anio,))
@@ -784,7 +784,7 @@ def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
             TRIM("Mes") AS Mes,
             SUM({total_expr}) AS Total
         FROM chatbot_raw
-        WHERE "Año"::int = %s
+        WHERE "Año" = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         GROUP BY TRIM("Mes")
         ORDER BY TRIM("Mes")
@@ -806,7 +806,7 @@ def get_dashboard_top_proveedores(anio: int, top_n: int = 10, moneda: str = "$")
             TRIM("Cliente / Proveedor") AS Proveedor,
             SUM({total_expr}) AS Total
         FROM chatbot_raw
-        WHERE "Año"::int = %s
+        WHERE "Año" = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
           AND {mon_filter}
           AND "Cliente / Proveedor" IS NOT NULL
@@ -826,7 +826,7 @@ def get_dashboard_gastos_familia(anio: int) -> pd.DataFrame:
             TRIM(COALESCE("Familia", 'SIN FAMILIA')) AS Familia,
             SUM({total_expr}) AS Total
         FROM chatbot_raw
-        WHERE "Año"::int = %s
+        WHERE "Año" = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         GROUP BY TRIM(COALESCE("Familia", 'SIN FAMILIA'))
         ORDER BY Total DESC
