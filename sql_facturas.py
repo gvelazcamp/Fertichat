@@ -287,6 +287,14 @@ def get_facturas_proveedor(
         LIMIT {limite};
     """
 
+    # DEBUG: Guardar en session_state para mostrar en UI
+    try:
+        import streamlit as st
+        st.session_state["DEBUG_SQL_FACTURA_QUERY"] = query
+        st.session_state["DEBUG_SQL_FACTURA_PARAMS"] = tuple(params)
+    except Exception:
+        pass
+
     # DEBUG SIMPLE: Imprimir qué tabla y query intenta ejecutar
     print(f"DEBUG: Intentando consultar tabla 'chatbot_raw' con query: {query.strip()}")
     print(f"DEBUG: Parámetros: {tuple(params)}")
@@ -625,4 +633,4 @@ def get_facturas_por_rango_monto(
     """
 
     params.extend([monto_min, monto_max])
-    return ejecutar_consulta(sql, tuple(params))
+    return ejecutar_consulta(sql, tuple(params))```
