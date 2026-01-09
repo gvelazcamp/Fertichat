@@ -532,16 +532,16 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
                 debug_msg = f"⚠️ **DEBUG DETALLADO:** No se encontraron resultados para '{pregunta_original}'.\n\n"
                 debug_msg += f"**Tipo detectado:** {tipo}\n"
                 debug_msg += f"**Módulo SQL usado:** sql_facturas\n"
+                debug_msg += f"**Consulta intentada:** Todas las facturas de {', '.join(proveedores_raw)} en {', '.join(map(str, params.get('anios', [])))} usando sql_facturas\n"
                 debug_msg += f"**Parámetros extraídos:**\n"
                 for k, v in params.items():
                     debug_msg += f"- {k}: {v}\n"
                 debug_msg += f"\n**Posibles causas:**\n"
                 debug_msg += f"- No hay datos en la BD para el proveedor '{', '.join(proveedores_raw)}' en el año {', '.join(map(str, params.get('anios', [])))}.\n"
+                debug_msg += f"- Verifica que la tabla 'chatbot_raw' tenga registros con 'Tipo Comprobante' como 'Compra Contado', 'Compra Crédito', 'Factura de Compra', etc.\n"
                 debug_msg += f"- El LIKE en proveedor usa LOWER, así que 'roche' debería coincidir con 'Roche' o 'ROCHE'.\n"
-                debug_msg += f"- Si no se especificó año, no filtra por año (ahora flexible).\n"
-                debug_msg += f"- Tipo Comprobante: Solo trae 'Compra Contado', 'Compra%' o 'Factura%'.\n"
-                debug_msg += f"- Moneda: Si especificas, filtra por esa moneda.\n"
-                debug_msg += f"- Prueba manual: Copia la query del debug y ejecútala en Supabase.\n"
+                debug_msg += f"- Si el año es 2025, confirma que haya datos en ese año.\n"
+                debug_msg += f"- Revisa la consola del servidor para ver el SQL impreso (DEBUG SQL FACTURAS_PROVEEDOR).\n"
                 return debug_msg, None, None
 
             prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
