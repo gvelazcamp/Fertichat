@@ -287,6 +287,10 @@ def get_facturas_proveedor(
         LIMIT {limite};
     """
 
+    # DEBUG SIMPLE: Imprimir qué tabla y query intenta ejecutar
+    print(f"DEBUG: Intentando consultar tabla 'chatbot_raw' con query: {query.strip()}")
+    print(f"DEBUG: Parámetros: {tuple(params)}")
+
     return ejecutar_consulta(query, tuple(params))
 
 
