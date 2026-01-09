@@ -39,7 +39,7 @@ from sql_compras import (
     get_detalle_compras_articulo_anio,
     get_total_compras_articulo_anio,
     get_compras_por_mes_excel,
-    # Facturas
+    # Facturas (quedan, pero abajo se "FORZA" sql_facturas si existe)
     get_ultima_factura_inteligente,
     get_facturas_de_articulo,
     get_detalle_factura_por_numero,
@@ -47,6 +47,24 @@ from sql_compras import (
     # Top
     get_top_10_proveedores_chatbot,
 )
+
+# --- FORZAR FACTURAS DESDE SQL_FACTURAS (SI EXISTE) ---
+# (No rompe: si falla, queda lo de sql_compras)
+try:
+    from sql_facturas import (
+        get_ultima_factura_inteligente as get_ultima_factura_inteligente,
+        get_detalle_factura_por_numero as get_detalle_factura_por_numero,
+        get_total_factura_por_numero as get_total_factura_por_numero,
+    )
+except Exception:
+    pass
+
+# Intentar mapear "facturas de articulo" a sql_facturas si existe
+try:
+    from sql_facturas import get_facturas_articulo as get_facturas_de_articulo
+except Exception:
+    pass
+
 
 # --- COMPAT: algunas versiones tuyas tienen nombres distintos ---
 # Detalle proveedor año: a veces se llama get_detalle_compras_proveedor_anio, a veces get_detalle_facturas_proveedor_anio
@@ -82,22 +100,30 @@ def get_detalle_compras_proveedor_anio(proveedor_like: str, anio: int, limite: i
     return pd.DataFrame()
 
 
-# Total facturas proveedor: en tu SQL aparece como get_total_facturas_proveedor (plural)
+# Total facturas proveedor (preferente: sql_facturas)
 try:
-    from sql_compras import get_total_factura_proveedor as get_total_factura_proveedor  # si existe en tu repo
+    from sql_facturas import get_total_facturas_proveedor as get_total_factura_proveedor
 except Exception:
+    # fallback a tus versiones anteriores
     try:
-        from sql_compras import get_total_facturas_proveedor as get_total_factura_proveedor
+        from sql_compras import get_total_factura_proveedor as get_total_factura_proveedor  # si existe en tu repo
     except Exception:
-        def get_total_factura_proveedor(*args, **kwargs) -> pd.DataFrame:
-            return pd.DataFrame()
+        try:
+            from sql_compras import get_total_facturas_proveedor as get_total_factura_proveedor
+        except Exception:
+            def get_total_factura_proveedor(*args, **kwargs) -> Any:
+                return {"registros": 0, "facturas": 0, "total_pesos": 0, "total_usd": 0}
 
 
-# Facturas por proveedor (detalle) - puede vivir en sql_queries.py o sql_compras.py
+# Facturas por proveedor (detalle) - FORZAR SQL_FACTURAS
 try:
-    from sql_queries import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
+    from sql_facturas import get_facturas_proveedor as get_facturas_proveedor_detalle
 except Exception:
-    from sql_compras import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
+    # fallback si no existe sql_facturas en tu repo
+    try:
+        from sql_queries import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
+    except Exception:
+        from sql_compras import get_facturas_proveedor_detalle as get_facturas_proveedor_detalle
 
 
 # --- COMPARATIVAS + GASTOS (según tu sql_comparativas.py) ---
@@ -417,22 +443,43 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             if not nro:
                 return "❌ Falta número de factura.", None, None
 
+            # Debug: confirmar handler
+            try:
+                st.session_state["DBG_SQL_HANDLER"] = "sql_facturas.get_detalle_factura_por_numero / get_total_factura_por_numero"
+            except Exception:
+                pass
+
             df = get_detalle_factura_por_numero(nro)
             if df is None or df.empty:
                 return f"No encontré detalle para la factura {nro}.", None, None
 
-            total_df = get_total_factura_por_numero(nro)
-            total_fact = 0
-            if total_df is not None and not total_df.empty and "total_factura" in total_df.columns:
+            total_obj = get_total_factura_por_numero(nro)
+            total_fact = 0.0
+            moneda_total = ""
+
+            # ✅ Compatible: si devuelve dict (sql_facturas) o DataFrame (otras versiones)
+            if isinstance(total_obj, dict):
                 try:
-                    total_fact = float(total_df["total_factura"].iloc[0] or 0)
+                    total_fact = float(total_obj.get("total", 0) or 0)
                 except Exception:
-                    total_fact = 0
+                    total_fact = 0.0
+                moneda_total = str(total_obj.get("moneda", "") or "")
+            elif isinstance(total_obj, pd.DataFrame):
+                try:
+                    if (total_obj is not None) and (not total_obj.empty) and ("total_factura" in total_obj.columns):
+                        total_fact = float(total_obj["total_factura"].iloc[0] or 0)
+                    if (total_obj is not None) and (not total_obj.empty) and ("Moneda" in total_obj.columns):
+                        moneda_total = str(total_obj["Moneda"].iloc[0] or "")
+                except Exception:
+                    total_fact = 0.0
 
             total_fmt = f"${total_fact:,.0f}".replace(",", ".") if total_fact else ""
             titulo = f"🧾 Detalle factura **{nro}**"
             if total_fmt:
-                titulo += f" | Total: **{total_fmt}**"
+                if moneda_total:
+                    titulo += f" | Total: **{total_fmt}** ({moneda_total})"
+                else:
+                    titulo += f" | Total: **{total_fmt}**"
 
             return titulo + ":", formatear_dataframe(df), None
 
@@ -448,8 +495,14 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str) -> Tuple
             if not proveedores_raw:
                 return "❌ Indicá el proveedor. Ej: todas las facturas roche 2025", None, None
 
+            # Debug: confirmar handler
+            try:
+                st.session_state["DBG_SQL_HANDLER"] = "sql_facturas.get_facturas_proveedor"
+            except Exception:
+                pass
+
             df = get_facturas_proveedor_detalle(
-                proveedores=proveedores_raw,  # <-- raw (roche). El LIKE lo hace SQL.
+                proveedores=proveedores_raw,  # <-- raw (roche). El LIKE lo hace SQL_FACTURAS.
                 meses=params.get("meses"),
                 anios=params.get("anios"),
                 desde=params.get("desde"),
