@@ -9,6 +9,12 @@ from typing import Tuple, Optional
 
 from ia_interpretador import interpretar_pregunta
 from sql_facturas import get_facturas_proveedor as get_facturas_proveedor_detalle
+from sql_compras import (  # Importar funciones de compras
+    get_compras_proveedor_anio,
+    get_detalle_compras_proveedor_mes,
+    get_compras_multiples,
+    get_compras_anio,
+)
 from utils_format import formatear_dataframe
 from utils_openai import responder_con_openai
 
@@ -179,6 +185,119 @@ def _ejecutar_consulta(tipo: str, params: dict, pregunta_original: str):
             prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
             return (
                 f"🧾 Facturas de **{prov_lbl}** ({len(df)} registros):",
+                formatear_dataframe(df),
+                None,
+            )
+
+        # =========================================================
+        # COMPRAS (LISTADO) - NUEVO: usa sql_compras
+        # =========================================================
+        elif tipo == "compras_proveedor_anio":
+            proveedor = params.get("proveedor", "").strip()
+            anio = params.get("anio", 2025)
+            if not proveedor:
+                return "❌ Indicá el proveedor. Ej: compras roche 2025", None, None
+
+            st.session_state["DBG_SQL_LAST_TAG"] = "compras_proveedor_anio (sql_compras)"
+
+            print("\n[ORQUESTADOR] Llamando get_compras_proveedor_anio()")
+            print(f"  proveedor = {proveedor}")
+            print(f"  anio      = {anio}")
+
+            df = get_compras_proveedor_anio(proveedor, anio)
+
+            if df is None or df.empty:
+                return f"⚠️ No se encontraron compras para '{proveedor}' en {anio}.", None, None
+
+            return (
+                f"🛒 Compras de **{proveedor.upper()}** en {anio} ({len(df)} registros):",
+                formatear_dataframe(df),
+                None,
+            )
+
+        elif tipo == "compras_proveedor_mes":
+            proveedor = params.get("proveedor", "").strip()
+            mes = params.get("mes", "").strip()
+            anio = params.get("anio")  # Opcional, puede ser None
+
+            if not proveedor or not mes:
+                return "❌ Indicá proveedor y mes. Ej: compras roche noviembre 2025", None, None
+
+            st.session_state["DBG_SQL_LAST_TAG"] = "compras_proveedor_mes (sql_compras)"
+
+            print("\n[ORQUESTADOR] Llamando get_detalle_compras_proveedor_mes()")
+            print(f"  proveedor = {proveedor}")
+            print(f"  mes       = {mes}")
+            print(f"  anio      = {anio}")
+
+            df = get_detalle_compras_proveedor_mes(proveedor, mes, anio)
+
+            if df is None or df.empty:
+                return f"⚠️ No se encontraron compras para '{proveedor}' en {mes} {anio or ''}.", None, None
+
+            return (
+                f"🛒 Compras de **{proveedor.upper()}** en {mes} {anio or ''} ({len(df)} registros):",
+                formatear_dataframe(df),
+                None,
+            )
+
+        elif tipo == "compras_multiples":
+            proveedores = params.get("proveedores", [])
+            if isinstance(proveedores, str):
+                # Si viene como string con comas, split
+                if "," in proveedores:
+                    proveedores = [p.strip() for p in proveedores.split(",") if p.strip()]
+                else:
+                    proveedores = [proveedores]
+
+            proveedores_raw = [str(p).strip() for p in proveedores if str(p).strip()]
+            if not proveedores_raw:
+                return "❌ Indicá los proveedores. Ej: compras roche, biodiagnostico noviembre 2025", None, None
+
+            meses = params.get("meses", [])
+            anios = params.get("anios", [])
+            limite = params.get("limite", 5000)
+
+            st.session_state["DBG_SQL_LAST_TAG"] = "compras_multiples (sql_compras)"
+
+            print("\n[ORQUESTADOR] Llamando get_compras_multiples()")
+            print(f"  proveedores = {proveedores_raw}")
+            print(f"  meses       = {meses}")
+            print(f"  anios       = {anios}")
+            print(f"  limite      = {limite}")
+
+            df = get_compras_multiples(proveedores_raw, meses, anios, limite)
+
+            if df is None or df.empty:
+                return f"⚠️ No se encontraron compras para {', '.join(proveedores_raw)}.", None, None
+
+            prov_lbl = ", ".join([p.upper() for p in proveedores_raw[:3]])
+            mes_lbl = ", ".join(meses) if meses else ""
+            anio_lbl = ", ".join(map(str, anios)) if anios else ""
+            filtro = f" {mes_lbl} {anio_lbl}".strip()
+            return (
+                f"🛒 Compras de **{prov_lbl}**{filtro} ({len(df)} registros):",
+                formatear_dataframe(df),
+                None,
+            )
+
+        elif tipo == "compras_anio":
+            anio = params.get("anio", 2025)
+            limite = params.get("limite", 5000)
+
+            st.session_state["DBG_SQL_LAST_TAG"] = "compras_anio (sql_compras)"
+
+            print("\n[ORQUESTADOR] Llamando get_compras_anio()")
+            print(f"  anio   = {anio}")
+            print(f"  limite = {limite}")
+
+            df = get_compras_anio(anio, limite)
+
+            if df is None or df.empty:
+                return f"⚠️ No se encontraron compras en {anio}.", None, None
+
+            return (
+                f"🛒 Todas las compras en {anio} ({len(df)} registros):",
                 formatear_dataframe(df),
                 None,
             )
