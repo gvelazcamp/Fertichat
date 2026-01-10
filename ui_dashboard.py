@@ -21,6 +21,33 @@ from sql_compras import (
 )
 
 # =========================
+# FUNCIÓN AUXILIAR PARA ALERTAS
+# =========================
+def get_alertas_vencimiento_multiple(limite: int = 5) -> list:
+    """Obtiene alertas de vencimientos próximos"""
+    try:
+        sql = """
+            SELECT
+                TRIM("Articulo") AS articulo,
+                "Vencimiento" AS vencimiento,
+                (DATE("Vencimiento") - CURRENT_DATE) AS dias_restantes
+            FROM chatbot_raw
+            WHERE "Vencimiento" IS NOT NULL
+              AND DATE("Vencimiento") >= CURRENT_DATE
+              AND DATE("Vencimiento") <= CURRENT_DATE + INTERVAL '90 days'
+            ORDER BY "Vencimiento" ASC
+            LIMIT %s
+        """
+        df = ejecutar_consulta(sql, (limite,))
+        if df is not None and not df.empty:
+            return df.to_dict('records')
+        return []
+    except Exception as e:
+        print(f"Error en get_alertas_vencimiento_multiple: {e}")
+        return []
+
+
+# =========================
 # 📊 DASHBOARD
 # =========================
 
@@ -201,7 +228,7 @@ def mostrar_dashboard():
             if alertas:
                 st.markdown("**⚠️ Próximos vencimientos:**")
                 for alerta in alertas[:3]:
-                    # ✅ FIX mínimo: soportar ambos nombres de clave (dias_restantes / dias)
+                    # Soportar ambos nombres de clave
                     dias = alerta.get('dias_restantes', alerta.get('dias', None))
                     try:
                         dias = int(dias) if dias is not None else 999999
@@ -218,8 +245,8 @@ def mostrar_dashboard():
                     st.markdown(f"{color} **{alerta['articulo'][:30]}** - {alerta['vencimiento']} ({dias} días)")
             else:
                 st.success("✅ No hay vencimientos próximos")
-        except:
-            pass
+        except Exception as e:
+            st.info("No hay alertas de vencimiento disponibles")
 
         st.markdown("---")
 
@@ -246,7 +273,7 @@ def mostrar_dashboard():
 def mostrar_indicadores_ia():
     url = "https://app.powerbi.com/view?r=eyJrIjoiMTBhMGY0ZjktYmM1YS00OTM4LTg3ZjItMTEzYWVmZWNkMGIyIiwidCI6ImQxMzBmYmU3LTFiZjAtNDczNi1hM2Q5LTQ1YjBmYWUwMDVmYSIsImMiOjR9"
 
-    scale = 0.50  # ✅ Zoom 65%
+    scale = 0.50  # Zoom 50%
 
     st.markdown(
         f"""
@@ -254,9 +281,9 @@ def mostrar_indicadores_ia():
           .pbi-wrap {{
             width: 100%;
             height: 92vh;
-            padding: 18px 24px;   /* aire alrededor */
+            padding: 18px 24px;
             box-sizing: border-box;
-            overflow: hidden;     /* evita scroll extra por el scale */
+            overflow: hidden;
           }}
 
           .pbi-iframe {{
@@ -307,7 +334,6 @@ def _get_totales_anio(anio: int) -> dict:
 
     params = (anio,)
 
-    # DEBUG (opcional)
     if DEBUG_MODE:
         st.session_state.debug = {
             "pregunta": "total compras por año",
@@ -410,7 +436,7 @@ def mostrar_resumen_compras_rotativo():
         for col in dfp.columns:
             if col.lower() == "proveedor":
                 nombre = str(row[col]) if pd.notna(row[col]) else "—"
-                prov_nom = " ".join(nombre.split()[:2])  # ✅ SOLO 2 PALABRAS
+                prov_nom = " ".join(nombre.split()[:2])  # SOLO 2 PALABRAS
             elif col.lower() == "total_$":
                 prov_pesos = _safe_float(row[col])
             elif col.lower() == "total_usd":
@@ -422,7 +448,7 @@ def mostrar_resumen_compras_rotativo():
     mes_txt = f"$ {_fmt_num_latam(tot_mes['pesos'], 0)}"
     mes_sub = f"U$S {_fmt_num_latam(tot_mes['usd'], 0)}"
     
-    # 🎨 CSS – RESPONSIVE PARA Z FLIP 5
+    # CSS RESPONSIVE PARA Z FLIP 5
     st.markdown(
         """
         <style>
@@ -468,9 +494,7 @@ def mostrar_resumen_compras_rotativo():
             margin: 0;
           }
           
-          /* ========================================
-             MOBILE RESPONSIVE (Z Flip 5 y similares)
-             ======================================== */
+          /* MOBILE RESPONSIVE (Z Flip 5) */
           @media (max-width: 768px) {
             .mini-resumen {
               flex-direction: column;
@@ -523,11 +547,8 @@ def mostrar_resumen_compras_rotativo():
             }
           }
           
-          /* ========================================
-             FIX INPUT BUSCADOR EN MÓVIL
-             ======================================== */
+          /* FIX INPUT BUSCADOR EN MÓVIL */
           @media (max-width: 768px) {
-            /* Input de búsqueda "Escribí tu consulta..." */
             .block-container input[type="text"],
             .block-container textarea,
             [data-baseweb="input"] input,
@@ -538,13 +559,11 @@ def mostrar_resumen_compras_rotativo():
               height: auto !important;
             }
             
-            /* Contenedor del input */
             [data-baseweb="input"],
             [data-baseweb="textarea"] {
               min-height: auto !important;
             }
             
-            /* Placeholder text */
             .block-container input::placeholder,
             .block-container textarea::placeholder {
               font-size: 14px !important;
@@ -556,7 +575,7 @@ def mostrar_resumen_compras_rotativo():
         unsafe_allow_html=True
     )
     
-    # 🧾 HTML FINAL
+    # HTML FINAL
     st.markdown(
         f"""
         <div class="mini-resumen">
