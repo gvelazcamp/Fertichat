@@ -89,7 +89,7 @@ TABLA_TIPOS = """
 | facturas_articulo | Todas las facturas de un artículo | articulo | "cuando vino vitek" |
 | stock_total | Resumen total de stock | (ninguno) | "stock total" |
 | stock_articulo | Stock de un artículo | articulo | "stock vitek" |
-| listado_facturas_anio | Listado de facturas por año agrupadas por proveedor | anio | "listado facturas 2025" |
+| listado_facturas_anio | Listado/resumen de facturas por año agrupadas por proveedor | anio | "listado facturas 2025" / "total facturas 2025" |
 | conversacion | Saludos | (ninguno) | "hola", "gracias" |
 | conocimiento | Preguntas generales | (ninguno) | "que es HPV" |
 | no_entendido | No se entiende | sugerencia | - |
@@ -627,7 +627,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     texto_lower_original = texto_original.lower()
 
     # FAST-PATH: listado facturas por año
-    if re.search(r"\b(listado|lista)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
+    if re.search(r"\b(listado|lista|resumen|total)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
         anios_listado = _extraer_anios(texto_lower_original)
         if anios_listado:
             anio = anios_listado[0]
@@ -637,14 +637,14 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                     "pregunta": texto_original,
                     "tipo": "listado_facturas_anio",
                     "parametros": {"anio": anio},
-                    "debug": f"listado facturas año {anio}",
+                    "debug": f"listado/resumen/total facturas año {anio}",
                 }
             except Exception:
                 pass
             return {
                 "tipo": "listado_facturas_anio",
                 "parametros": {"anio": anio},
-                "debug": f"listado facturas año {anio}",
+                "debug": f"listado/resumen/total facturas año {anio}",
             }
 
     # FAST-PATH: detalle factura por número
