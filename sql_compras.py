@@ -266,7 +266,7 @@ def get_detalle_compras_articulo_mes(articulo_like: str, mes_key: str) -> pd.Dat
             TRIM("Monto Neto") AS Total
         FROM chatbot_raw 
         WHERE LOWER(TRIM("Articulo")) LIKE %s
-          AND "Mes" = %s
+          AND TRIM("Mes") = %s
           AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         ORDER BY "Fecha" DESC NULLS LAST
     """
@@ -555,8 +555,8 @@ def get_total_facturas_proveedor(
 
     elif meses:
         ph = ", ".join(["%s"] * len(meses))
-        where_parts.append(f'TRIM("Mes") IN ({ph})')
-        params.extend(meses)
+        where_parts.append(f'LOWER(TRIM("Mes")) IN ({ph})')  # ✅ LOWER agregado
+        params.extend([m.lower() for m in meses])  # ✅ .lower() agregado
 
     elif anios:
         ph = ", ".join(["%s"] * len(anios))
@@ -679,8 +679,8 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
         meses_ok = [m for m in (meses or []) if m]
         if meses_ok:
             ph = ", ".join(["%s"] * len(meses_ok))
-            where_parts.append(f'TRIM("Mes") IN ({ph})')
-            params.extend(meses_ok)
+            where_parts.append(f'LOWER(TRIM("Mes")) IN ({ph})')  # ✅ LOWER agregado
+            params.extend([m.lower() for m in meses_ok])  # ✅ .lower() agregado
 
     if anios:
         anios_ok: List[int] = []
