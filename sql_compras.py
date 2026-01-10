@@ -514,12 +514,13 @@ def get_total_facturas_proveedor(
 
 
 # =========================
-# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO PARA MANEJAR "TODAS" COMO SIN FILTRO
+# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO PARA MANEJAR "TODAS" Y AUMENTAR LÍMITE PARA TODAS LAS FACTURAS
 # =========================
 def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, articulo, moneda, limite):
     """
     Listado/detalle de facturas para proveedor(es) con filtros opcionales.
     Ahora maneja palabras como "todas", "las", "all" como indicadores de sin filtro de proveedor.
+    Para consultas generales (sin proveedores), aumenta el límite a 10000 para traer más datos.
     """
 
     # ✅ FIX: Si proveedores contiene palabras genéricas como "todas", "las", "all", setear vacío para traer TODAS
@@ -550,10 +551,10 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     if limite <= 0:
         limite = 5000
 
-    # Si no hay proveedores, meses, desde/hasta, articulo, moneda, solo anios, usar get_compras_anio
+    # Si no hay proveedores, meses, desde/hasta, articulo, moneda, solo anios, usar get_compras_anio con límite mayor
     if not proveedores and not meses and not desde and not hasta and not articulo and not moneda and anios:
-        # Caso general: todas las facturas del año
-        return get_compras_anio(anios[0], limite)
+        # Caso general: todas las facturas del año, aumentar límite a 10000
+        return get_compras_anio(anios[0], max(limite, 10000))
 
     # QUERY SIMPLIFICADO PARA EVITAR ERRORES EN CONSTRUCCIÓN DE WHERE
     if proveedores and anios and not meses and not desde and not hasta and not articulo and not moneda:
