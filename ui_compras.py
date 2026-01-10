@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-from ia_router import interpretar_pregunta, obtener_info_tipo
+from ia_interpretador import interpretar_pregunta, obtener_info_tipo
 from utils_openai import responder_con_openai
 import sql_compras as sqlq_compras
 import sql_comparativas as sqlq_comparativas
@@ -114,7 +114,7 @@ def calcular_totales_por_moneda(df: pd.DataFrame) -> dict:
 
 
 # =========================
-# ROUTER SQL (usa sql_facturas para facturas)
+# ROUTER SQL (ahora incluye compras, comparativas y stock)
 # =========================
 def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 
@@ -181,8 +181,64 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         _dbg_set_result(df)
         return df
 
-    # (Aquí irían el resto de tipos de COMPRAS/COMPARATIVAS/STOCK si los usás)
+    # ===== COMPRAS =====
+    elif tipo == "compras_anio":
+        df = sqlq_compras.get_compras_anio(parametros["anio"])
+        _dbg_set_result(df)
+        return df
 
+    elif tipo == "compras_mes":
+        df = sqlq_compras.get_compras_por_mes_excel(parametros["mes"])
+        _dbg_set_result(df)
+        return df
+
+    elif tipo == "compras_proveedor_mes":
+        df = sqlq_compras.get_detalle_compras_proveedor_mes(parametros["proveedor"], parametros["mes"])
+        _dbg_set_result(df)
+        return df
+
+    # ===== COMPARATIVAS =====
+    elif tipo == "comparar_proveedor_meses":
+        df = sqlq_comparativas.get_comparacion_proveedor_meses(
+            parametros["proveedor"], parametros["mes1"], parametros["mes2"], parametros["label1"], parametros["label2"]
+        )
+        _dbg_set_result(df)
+        return df
+
+    elif tipo == "comparar_proveedor_anios":
+        df = sqlq_comparativas.get_comparacion_proveedor_anios(
+            parametros["proveedor"], parametros["anios"], parametros["label1"], parametros["label2"]
+        )
+        _dbg_set_result(df)
+        return df
+
+    elif tipo == "comparar_proveedores_meses":
+        df = sqlq_comparativas.get_comparacion_proveedores_meses(
+            parametros["proveedores"], parametros["mes1"], parametros["mes2"], parametros["label1"], parametros["label2"]
+        )
+        _dbg_set_result(df)
+        return df
+
+    elif tipo == "comparar_proveedores_anios":
+        df = sqlq_comparativas.get_comparacion_proveedores_anios(
+            parametros["proveedores"], parametros["anios"], parametros["label1"], parametros["label2"]
+        )
+        _dbg_set_result(df)
+        return df
+
+    # ===== STOCK =====
+    elif tipo == "stock_total":
+        # Asumiendo que tienes una función en sql_compras o crea una; si no, ajusta
+        df = sqlq_compras.get_stock_total()  # Ajusta si es otro módulo
+        _dbg_set_result(df)
+        return df
+
+    elif tipo == "stock_articulo":
+        df = sqlq_compras.get_stock_articulo(parametros["articulo"])  # Ajusta si es otro módulo
+        _dbg_set_result(df)
+        return df
+
+    # ===== NO IMPLEMENTADO =====
     raise ValueError(f"Tipo '{tipo}' no implementado en ejecutar_consulta_por_tipo")
 
 
@@ -293,6 +349,18 @@ def Compras_IA():
                         elif tipo.startswith("facturas_"):
                             respuesta_content = (
                                 f"✅ Encontré **{len(resultado_sql)}** facturas"
+                            )
+                        elif tipo.startswith("compras_"):
+                            respuesta_content = (
+                                f"✅ Encontré **{len(resultado_sql)}** compras"
+                            )
+                        elif tipo.startswith("comparar_"):
+                            respuesta_content = (
+                                f"✅ Comparación lista - {len(resultado_sql)} filas"
+                            )
+                        elif tipo.startswith("stock_"):
+                            respuesta_content = (
+                                f"✅ Stock encontrado - {len(resultado_sql)} filas"
                             )
                         else:
                             respuesta_content = (
