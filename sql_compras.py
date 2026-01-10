@@ -509,7 +509,7 @@ def get_total_facturas_proveedor(
 
 
 # =========================
-# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO: QUITAR Total PARA DEBUG
+# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO: QUERY SIMPLIFICADO PARA AÑO
 # =========================
 def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, articulo, moneda, limite):
     """
@@ -536,6 +536,33 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     if limite <= 0:
         limite = 5000
 
+    # QUERY SIMPLIFICADO PARA EVITAR ERRORES EN CONSTRUCCIÓN DE WHERE
+    if proveedores and anios and not meses and not desde and not hasta and not articulo and not moneda:
+        # Caso simple: solo proveedores y años
+        prov_like = f"%{proveedores[0].lower()}%"
+        anio_val = anios[0]
+        sql = f"""
+            SELECT
+                TRIM("Cliente / Proveedor") AS Proveedor,
+                TRIM("Articulo") AS Articulo,
+                TRIM("Nro. Comprobante") AS Nro_Factura,
+                "Fecha",
+                "Cantidad",
+                "Moneda"
+            FROM chatbot_raw
+            WHERE LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+              AND "Año" = %s
+              AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+            ORDER BY "Fecha" DESC NULLS LAST
+            LIMIT %s
+        """
+        params = (prov_like, anio_val, limite)
+        print(f"\n🛠 SQL simplificado: {sql}")
+        print(f"🛠 Params: {params}")
+        df = ejecutar_consulta(sql, params)
+        return df if df is not None else pd.DataFrame()
+
+    # Para otros casos, usar el query complejo original (sin Total para debug)
     where_parts = [
         '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'
     ]
@@ -588,7 +615,6 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
             where_parts.append(f'"Año" IN ({ph})')
             params.extend(anios_ok)
 
-    # MODIFICADO: QUITAR Total para debug temporal
     query = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
@@ -604,7 +630,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     """
     params.append(limite)
 
-    print(f"\n🛠 SQL generado (facturas_proveedor_detalle): {query}")
+    print(f"\n🛠 SQL generado (complejo): {query}")
     print(f"🛠 Parámetros: {params}")
 
     try:
