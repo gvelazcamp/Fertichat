@@ -650,11 +650,12 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
 
 
 # =========================
+# =========================
 # TOTAL FACTURAS POR MONEDA AÑO
 # =========================
 def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
     """Total de facturas por moneda en un año específico."""
-    sql = f"""
+    sql = """
         SELECT
             "Moneda",
             COUNT(DISTINCT "Nro. Comprobante") AS total_facturas,
@@ -663,7 +664,8 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
                     WHEN TRIM("Monto Neto") LIKE '(%'
                         THEN -1 * REPLACE(
                                    REPLACE(
-                                     REPLACE(TRIM("Monto Neto"), '(', ''),
+                                     REPLACE(
+                                       REPLACE(TRIM("Monto Neto"), '(', ''),
                                      ')', ''),
                                    '.', ''),
                                  ',', '.'
@@ -676,7 +678,8 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
             ) AS monto_total
         FROM chatbot_raw
         WHERE
-            EXTRACT(YEAR FROM "Fecha"::date) = %s
+            "Fecha"::date >= DATE %s
+            AND "Fecha"::date <  DATE %s
             AND (
                 "Tipo Comprobante" ILIKE 'Compra%'
                 OR "Tipo Comprobante" ILIKE 'Factura%'
@@ -684,8 +687,11 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
         GROUP BY "Moneda"
         ORDER BY "Moneda";
     """
-    return ejecutar_consulta(sql, (anio,))
 
+    desde = f"{anio}-01-01"
+    hasta = f"{anio + 1}-01-01"
+
+    return ejecutar_consulta(sql, (desde, hasta))
 
 # =========================
 # TOTAL COMPRAS POR MONEDA AÑO
