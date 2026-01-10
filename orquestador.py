@@ -61,7 +61,7 @@ def _extraer_nro_factura_fallback(texto: str) -> Optional[str]:
     m = re.search(
         r"\b(?:detalle\s+)?(?:factura|comprobante|nro\.?\s*factura|nro\.?\s*comprobante)\b\s*[:#-]?\s*([A-Za-z]?\d{3,})\b",
         t,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE
     )
     if m:
         return _normalizar_nro_factura(m.group(1))
