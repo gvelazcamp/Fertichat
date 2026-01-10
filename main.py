@@ -246,7 +246,7 @@ def mostrar_debug_sql_factura():
     else:
         st.warning("⚠️ Orquestador no cargado")
 
-    # Params últimos de facturas
+    # Params últimos de facturas (si los usás desde sql_facturas)
     if "DEBUG_SQL_FACTURA_PARAMS" in st.session_state:
         st.subheader("🎯 Interpretador trata de traer esto:")
         params = st.session_state["DEBUG_SQL_FACTURA_PARAMS"]
@@ -270,6 +270,7 @@ def mostrar_debug_sql_factura():
         st.write("**Tabla objetivo:** chatbot_raw")
     else:
         st.info("ℹ️ No hay SQL reciente. Hacé una consulta primero.")
+
 
 # =========================
 # ROUTER PRINCIPAL
