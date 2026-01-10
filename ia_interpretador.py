@@ -90,6 +90,7 @@ TABLA_TIPOS = """
 | stock_total | Resumen total de stock | (ninguno) | "stock total" |
 | stock_articulo | Stock de un artículo | articulo | "stock vitek" |
 | listado_facturas_anio | Listado/resumen de facturas por año agrupadas por proveedor | anio | "listado facturas 2025" / "total facturas 2025" |
+| total_facturas_por_moneda_anio | Total de facturas por moneda en un año | anio | "total 2025 por moneda" |
 | conversacion | Saludos | (ninguno) | "hola", "gracias" |
 | conocimiento | Preguntas generales | (ninguno) | "que es HPV" |
 | no_entendido | No se entiende | sugerencia | - |
@@ -100,7 +101,7 @@ TABLA_TIPOS = """
 # =====================================================================
 TABLA_CANONICA_50 = r"""
 | # | ACCIÓN | OBJETO | TIEMPO | MULTI | TIPO (output) | PARAMS |
-|---|--------|--------|--------|-------|---------------|--------|
+|---|---|--------|--------|-------|---------------|--------|
 | 01 | compras | (ninguno) | anio | no | compras_anio | anio |
 | 02 | compras | (ninguno) | mes | no | compras_mes | mes |
 | 03 | compras | proveedor | anio | no | facturas_proveedor | proveedores, anios |
@@ -152,7 +153,7 @@ def normalizar_texto(texto: str) -> str:
 
     texto = "".join(
         c
-        for c in unicodedata.normalize("NFD", s)
+        for c in unicodedata.normalize("NFD", texto)
         if unicodedata.category(c) != "Mn"
     )
     texto = re.sub(r"[^\w\s]", "", texto)
@@ -501,7 +502,7 @@ def _interpretar_con_openai(pregunta: str) -> Optional[Dict]:
         return None
 
     try:
-        response = client.chat_completions.create(
+        response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": _get_system_prompt()},
@@ -593,6 +594,10 @@ MAPEO_FUNCIONES = {
         "funcion": "get_listado_facturas_por_anio",
         "params": ["anio"],
     },
+    "total_facturas_por_moneda_anio": {
+        "funcion": "get_total_facturas_por_moneda_anio",
+        "params": ["anio"],
+    },
 }
 
 def obtener_info_tipo(tipo: str) -> Optional[Dict]:
@@ -647,27 +652,6 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 "debug": f"listado facturas año {anio}",
             }
 
-    # FAST-PATH: todas las facturas + año
-    if re.search(r"\b(todas|todoas)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
-        anios_todas = _extraer_anios(texto_lower_original)
-        if anios_todas:
-            anio = anios_todas[0]
-            print(f"\n[INTÉRPRETE] TODAS LAS FACTURAS AÑO={anio}")
-            try:
-                st.session_state["DBG_INT_LAST"] = {
-                    "pregunta": texto_original,
-                    "tipo": "listado_facturas_anio",
-                    "parametros": {"anio": anio},
-                    "debug": f"todas las facturas año {anio}",
-                }
-            except Exception:
-                pass
-            return {
-                "tipo": "listado_facturas_anio",
-                "parametros": {"anio": anio},
-                "debug": f"todas las facturas año {anio}",
-            }
-
     # FAST-PATH: detalle factura por número
     if contiene_factura(texto_lower_original):
         nro = _extraer_nro_factura(texto_original)
@@ -686,6 +670,27 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                 "tipo": "detalle_factura_numero",
                 "parametros": {"nro_factura": nro},
                 "debug": f"factura nro={nro}",
+            }
+
+    # FAST-PATH: total facturas por moneda año
+    if "total" in texto_lower_original and "facturas" in texto_lower_original and "moneda" in texto_lower_original:
+        anios = _extraer_anios(texto_lower_original)
+        if anios:
+            anio = anios[0]
+            print(f"\n[INTÉRPRETE] TOTAL FACTURAS POR MONEDA AÑO={anio}")
+            try:
+                st.session_state["DBG_INT_LAST"] = {
+                    "pregunta": texto_original,
+                    "tipo": "total_facturas_por_moneda_anio",
+                    "parametros": {"anio": anio},
+                    "debug": f"total facturas por moneda año {anio}",
+                }
+            except Exception:
+                pass
+            return {
+                "tipo": "total_facturas_por_moneda_anio",
+                "parametros": {"anio": anio},
+                "debug": f"total facturas por moneda año {anio}",
             }
 
     texto_limpio = limpiar_consulta(texto_original)
@@ -755,7 +760,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                         if len(meses_out) >= MAX_MESES:
                             break
                     if len(meses_out) >= MAX_MESES:
-                        break
+                            break
 
         moneda = _extraer_moneda(texto_lower_original)
 
