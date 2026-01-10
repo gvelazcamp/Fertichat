@@ -89,6 +89,33 @@ def get_compras_proveedor_anio(proveedor_like: str, anio: int, limite: int = 500
 
 
 # =====================================================================
+# COMPRAS MÚLTIPLES: PROVEEDORES, MESES Y AÑOS (NUEVA FUNCIÓN)
+# =====================================================================
+
+def get_compras_multiples(
+    proveedores: List[str], 
+    meses: Optional[List[str]] = None, 
+    anios: Optional[List[int]] = None, 
+    limite: int = 5000
+) -> pd.DataFrame:
+    """
+    Detalle de compras para múltiples proveedores, meses y años.
+    Ejemplo: proveedores=["roche", "biodiagnostico"], meses=["octubre", "noviembre"], anios=[2024, 2025]
+    """
+    # Usa la función existente get_facturas_proveedor_detalle para consistencia
+    return get_facturas_proveedor_detalle(
+        proveedores=proveedores,
+        meses=meses,
+        anios=anios,
+        desde=None,
+        hasta=None,
+        articulo=None,
+        moneda=None,
+        limite=limite
+    )
+
+
+# =====================================================================
 # DETALLE COMPRAS: PROVEEDOR + MES
 # =====================================================================
 
