@@ -588,9 +588,9 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     if moneda and str(moneda).strip():
         m = str(moneda).upper().strip()
         if m in ("USD", "U$S", "U$$", "US$"):
-            where_parts.append('TRIM("Moneda") IN (\\'U$S\\', \\'U$$\\', \\'USD\\', \\'US$\\')')
+            where_parts.append('TRIM("Moneda") IN (\'U$S\', \'U$$\', \'USD\', \'US$\')')
         elif m in ("$", "UYU", "PESOS"):
-            where_parts.append('TRIM("Moneda") = \\'$\\''))
+            where_parts.append('TRIM("Moneda") = \'$\'')
 
     if desde and hasta:
         where_parts.append('"Fecha"::date BETWEEN %s AND %s')
@@ -606,16 +606,14 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     elif anios:
         anios_ok: List[int] = []
         for a in (anios or []):
-            try:
-                anios_ok.append(int(a))
-            except Exception:
-                pass
+            if isinstance(a, int):
+                anios_ok.append(a)
         if anios_ok:
             ph = ", ".join(["%s"] * len(anios_ok))
             where_parts.append(f'"Año" IN ({ph})')
             params.extend(anios_ok)
 
-    query = f"""
+    sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
             TRIM("Articulo") AS Articulo,
@@ -626,299 +624,46 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
         FROM chatbot_raw
         WHERE {" AND ".join(where_parts)}
         ORDER BY "Fecha" DESC NULLS LAST
-        LIMIT %s
+        LIMIT {limite}
     """
-    params.append(limite)
-
-    print(f"\n🛠 SQL generado (complejo): {query}")
-    print(f"🛠 Parámetros: {params}")
-
-    try:
-        st.session_state["DBG_SQL_FACT_PROV"] = {
-            "funcion": "get_facturas_proveedor_detalle",
-            "params_entrada": {
-                "proveedores": proveedores,
-                "meses": meses,
-                "anios": anios,
-                "desde": desde,
-                "hasta": hasta,
-                "articulo": articulo,
-                "moneda": moneda,
-                "limite": limite,
-            },
-            "sql": query,
-            "sql_params": params,
-        }
-    except Exception:
-        pass
-
-    return ejecutar_consulta(query, tuple(params))
-
-
-# =====================================================================
-# SERIES / DASHBOARD (usar Total simple donde sea necesario)
-# =====================================================================
-
-def get_serie_compras_agregada(where_clause: str, params: tuple) -> pd.DataFrame:
-    """Serie temporal agregada."""
-    sql = f"""
-        SELECT
-            "Fecha"::date AS Fecha,
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total
-        FROM chatbot_raw
-        WHERE {where_clause}
-        GROUP BY "Fecha"::date
-        ORDER BY "Fecha"::date
-    """
-    return ejecutar_consulta(sql, params)
-
-
-def get_dataset_completo(where_clause: str, params: tuple):
-    sql = f"""
-        SELECT
-            "Fecha",
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Articulo") AS Articulo,
-            "Cantidad",
-            "Moneda",
-            TRIM("Monto Neto") AS Total
-        FROM chatbot_raw
-        WHERE {where_clause}
-    """
-    return ejecutar_consulta(sql, params)
-
-
-def get_detalle_compras(where_clause: str, params: tuple) -> pd.DataFrame:
-    """Detalle de compras con where personalizado."""
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Articulo") AS Articulo,
-            TRIM("Nro. Comprobante") AS Nro_Factura,
-            "Fecha",
-            "Cantidad",
-            "Moneda",
-            TRIM("Monto Neto") AS Total
-        FROM chatbot_raw
-        WHERE {where_clause}
-        ORDER BY "Fecha" DESC NULLS LAST
-    """
-    return ejecutar_consulta(sql, params)
-
-
-def get_compras_por_mes_excel(mes_key: str) -> pd.DataFrame:
-    """Compras de un mes para exportar a Excel."""
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Articulo") AS Articulo,
-            TRIM("Nro. Comprobante") AS Nro_Factura,
-            "Fecha",
-            "Cantidad",
-            "Moneda",
-            TRIM("Monto Neto") AS Total
-        FROM chatbot_raw
-        WHERE TRIM("Mes") = %s
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-        ORDER BY "Fecha" DESC, TRIM("Cliente / Proveedor")
-    """
-    return ejecutar_consulta(sql, (mes_key,))
-
-
-def get_top_10_proveedores_chatbot(moneda: str = None, anio: int = None, mes: str = None) -> pd.DataFrame:
-    """Top 10 proveedores."""
-    condiciones = ["(\\\"Tipo Comprobante\\\" = 'Compra Contado' OR \\\"Tipo Comprobante\\\" LIKE 'Compra%%')"]
-    params = []
-
-    if moneda:
-        mon = moneda.strip().upper()
-        if mon in ("U$S", "U$$", "USD"):
-            condiciones.append("TRIM(\\\"Moneda\\\") IN ('U$S', 'U$$')")
-        else:
-            condiciones.append("TRIM(\\\"Moneda\\\") = '$'")
-
-    if mes:
-        condiciones.append("TRIM(\\\"Mes\\\") = %s")
-        params.append(mes)
-    elif anio:
-        condiciones.append(\\\"Año\\\" = %s")
-        params.append(anio)
-
-    where_sql = " AND ".join(condiciones)
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total,
-            COUNT(*) AS Registros
-        FROM chatbot_raw
-        WHERE {where_sql}
-          AND "Cliente / Proveedor" IS NOT NULL
-          AND TRIM("Cliente / Proveedor") <> ''
-        GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY Total DESC
-        LIMIT 10
-    """
-    return ejecutar_consulta(sql, tuple(params) if params else None)
-
-
-def get_dashboard_totales(anio: int) -> dict:
-    """Totales para dashboard."""
-    total_pesos = _sql_total_num_expr()
-    total_usd = _sql_total_num_expr_usd()
-    sql = f"""
-        SELECT
-            COALESCE(SUM(CASE WHEN TRIM("Moneda") = '$' THEN {total_pesos} ELSE 0 END), 0) AS total_pesos,
-            COALESCE(SUM(CASE WHEN TRIM("Moneda") IN ('U$S', 'U$$') THEN {total_usd} ELSE 0 END), 0) AS total_usd,
-            COUNT(DISTINCT "Cliente / Proveedor") AS proveedores,
-            COUNT(DISTINCT "Nro. Comprobante") AS facturas
-        FROM chatbot_raw
-        WHERE "Año" = %s
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-    """
-    df = ejecutar_consulta(sql, (anio,))
-    if df is not None and not df.empty:
-        return {
-            "total_pesos": float(df["total_pesos"].iloc[0] or 0),
-            "total_usd": float(df["total_usd"].iloc[0] or 0),
-            "proveedores": int(df["proveedores"].iloc[0] or 0),
-            "facturas": int(df["facturas"].iloc[0] or 0)
-        }
-    return {"total_pesos": 0, "total_usd": 0, "proveedores": 0, "facturas": 0}
-
-
-def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
-    """Compras por mes para dashboard."""
-    sql = f"""
-        SELECT
-            TRIM("Mes") AS Mes,
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total
-        FROM chatbot_raw
-        WHERE "Año" = %s
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-        GROUP BY TRIM("Mes")
-        ORDER BY TRIM("Mes")
-    """
-    return ejecutar_consulta(sql, (anio,))
-
-
-def get_dashboard_top_proveedores(anio: int, top_n: int = 10, moneda: str = "$") -> pd.DataFrame:
-    """Top proveedores para dashboard."""
-    if moneda in ("U$S", "U$$", "USD"):
-        mon_filter = "TRIM(\\\"Moneda\\\") IN ('U$S', 'U$$')"
-    else:
-        mon_filter = "TRIM(\\\"Moneda\\\") = '$'"
-
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total
-        FROM chatbot_raw
-        WHERE "Año" = %s
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND {mon_filter}
-          AND "Cliente / Proveedor" IS NOT NULL
-          AND TRIM("Cliente / Proveedor") <> ''
-        GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY Total DESC
-        LIMIT %s
-    """
-    return ejecutar_consulta(sql, (anio, top_n))
-
-
-def get_dashboard_gastos_familia(anio: int) -> pd.DataFrame:
-    """Gastos por familia para dashboard."""
-    sql = f"""
-        SELECT
-            TRIM(COALESCE("Familia", 'SIN FAMILIA')) AS Familia,
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total
-        FROM chatbot_raw
-        WHERE "Año" = %s
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-        GROUP BY TRIM(COALESCE("Familia", 'SIN FAMILIA'))
-        ORDER BY Total DESC
-        LIMIT 10
-    """
-    return ejecutar_consulta(sql, (anio,))
-
-
-def get_dashboard_ultimas_compras(limite: int = 10) -> pd.DataFrame:
-    """Últimas compras para dashboard."""
-    sql = f"""
-        SELECT
-            "Fecha",
-            TRIM("Articulo") AS Articulo,
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Monto Neto") AS Total
-        FROM chatbot_raw
-        WHERE (\"Tipo Comprobante\" = 'Compra Contado' OR \"Tipo Comprobante\" LIKE 'Compra%%')
-        ORDER BY "Fecha" DESC NULLS LAST
-        LIMIT %s
-    """
-    return ejecutar_consulta(sql, (limite,))
-
-
-def get_total_compras_proveedor_moneda_periodos(periodos: List[str], monedas: List[str] = None) -> pd.DataFrame:
-    """Total de compras por proveedor en múltiples períodos."""
-    periodos_sql = ", ".join(["%s"] * len(periodos))
-    sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            TRIM("Mes") AS Mes,
-            "Moneda",
-            SUM(CAST(NULLIF(TRIM("Monto Neto"), '') AS NUMERIC)) AS Total
-        FROM chatbot_raw
-        WHERE TRIM("Mes") IN ({periodos_sql})
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-        GROUP BY TRIM("Cliente / Proveedor"), TRIM("Mes"), "Moneda"
-        ORDER BY TRIM("Mes"), Total DESC
-    """
-    return ejecutar_consulta(sql, tuple(periodos))
+    df = ejecutar_consulta(sql, tuple(params))
+    return df if df is not None else pd.DataFrame()
 
 
 # =========================
-# NUEVA FUNCIÓN: LISTADO FACTURAS POR AÑO
-# =========================
-def get_listado_facturas_por_anio(anio: int) -> pd.DataFrame:
-    \"\"\"Listado de facturas agrupadas por proveedor y moneda para un año específico.\"\"\"
-    total_expr = _sql_total_num_expr_general()
-    sql = f\"\"\"
-        SELECT
-            TRIM(\"Cliente / Proveedor\") AS proveedor,
-            \"Moneda\",
-            COUNT(DISTINCT \"Nro. Comprobante\") AS cantidad_facturas,
-            SUM({total_expr}) AS monto_total
-        FROM chatbot_raw
-        WHERE
-            \"Fecha\"::date >= DATE '{anio}-01-01'
-            AND \"Fecha\"::date < DATE '{anio + 1}-01-01'
-            AND (\"Tipo Comprobante\" = 'Compra Contado' OR \"Tipo Comprobante\" LIKE 'Compra%%')
-        GROUP BY
-            TRIM(\"Cliente / Proveedor\"),
-            \"Moneda\"
-        ORDER BY proveedor, \"Moneda\"
-    \"\"\"
-    return ejecutar_consulta(sql, ())
-
-
-# =========================
-# NUEVA FUNCIÓN: TOTAL FACTURAS POR MONEDA AÑO
+# TOTAL FACTURAS POR MONEDA AÑO
 # =========================
 def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
-    \"\"\"Total de facturas por moneda para un año específico.\"\"\"
-    total_expr = _sql_total_num_expr_general()
-    sql = f\"\"\"
+    """Total de facturas por moneda en un año específico."""
+    sql = f"""
         SELECT
-            \"Moneda\",
-            COUNT(DISTINCT \"Nro. Comprobante\") AS total_facturas,
-            SUM({total_expr}) AS monto_total
+            "Moneda",
+            COUNT(DISTINCT "Nro. Comprobante") AS total_facturas,
+            SUM(
+                CASE
+                    WHEN TRIM("Monto Neto") LIKE '(%'
+                        THEN -1 * REPLACE(
+                                   REPLACE(
+                                     REPLACE(
+                                       REPLACE(TRIM("Monto Neto"), '(', ''),
+                                     ')', ''),
+                                   '.', ''),
+                                 ',', '.'
+                               )::numeric
+                    ELSE REPLACE(
+                           REPLACE(TRIM("Monto Neto"), '.', ''),
+                           ',', '.'
+                         )::numeric
+                END
+            ) AS monto_total
         FROM chatbot_raw
         WHERE
-            EXTRACT(YEAR FROM \"Fecha\"::date) = %s
+            EXTRACT(YEAR FROM "Fecha"::date) = %s
             AND (
-                \"Tipo Comprobante\" ILIKE 'Compra%%'
-                OR \"Tipo Comprobante\" ILIKE 'Factura%%'
+                "Tipo Comprobante" ILIKE 'Compra%'
+                OR "Tipo Comprobante" ILIKE 'Factura%'
             )
-        GROUP BY \"Moneda\"
-        ORDER BY \"Moneda\"
-    \"\"\"
+        GROUP BY "Moneda"
+        ORDER BY "Moneda";
+    """
     return ejecutar_consulta(sql, (anio,))
