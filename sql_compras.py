@@ -891,10 +891,7 @@ def get_listado_facturas_por_anio(anio: int) -> pd.DataFrame:
         WHERE
             "Fecha"::date >= DATE '{anio}-01-01'
             AND "Fecha"::date < DATE '{anio + 1}-01-01'
-            AND (
-                "Tipo Comprobante" ILIKE 'Compra%'
-                OR "Tipo Comprobante" ILIKE 'Factura%'
-            )
+            AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         GROUP BY
             TRIM("Cliente / Proveedor"),
             "Moneda"
