@@ -620,7 +620,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
         return get_compras_anio(anios[0], max(limite, 10000))
 
     # QUERY SIMPLIFICADO PARA EVITAR ERRORES EN CONSTRUCCIÓN DE WHERE
-    if proveedores and anios and not meses and not desde and not hasta and not articulo and not moneda:
+    if len(proveedores or []) == 1 and anios and not meses and not desde and not hasta and not articulo and not moneda:
         # Caso simple: solo proveedores y años
         prov_like = f"%{proveedores[0].lower()}%"
         anio_val = anios[0]
@@ -633,7 +633,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
                 "Cantidad",
                 "Moneda"
             FROM chatbot_raw
-            WHERE LOWER(TRIM("Cliente / Proveedor")) LIKE %s
+            WHERE LOWER(TRIM(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace("Cliente / Proveedor", \'á\', \'a\'), \'é\', \'e\'), \'í\', \'i\'), \'ó\', \'o\'), \'ú\', \'u\'), \'Á\', \'A\'), \'É\', \'E\'), \'Í\', \'I\'), \'Ó\', \'O\'), \'Ú\', \'U\'))) LIKE %s
               AND "Año" = %s
               AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
             ORDER BY "Fecha" DESC NULLS LAST
