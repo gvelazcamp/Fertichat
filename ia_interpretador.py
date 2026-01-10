@@ -900,8 +900,18 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         if provs and (meses_yyyymm or (meses_nombre and anios)):
             if len(provs) > 1:
                 # MÚLTIPLES PROVEEDORES + MES/AÑO
-                # ✅ FIX: Usar YYYY-MM directamente, no nombres
-                meses_out = meses_yyyymm  # Pasar YYYY-MM como "2025-07"
+                # ✅ FIX: Extraer meses correctamente para "julio 2025" -> ["2025-07"]
+                meses_out = []
+                if meses_yyyymm:
+                    meses_out = meses_yyyymm
+                elif meses_nombre and anios:
+                    for a in anios[:1]:  # Solo el primer año
+                        for mn in meses_nombre[:MAX_MESES]:
+                            meses_out.append(_to_yyyymm(a, mn))
+                            if len(meses_out) >= MAX_MESES:
+                                break
+                        if len(meses_out) >= MAX_MESES:
+                            break
 
                 print("\n[INTÉRPRETE] COMPRAS_MULTIPLE_PROVEEDORES_MES")
                 print(f"  Pregunta    : {texto_original}")
@@ -1124,3 +1134,4 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         "sugerencia": "Probá: compras roche noviembre 2025 | comparar compras roche junio julio 2025 | detalle factura 273279 | todas las facturas roche 2025 | listado facturas 2025 | total 2025 | total facturas por moneda | total compras por moneda",
         "debug": "no match",
     }
+
