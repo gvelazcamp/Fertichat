@@ -251,11 +251,11 @@ def get_facturas_proveedor(
             if anios_ok:
                 if len(anios_ok) == 1:
                     where_parts.append('"Año" = %s')
-                    params.append(anios_ok[0])
+                    params.append(str(anios_ok[0]))  # CAMBIO: convertir a string
                 else:
                     ph = ", ".join(["%s"] * len(anios_ok))
                     where_parts.append(f'"Año" IN ({ph})')
-                    params.extend(anios_ok)
+                    params.extend([str(a) for a in anios_ok])  # CAMBIO: convertir a string
 
     # Seguridad: si por algún motivo no hay filtros, no traigas todo
     if not where_parts:
@@ -369,11 +369,11 @@ def get_total_facturas_proveedor(
             if anios_ok:
                 if len(anios_ok) == 1:
                     where_parts.append('"Año" = %s')
-                    params.append(anios_ok[0])
+                    params.append(str(anios_ok[0]))  # CAMBIO: convertir a string
                 else:
                     ph = ", ".join(["%s"] * len(anios_ok))
                     where_parts.append(f'"Año" IN ({ph})')
-                    params.extend(anios_ok)
+                    params.extend([str(a) for a in anios_ok])  # CAMBIO: convertir a string
 
     if not where_parts:
         where_parts.append("1=0")
@@ -534,11 +534,11 @@ def get_resumen_facturas_por_proveedor(
         if anios_ok:
             if len(anios_ok) == 1:
                 where_parts.append('"Año" = %s')
-                params.append(anios_ok[0])
+                params.append(str(anios_ok[0]))  # CAMBIO: convertir a string
             else:
                 ph = ", ".join(["%s"] * len(anios_ok))
                 where_parts.append(f'"Año" IN ({ph})')
-                params.extend(anios_ok)
+                params.extend([str(a) for a in anios_ok])  # CAMBIO: convertir a string
 
     monto_expr = _sql_monto_neto_num_expr()
 
@@ -608,11 +608,11 @@ def get_facturas_por_rango_monto(
         if anios_ok:
             if len(anios_ok) == 1:
                 where_parts.append('"Año" = %s')
-                params.append(anios_ok[0])
+                params.append(str(anios_ok[0]))  # CAMBIO: convertir a string
             else:
                 ph = ", ".join(["%s"] * len(anios_ok))
                 where_parts.append(f'"Año" IN ({ph})')
-                params.extend(anios_ok)
+                params.extend([str(a) for a in anios_ok])  # CAMBIO: convertir a string
 
     monto_expr = _sql_monto_neto_num_expr()
 
