@@ -651,47 +651,23 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
 
 # =========================
 # =========================
-# TOTAL FACTURAS POR MONEDA AÑO
+# TOTAL FACTURAS POR MONEDA AÑO - CORREGIDA
 # =========================
 def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
     """Total de facturas por moneda en un año específico."""
-    sql = """
+    total_expr = _sql_total_num_expr_general()  # Usa la expresión estándar para consistencia
+    sql = f"""
         SELECT
-            "Moneda",
+            TRIM("Moneda") AS Moneda,
             COUNT(DISTINCT "Nro. Comprobante") AS total_facturas,
-            SUM(
-                CASE
-                    WHEN TRIM("Monto Neto") LIKE '(%'
-                        THEN -1 * REPLACE(
-                                   REPLACE(
-                                     REPLACE(
-                                       REPLACE(TRIM("Monto Neto"), '(', ''),
-                                     ')', ''),
-                                   '.', ''),
-                                 ',', '.'
-                               )::numeric
-                    ELSE REPLACE(
-                           REPLACE(TRIM("Monto Neto"), '.', ''),
-                           ',', '.'
-                         )::numeric
-                END
-            ) AS monto_total
+            COALESCE(SUM({total_expr}), 0) AS monto_total
         FROM chatbot_raw
-        WHERE
-            "Fecha"::date >= DATE %s
-            AND "Fecha"::date <  DATE %s
-            AND (
-                "Tipo Comprobante" ILIKE 'Compra%'
-                OR "Tipo Comprobante" ILIKE 'Factura%'
-            )
-        GROUP BY "Moneda"
-        ORDER BY "Moneda";
+        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND "Año" = %s
+        GROUP BY TRIM("Moneda")
+        ORDER BY monto_total DESC  -- Cambiado a DESC para un ordenamiento más útil
     """
-
-    desde = f"{anio}-01-01"
-    hasta = f"{anio + 1}-01-01"
-
-    return ejecutar_consulta(sql, (desde, hasta))
+    return ejecutar_consulta(sql, (anio,))
 
 # =========================
 # TOTAL COMPRAS POR MONEDA AÑO
