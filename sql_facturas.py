@@ -121,12 +121,10 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
     if not variantes:
         return ejecutar_consulta(sql, ("",))
 
-    # Intento con la variante principal
     df = ejecutar_consulta(sql, (variantes[0],))
     if df is not None and not df.empty:
         return df
 
-    # Intento con las restantes
     for alt in variantes[1:]:
         df2 = ejecutar_consulta(sql, (alt,))
         if df2 is not None and not df2.empty:
@@ -179,7 +177,7 @@ def get_total_factura_por_numero(nro_factura: str) -> dict:
 
 
 # =====================================================================
-# FACTURAS POR PROVEEDOR
+# FACTURAS POR PROVEEDOR  (conexión directa a chatbot_raw)
 # =====================================================================
 
 def get_facturas_proveedor(
@@ -193,12 +191,12 @@ def get_facturas_proveedor(
     limite: int = 5000,
 ) -> pd.DataFrame:
     """
-    VERSIÓN ROBUSTA:
-    - NO filtra por Tipo Comprobante (trae todo lo de ese proveedor/año).
-    - Filtra por:
-        * proveedor LIKE %texto%
-        * año (si se pasa)
-        * meses / rango / artículo / moneda (opcional)
+    Lista facturas/comprobantes de compra por proveedor(es) directamente desde chatbot_raw.
+
+    - NO filtra por tipo de comprobante (para no dejar afuera nada raro).
+    - Filtra por proveedor LIKE %texto%.
+    - Filtra por año (columna "Año") si se especifica.
+    - Opcionalmente filtra por meses/rango/moneda/artículo.
     """
 
     if not proveedores:
@@ -211,13 +209,12 @@ def get_facturas_proveedor(
     where_parts: List[str] = []
     params: List[Any] = []
 
-    # Proveedores (OR de varios)
+    # Proveedores
     prov_clauses: List[str] = []
     for p in [str(x).strip() for x in proveedores if str(x).strip()]:
         p_clean = p.lower().strip()
         prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
         params.append(f"%{p_clean}%")
-
     if prov_clauses:
         where_parts.append("(" + " OR ".join(prov_clauses) + ")")
 
@@ -295,13 +292,13 @@ def get_facturas_proveedor(
     # DEBUG hacia la UI si está en Streamlit
     try:
         import streamlit as st
-        st.session_state["DBG_SQL_LAST_TAG"] = "facturas_proveedor (sin filtro tipo)"
+        st.session_state["DBG_SQL_LAST_TAG"] = "facturas_proveedor (chatbot_raw directo)"
         st.session_state["DBG_SQL_LAST_QUERY"] = query
         st.session_state["DBG_SQL_LAST_PARAMS"] = tuple(params)
     except Exception:
         pass
 
-    print("DEBUG facturas_proveedor (sin filtro tipo):")
+    print("DEBUG facturas_proveedor (chatbot_raw directo):")
     print(query.strip())
     print("Params:", tuple(params))
 
@@ -378,10 +375,10 @@ def get_total_facturas_proveedor(
                     where_parts.append(f'"Año" IN ({ph})')
                     params.extend(anios_ok)
 
-    monto_expr = _sql_monto_neto_num_expr()
-
     if not where_parts:
         where_parts.append("1=0")
+
+    monto_expr = _sql_monto_neto_num_expr()
 
     sql = f"""
         SELECT
