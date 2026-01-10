@@ -47,7 +47,7 @@ def get_db_connection():
             dbname=dbname,
             user=user,
             password=password,
-            sslmode="require"
+            sslmode="require",
         )
         return conn
 
@@ -63,16 +63,16 @@ def get_db_connection():
 TABLE_COMPRAS = "chatbot_raw"
 
 COL_TIPO_COMP = '"Tipo Comprobante"'
-COL_NRO_COMP  = '"Nro. Comprobante"'
-COL_MONEDA    = '"Moneda"'
-COL_PROV      = '"Cliente / Proveedor"'
-COL_FAMILIA   = '"Familia"'
-COL_ART       = '"Articulo"'
-COL_ANIO      = '"Año"'
-COL_MES       = '"Mes"'
-COL_FECHA     = '"Fecha"'
-COL_CANT      = '"Cantidad"'
-COL_MONTO     = '"Monto Neto"'
+COL_NRO_COMP = '"Nro. Comprobante"'
+COL_MONEDA = '"Moneda"'
+COL_PROV = '"Cliente / Proveedor"'
+COL_FAMILIA = '"Familia"'
+COL_ART = '"Articulo"'
+COL_ANIO = '"Año"'
+COL_MES = '"Mes"'
+COL_FECHA = '"Fecha"'
+COL_CANT = '"Cantidad"'
+COL_MONTO = '"Monto Neto"'
 
 
 # =====================================================================
@@ -80,6 +80,7 @@ COL_MONTO     = '"Monto Neto"'
 # =====================================================================
 
 def _safe_ident(col_name: str) -> str:
+    """Escapa un nombre de columna para usar en SQL de forma segura."""
     clean = str(col_name).strip().strip('"')
     return f'"{clean}"'
 
@@ -101,6 +102,7 @@ def _sql_num_from_text(text_expr: str) -> str:
 
 
 def _sql_total_num_expr() -> str:
+    """Convierte Monto Neto a número (pesos)."""
     limpio = """
         REPLACE(
             REPLACE(
@@ -120,6 +122,7 @@ def _sql_total_num_expr() -> str:
 
 
 def _sql_total_num_expr_usd() -> str:
+    """Convierte Monto Neto a número (USD)."""
     limpio = """
         REPLACE(
             REPLACE(
@@ -145,6 +148,7 @@ def _sql_total_num_expr_usd() -> str:
 
 
 def _sql_total_num_expr_general() -> str:
+    """Convierte Monto Neto a número (sirve para $ o U$S)."""
     limpio = """
         REPLACE(
             REPLACE(
@@ -179,6 +183,9 @@ def _sql_total_num_expr_general() -> str:
 def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
     """
     Ejecuta una consulta SQL y retorna los resultados en un DataFrame.
+
+    Usa cursor psycopg2 en vez de pd.read_sql_query para evitar conflictos
+    con % y placeholders %s.
     """
     try:
         conn = get_db_connection()
@@ -220,3 +227,110 @@ def ejecutar_consulta(query: str, params: tuple = None) -> pd.DataFrame:
         print(f"SQL fallido:\n{query}")
         print(f"Parámetros:\n{params}")
         return pd.DataFrame()
+
+
+# =====================================================================
+# LISTADOS Y HELPERS QUE YA USABAS
+# (los dejo como los tenías, no son el origen del fallo)
+# =====================================================================
+
+def get_valores_unicos(
+    tabla: str,
+    columna: str,
+    incluir_todos: bool = True,
+    label_todos: str = "Todos",
+    limite: int = 500
+) -> list:
+    """
+    Devuelve valores únicos (TRIM) de una columna en una tabla.
+    Pensada para armar filtros/selector.
+    """
+    try:
+        t = str(tabla).strip().strip('"')
+        if not re.fullmatch(r"[A-Za-z0-9_]+", t):
+            print(f"⚠️ Tabla inválida para get_valores_unicos: {tabla}")
+            return [label_todos] if incluir_todos else []
+
+        col_sql = _safe_ident(columna)
+        tabla_sql = f'"{t}"'
+
+        sql = f"""
+            SELECT DISTINCT TRIM({col_sql}) AS valor
+            FROM {tabla_sql}
+            WHERE {col_sql} IS NOT NULL AND TRIM({col_sql}) <> ''
+            ORDER BY valor
+            LIMIT %s
+        """
+        df = ejecutar_consulta(sql, (int(limite),))
+
+        if df.empty:
+            return [label_todos] if incluir_todos else []
+
+        vals = df["valor"].dropna().astype(str).tolist()
+        return ([label_todos] + vals) if incluir_todos else vals
+
+    except Exception as e:
+        print(f"❌ Error en get_valores_unicos: {e}")
+        return [label_todos] if incluir_todos else []
+
+
+def get_lista_anios() -> list:
+    sql = """
+        SELECT DISTINCT "Año"::int AS anio
+        FROM chatbot_raw
+        WHERE "Año" IS NOT NULL AND "Año" <> ''
+        ORDER BY anio DESC
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron años en la base de datos.")
+        return []
+    return df["anio"].tolist()
+
+
+def get_lista_meses() -> list:
+    sql = """
+        SELECT DISTINCT TRIM("Mes") AS mes
+        FROM chatbot_raw
+        WHERE "Mes" IS NOT NULL AND TRIM("Mes") <> ''
+        ORDER BY mes
+    """
+    df = ejecutar_consulta(sql)
+    if df.empty:
+        print("⚠️ No se encontraron meses en la base de datos.")
+        return []
+    return df["mes"].tolist()
+
+
+# =====================================================================
+# FUNCIÓN PARA OBTENER ÚLTIMO MES DISPONIBLE  ✅ (LA QUE FALTABA)
+# =====================================================================
+
+def get_ultimo_mes_disponible_hasta(mes_key: str) -> Optional[str]:
+    """
+    Busca el último mes disponible en la tabla chatbot_raw hasta el mes indicado.
+    Se usa desde sql_compras.py.
+    """
+    try:
+        sql = """
+            SELECT DISTINCT TRIM("Mes") AS mes
+            FROM chatbot_raw
+            WHERE TRIM("Mes") IS NOT NULL 
+              AND TRIM("Mes") <> ''
+              AND TRIM("Mes") <= %s
+            ORDER BY TRIM("Mes") DESC
+            LIMIT 1
+        """
+        df = ejecutar_consulta(sql, (mes_key,))
+
+        if df.empty:
+            print(f"⚠️ No se encontró mes disponible hasta {mes_key}")
+            return None
+
+        mes_encontrado = df["mes"].iloc[0]
+        print(f"✅ Último mes disponible hasta {mes_key}: {mes_encontrado}")
+        return mes_encontrado
+
+    except Exception as e:
+        print(f"❌ Error buscando último mes disponible: {e}")
+        return None
