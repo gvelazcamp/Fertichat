@@ -509,14 +509,22 @@ def get_total_facturas_proveedor(
 
 
 # =========================
-# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO PARA PERMITIR TODAS LAS FACTURAS SIN PROVEEDOR
+# FACTURAS PROVEEDOR (DETALLE) - MODIFICADO PARA MANEJAR "TODAS" COMO SIN FILTRO
 # =========================
 def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, articulo, moneda, limite):
     """
     Listado/detalle de facturas para proveedor(es) con filtros opcionales.
-    Clave: proveedor se filtra por LIKE %texto% (no IN exacto).
-    Ahora permite proveedores vacío para traer TODAS las facturas.
+    Ahora maneja palabras como "todas", "las", "all" como indicadores de sin filtro de proveedor.
     """
+
+    # ✅ FIX: Si proveedores contiene palabras genéricas como "todas", "las", "all", setear vacío para traer TODAS
+    if proveedores:
+        proveedores_filtrados = []
+        for p in proveedores:
+            p_clean = str(p).strip().lower()
+            if p_clean not in ("todas", "las", "all", "todos", "todo"):
+                proveedores_filtrados.append(p)
+        proveedores = proveedores_filtrados if proveedores_filtrados else None
 
     print("\n[SQL_COMPRAS] get_facturas_proveedor_detalle() llamado con:")
     print(f"  proveedores = {proveedores}")
@@ -570,7 +578,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
     params: List[Any] = []
 
     prov_clauses = []
-    if proveedores:  # Solo agregar filtro si hay proveedores
+    if proveedores:  # Solo agregar filtro si hay proveedores reales
         for p in proveedores:
             p = str(p).strip().lower()
             if not p:
