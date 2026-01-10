@@ -193,12 +193,12 @@ def get_facturas_proveedor(
     limite: int = 5000,
 ) -> pd.DataFrame:
     """
-    Lista facturas/comprobantes de compra por proveedor(es).
-
-    - Filtra por tipos:
-        'Compra Crédito', 'Nota de Crédito - Proveedor'
-    - Filtra por proveedor (LIKE %proveedor%),
-      año, y opcionalmente meses/rango/moneda/artículo.
+    VERSIÓN ROBUSTA:
+    - NO filtra por Tipo Comprobante (trae todo lo de ese proveedor/año).
+    - Filtra por:
+        * proveedor LIKE %texto%
+        * año (si se pasa)
+        * meses / rango / artículo / moneda (opcional)
     """
 
     if not proveedores:
@@ -208,10 +208,7 @@ def get_facturas_proveedor(
     if limite <= 0:
         limite = 5000
 
-    # Tipos de comprobante que queremos incluir
-    where_parts: List[str] = [
-        '"Tipo Comprobante" IN (\'Compra Crédito\', \'Nota de Crédito - Proveedor\')'
-    ]
+    where_parts: List[str] = []
     params: List[Any] = []
 
     # Proveedores (OR de varios)
@@ -263,12 +260,18 @@ def get_facturas_proveedor(
                     where_parts.append(f'"Año" IN ({ph})')
                     params.extend(anios_ok)
 
+    # Seguridad: si por algún motivo no hay filtros, no traigas todo
+    if not where_parts:
+        where_parts.append("1=0")
+
     monto_expr = _sql_monto_neto_num_expr()
 
     query = f"""
         SELECT
           ROW_NUMBER() OVER (ORDER BY "Fecha"::date, "Nro. Comprobante") AS nro,
           TRIM("Cliente / Proveedor") AS proveedor,
+          "Año",
+          "Mes",
           "Fecha",
           "Tipo Comprobante",
           "Nro. Comprobante",
@@ -278,6 +281,8 @@ def get_facturas_proveedor(
         WHERE {" AND ".join(where_parts)}
         GROUP BY
           TRIM("Cliente / Proveedor"),
+          "Año",
+          "Mes",
           "Fecha",
           "Tipo Comprobante",
           "Nro. Comprobante",
@@ -290,14 +295,15 @@ def get_facturas_proveedor(
     # DEBUG hacia la UI si está en Streamlit
     try:
         import streamlit as st
-        st.session_state["DBG_SQL_LAST_TAG"] = "facturas_proveedor"
+        st.session_state["DBG_SQL_LAST_TAG"] = "facturas_proveedor (sin filtro tipo)"
         st.session_state["DBG_SQL_LAST_QUERY"] = query
         st.session_state["DBG_SQL_LAST_PARAMS"] = tuple(params)
     except Exception:
         pass
 
-    print(f"DEBUG: Intentando consultar 'chatbot_raw' con query:\n{query.strip()}")
-    print(f"DEBUG: Parámetros: {tuple(params)}")
+    print("DEBUG facturas_proveedor (sin filtro tipo):")
+    print(query.strip())
+    print("Params:", tuple(params))
 
     return ejecutar_consulta(query, tuple(params))
 
@@ -325,9 +331,7 @@ def get_total_facturas_proveedor(
     if not proveedores:
         return {"registros": 0, "facturas": 0, "total_pesos": 0, "total_usd": 0}
 
-    where_parts: List[str] = [
-        '"Tipo Comprobante" IN (\'Compra Crédito\', \'Nota de Crédito - Proveedor\')'
-    ]
+    where_parts: List[str] = []
     params: List[Any] = []
 
     # Proveedores
@@ -375,6 +379,9 @@ def get_total_facturas_proveedor(
                     params.extend(anios_ok)
 
     monto_expr = _sql_monto_neto_num_expr()
+
+    if not where_parts:
+        where_parts.append("1=0")
 
     sql = f"""
         SELECT
