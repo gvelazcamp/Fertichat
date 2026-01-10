@@ -669,6 +669,25 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
 
 
 # =========================
+# TOTAL COMPRAS POR MONEDA AÑO
+# =========================
+def get_total_compras_por_moneda_anio(anio: int) -> pd.DataFrame:
+    """Total de compras (monto) por moneda en un año específico."""
+    total_expr = _sql_total_num_expr_general()
+    sql = f"""
+        SELECT
+            TRIM("Moneda") AS Moneda,
+            COALESCE(SUM({total_expr}), 0) AS Total_Compras
+        FROM chatbot_raw
+        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND "Año" = %s
+        GROUP BY TRIM("Moneda")
+        ORDER BY Total_Compras DESC
+    """
+    return ejecutar_consulta(sql, (anio,))
+
+
+# =========================
 # FUNCIONES PARA DASHBOARD
 # =========================
 
