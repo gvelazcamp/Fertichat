@@ -543,7 +543,7 @@ def get_total_facturas_proveedor(
     for p in proveedores:
         p = str(p).strip().lower()
         if p:
-            prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
+            prov_clauses.append('LOWER(TRIM(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace("Cliente / Proveedor", \'á\', \'a\'), \'é\', \'e\'), \'í\', \'i\'), \'ó\', \'o\'), \'ú\', \'u\'), \'Á\', \'A\'), \'É\', \'E\'), \'Í\', \'I\'), \'Ó\', \'O\'), \'Ú\', \'U\'))) LIKE %s')
             params.append(f"%{p}%")
 
     if prov_clauses:
@@ -657,7 +657,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
             p = str(p).strip().lower()
             if not p:
                 continue
-            prov_clauses.append('LOWER(TRIM("Cliente / Proveedor")) LIKE %s')
+            prov_clauses.append('LOWER(TRIM(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace("Cliente / Proveedor", \'á\', \'a\'), \'é\', \'e\'), \'í\', \'i\'), \'ó\', \'o\'), \'ú\', \'u\'), \'Á\', \'A\'), \'É\', \'E\'), \'Í\', \'I\'), \'Ó\', \'O\'), \'Ú\', \'U\'))) LIKE %s')
             params.append(f"%{p}%")
 
     if prov_clauses:
