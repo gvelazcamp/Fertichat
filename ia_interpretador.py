@@ -152,7 +152,7 @@ def normalizar_texto(texto: str) -> str:
 
     texto = "".join(
         c
-        for c in unicodedata.normalize("NFD", texto)
+        for c in unicodedata.normalize("NFD", s)
         if unicodedata.category(c) != "Mn"
     )
     texto = re.sub(r"[^\w\s]", "", texto)
@@ -627,7 +627,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
     texto_lower_original = texto_original.lower()
 
     # FAST-PATH: listado facturas por año
-    if re.search(r"\b(listado|lista|resumen|total)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
+    if re.search(r"\b(listado|lista)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
         anios_listado = _extraer_anios(texto_lower_original)
         if anios_listado:
             anio = anios_listado[0]
@@ -637,14 +637,35 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
                     "pregunta": texto_original,
                     "tipo": "listado_facturas_anio",
                     "parametros": {"anio": anio},
-                    "debug": f"listado/resumen/total facturas año {anio}",
+                    "debug": f"listado facturas año {anio}",
                 }
             except Exception:
                 pass
             return {
                 "tipo": "listado_facturas_anio",
                 "parametros": {"anio": anio},
-                "debug": f"listado/resumen/total facturas año {anio}",
+                "debug": f"listado facturas año {anio}",
+            }
+
+    # FAST-PATH: todas las facturas + año
+    if re.search(r"\b(todas|todoas)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
+        anios_todas = _extraer_anios(texto_lower_original)
+        if anios_todas:
+            anio = anios_todas[0]
+            print(f"\n[INTÉRPRETE] TODAS LAS FACTURAS AÑO={anio}")
+            try:
+                st.session_state["DBG_INT_LAST"] = {
+                    "pregunta": texto_original,
+                    "tipo": "listado_facturas_anio",
+                    "parametros": {"anio": anio},
+                    "debug": f"todas las facturas año {anio}",
+                }
+            except Exception:
+                pass
+            return {
+                "tipo": "listado_facturas_anio",
+                "parametros": {"anio": anio},
+                "debug": f"todas las facturas año {anio}",
             }
 
     # FAST-PATH: detalle factura por número
