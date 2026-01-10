@@ -343,13 +343,13 @@ elif menu_actual == "🛒 Compras IA":
               TRIM("Cliente / Proveedor") AS proveedor,
               COUNT(*) AS filas
             FROM chatbot_raw
-            WHERE "Año" = 2025
-              AND LOWER(TRIM("Cliente / Proveedor")) LIKE '%roche%'
+            WHERE "Año" = %s
+              AND LOWER(TRIM("Cliente / Proveedor")) LIKE %s
             GROUP BY "Año", "Tipo Comprobante", TRIM("Cliente / Proveedor")
             ORDER BY "Tipo Comprobante";
         """
         st.code(sql_test, language="sql")
-        df_test = ejecutar_consulta(sql_test, ())
+        df_test = ejecutar_consulta(sql_test, (2025, "%roche%"))
         st.write("Shape (filas, columnas):", df_test.shape)
         st.dataframe(df_test)
 
