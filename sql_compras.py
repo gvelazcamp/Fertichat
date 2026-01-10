@@ -41,6 +41,11 @@ def get_compras_anio(anio: int, limite: int = 5000) -> pd.DataFrame:
     return ejecutar_consulta(sql, (anio, limite))
 
 
+def get_todas_facturas_anio(anio: int, limite: int = 5000) -> pd.DataFrame:
+    """Alias para get_compras_anio: Todas las facturas/compras de un año sin filtro de proveedor."""
+    return get_compras_anio(anio, limite)
+
+
 def get_total_compras_anio(anio: int) -> dict:
     """Total de compras de un año (resumen)."""
     total_pesos = _sql_total_num_expr()
