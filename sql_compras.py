@@ -674,7 +674,7 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
         elif m in ("$", "UYU", "PESOS"):
             where_parts.append('TRIM("Moneda") = \'$\'')
 
-    # MODIFICACIÓN: Permitir filtros combinados de meses y años
+    # MODIFICACIÓN: Permitir filtros combinados de meses y años (eliminé elif y usé if para ambos)
     if meses:
         meses_ok = [m for m in (meses or []) if m]
         if meses_ok:
