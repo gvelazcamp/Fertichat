@@ -7,7 +7,16 @@ import pandas as pd
 import re
 from typing import Tuple, Optional
 
-from ia_interpretador import interpretar_pregunta
+# =========================
+# AGENTIC AI (fallback seguro)
+# - Si existe agentic_decidir, lo usamos.
+# - Si no existe, cae a interpretar_pregunta (compatibilidad).
+# =========================
+try:
+    from ia_interpretador import agentic_decidir as _agentic_decidir
+except Exception:
+    from ia_interpretador import interpretar_pregunta as _agentic_decidir
+
 from sql_facturas import get_facturas_proveedor as get_facturas_proveedor_detalle
 from sql_compras import (  # Importar funciones de compras
     get_compras_proveedor_anio,
@@ -75,7 +84,10 @@ def procesar_pregunta_v2(pregunta: str):
     print(f"📝 PREGUNTA: {pregunta}")
     print(f"{'=' * 60}")
 
-    interpretacion = interpretar_pregunta(pregunta)
+    # =========================
+    # AGENTIC AI: decisión (tipo + parametros), no ejecuta SQL
+    # =========================
+    interpretacion = _agentic_decidir(pregunta)
 
     tipo = interpretacion.get("tipo", "no_entendido")
     params = interpretacion.get("parametros", {})
