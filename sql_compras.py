@@ -109,7 +109,7 @@ def get_compras_multiples(
         return pd.DataFrame()
 
     where_parts = [
-        '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'
+        # '("Tipo Comprobante" = \'Compra Contado\' OR "Tipo Comprobante" LIKE \'Compra%\')'  # TEMPORAL: Quitado para probar
     ]
     params: List[Any] = []
 
