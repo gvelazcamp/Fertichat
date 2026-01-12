@@ -15,6 +15,24 @@ import sql_facturas as sqlq_facturas
 
 
 # =========================
+# CONVERSIÓN DE MESES A NOMBRES
+# =========================
+def convertir_mes_a_nombre(mes_str):
+    if not mes_str or '-' not in mes_str:
+        return mes_str
+    try:
+        year, month = mes_str.split('-')
+        month_num = int(month)
+        meses = {
+            1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril', 5: 'mayo', 6: 'junio',
+            7: 'julio', 8: 'agosto', 9: 'septiembre', 10: 'octubre', 11: 'noviembre', 12: 'diciembre'
+        }
+        return f"{meses.get(month_num, 'desconocido')} {year}"
+    except:
+        return mes_str
+
+
+# =========================
 # DEBUG HELPERS
 # =========================
 def _dbg_set_interpretacion(obj: dict):
@@ -366,6 +384,10 @@ def Compras_IA():
         else:
             try:
                 resultado_sql = ejecutar_consulta_por_tipo(tipo, parametros)
+
+                # ✅ AGREGADO: Convertir "Mes" a nombres de meses antes de mostrar
+                if isinstance(resultado_sql, pd.DataFrame) and 'Mes' in resultado_sql.columns:
+                    resultado_sql['Mes'] = resultado_sql['Mes'].apply(convertir_mes_a_nombre)
 
                 if isinstance(resultado_sql, pd.DataFrame):
                     if len(resultado_sql) == 0:
