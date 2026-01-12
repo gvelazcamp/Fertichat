@@ -101,6 +101,9 @@ def get_compras_multiples(
     """
     Detalle de compras para múltiples proveedores, meses y años.
     Ejemplo: proveedores=["roche", "biodiagnostico"], meses=["2025-07"], anios=[2025]
+
+    FIX: el filtro por meses se hace por rango de "Fecha" (construido desde YYYY-MM),
+    para no depender del formato/consistencia de la columna "Mes".
     """
     if not proveedores:
         return pd.DataFrame()
@@ -110,24 +113,44 @@ def get_compras_multiples(
     ]
     params: List[Any] = []
 
+    # Proveedores (robusto: normaliza acentos con translate)
     prov_clauses = []
     for p in proveedores:
         p = str(p).strip().lower()
         if not p:
             continue
-        prov_clauses.append('LOWER(TRIM(regexp_replace("Cliente / Proveedor", \'[áéíóúÁÉÍÓÚñÑ]\', \'[aeiouAEIOUñN]\', \'g\'))) LIKE %s')
+        prov_clauses.append(
+            "translate(LOWER(TRIM(\"Cliente / Proveedor\")), 'áéíóúñ', 'aeioun') LIKE %s"
+        )
         params.append(f"%{p}%")
 
     if prov_clauses:
         where_parts.append("(" + " OR ".join(prov_clauses) + ")")
 
+    # Meses -> rangos por Fecha (YYYY-MM)
     if meses:
-        meses_ok = [m for m in (meses or []) if m]
-        if meses_ok:
-            ph = ", ".join(["%s"] * len(meses_ok))
-            where_parts.append(f'LOWER(TRIM("Mes")) IN ({ph})')
-            params.extend([m.lower() for m in meses_ok])
+        rangos_sql = []
+        for m in (meses or []):
+            if not m:
+                continue
+            mm = re.match(r"^(\d{4})-(\d{1,2})$", str(m).strip())
+            if not mm:
+                continue
+            y = int(mm.group(1))
+            mo = int(mm.group(2))
+            desde = f"{y}-{mo:02d}-01"
+            if mo == 12:
+                hasta = f"{y + 1}-01-01"
+            else:
+                hasta = f"{y}-{mo + 1:02d}-01"
 
+            rangos_sql.append('("Fecha"::date >= %s AND "Fecha"::date < %s)')
+            params.extend([desde, hasta])
+
+        if rangos_sql:
+            where_parts.append("(" + " OR ".join(rangos_sql) + ")")
+
+    # Años (opcional)
     if anios:
         anios_ok: List[int] = []
         for a in (anios or []):
@@ -145,7 +168,8 @@ def get_compras_multiples(
             TRIM("Nro. Comprobante") AS Nro_Factura,
             "Fecha",
             "Cantidad",
-            "Moneda"
+            "Moneda",
+            TRIM("Monto Neto") AS Total
         FROM chatbot_raw
         WHERE {" AND ".join(where_parts)}
         ORDER BY "Fecha" DESC NULLS LAST
@@ -753,7 +777,6 @@ def get_facturas_proveedor_detalle(proveedores, meses, anios, desde, hasta, arti
 
 
 # =========================
-# =========================
 # TOTAL FACTURAS POR MONEDA AÑO - CORREGIDA
 # =========================
 def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
@@ -768,7 +791,7 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
           AND "Año" = %s
         GROUP BY TRIM("Moneda")
-        ORDER BY monto_total DESC  -- Cambiado a DESC para un ordenamiento más útil
+        ORDER BY monto_total DESC
     """
     return ejecutar_consulta(sql, (anio,))
 
@@ -777,7 +800,7 @@ def get_total_facturas_por_moneda_anio(anio: int) -> pd.DataFrame:
 # =========================
 def get_total_facturas_por_moneda_todos_anios() -> pd.DataFrame:
     """Total de facturas por moneda y año, mostrando todos los años disponibles."""
-    total_expr = _sql_total_num_expr_general()  # Usa la expresión estándar para consistencia
+    total_expr = _sql_total_num_expr_general()
     sql = f"""
         SELECT
             "Año" AS Anio,
@@ -796,7 +819,7 @@ def get_total_facturas_por_moneda_todos_anios() -> pd.DataFrame:
 # =========================
 def get_total_compras_por_moneda_todos_anios() -> pd.DataFrame:
     """Total de compras por moneda y año, mostrando todos los años disponibles."""
-    total_expr = _sql_total_num_expr_general()  # Usa la expresión estándar para consistencia
+    total_expr = _sql_total_num_expr_general()
     sql = f"""
         SELECT
             "Año" AS Anio,
