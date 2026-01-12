@@ -1,4 +1,3 @@
-```python
 # =========================
 # SQL COMPRAS - CONSULTAS TRANSACCIONALES
 # =========================
@@ -106,8 +105,6 @@ def get_compras_multiples(
     FIX: el filtro por meses se hace por "Mes" (directo, sin rangos de fecha),
     para consistencia con otras consultas y evitar problemas con formatos de "Fecha".
     """
-    print(f"[DEBUG] get_compras_multiples called: proveedores={proveedores}, meses={meses}, anios={anios}")  # TEMP
-    
     if not proveedores:
         return pd.DataFrame()
 
@@ -155,13 +152,7 @@ def get_compras_multiples(
         ORDER BY "Fecha" DESC NULLS LAST
         LIMIT {limite}
     """
-    print(f"[DEBUG] SQL: {sql}")  # TEMP
-    print(f"[DEBUG] Params: {params}")  # TEMP
-    
-    df = ejecutar_consulta(sql, tuple(params))
-    print(f"[DEBUG] df shape: {df.shape if df is not None and hasattr(df, 'shape') else 'None or no shape'}")  # TEMP
-    
-    return df
+    return ejecutar_consulta(sql, tuple(params))
 
 
 # =====================================================================
@@ -934,4 +925,3 @@ def get_dashboard_ultimas_compras(limite: int = 5) -> pd.DataFrame:
         LIMIT %s
     """
     return ejecutar_consulta(sql, (limite,))
-```
