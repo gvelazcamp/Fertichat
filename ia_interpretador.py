@@ -154,20 +154,11 @@ def _tokens(texto: str) -> List[str]:
     return out
 
 def normalizar_texto(texto: str) -> str:
-    if not texto:
-        return ""
-
-    ruido = ["gonzalo", "daniela", "andres", "sndres", "juan", "quiero", "por favor", "las", "los", "una", "un"]
-    texto = texto.lower().strip()
-    for r in ruido:
-        texto = re.sub(fr"\b{re.escape(r)}\b", "", texto)
-
-    texto = "".join(
-        c
-        for c in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(c) != "Mn"
-    )
-    texto = re.sub(r"[^\w\s]", "", texto)
+    texto = texto.lower()
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
+    texto = re.sub(r"(.)\1{1,}", r"\1", texto)  # elimina letras repetidas
+    texto = re.sub(r"[^a-z0-9 ]+", " ", texto)
     texto = re.sub(r"\s+", " ", texto).strip()
     return texto
 
@@ -247,6 +238,22 @@ def detectar_articulo_valido(tokens, catalogo_articulos):
             if t in art.lower():
                 return art
     return None
+
+def es_saludo(texto: str) -> bool:
+    saludos = [
+        "hola",
+        "buenas",
+        "buen día",
+        "buen dia",
+        "buenas tardes",
+        "buenas noches",
+        "como andas",
+        "como estás",
+        "qué tal",
+        "que tal"
+    ]
+    t = texto.lower().strip()
+    return any(t.startswith(s) or s in t for s in saludos)
 
 # =====================================================================
 # HELPERS DE KEYWORDS
@@ -603,7 +610,7 @@ MAPEO_FUNCIONES = {
     },
     "comparar_proveedores_meses": {
         "funcion": "get_comparacion_proveedores_meses",
-        "params": ["proveedores", "mes1", "mes2", "label1", "label2"],
+        "parametros": ["proveedores", "mes1", "mes2", "label1", "label2"],
     },
     "comparar_proveedores_anios": {
         "funcion": "get_comparacion_proveedores_anios",
@@ -683,6 +690,28 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
 
     texto_original = str(pregunta).strip()
     texto_lower_original = texto_original.lower()
+
+    texto_norm = normalizar_texto(texto_original)
+
+    # ============================
+    # SALUDOS
+    # ============================
+    if es_saludo(texto_lower_original):
+        usuario = st.session_state.get("nombre", "👋")
+
+        return {
+            "tipo": "saludo",
+            "mensaje": (
+                f"Hola **{usuario}** 👋\n\n"
+                "¿En qué puedo ayudarte hoy?\n\n"
+                "Puedo ayudarte con:\n"
+                "• 🛒 **Compras**\n"
+                "• 📦 **Stock**\n"
+                "• 📊 **Comparativas**\n"
+                "• 🧪 **Artículos**\n\n"
+                "Escribí lo que necesites 👇"
+            )
+        }
 
     # FAST-PATH: listado facturas por año
     if re.search(r"\b(listado|lista)\b", texto_lower_original) and re.search(r"\bfacturas?\b", texto_lower_original):
@@ -1273,7 +1302,7 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         return {"tipo": "stock_total", "parametros": {}, "debug": "stock total"}
 
     # ======================================================
-    # TOP PROVEEDORES POR AÑO
+    # TOP PROVEEDORES POR AÑO/MES  ✅ ACTUALIZADO
     # ======================================================
     if (
         any(k in texto_lower_original for k in ["top", "ranking", "principales"])
@@ -1291,9 +1320,19 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
         else:
             moneda_param = "$"
 
+        # ✅ NUEVO: Detectar si hay meses especificados
+        meses_param = None
+        if meses_yyyymm:
+            # Ya tenemos meses en formato YYYY-MM
+            meses_param = meses_yyyymm
+        elif meses_nombre:
+            # Convertir nombres de mes a formato YYYY-MM
+            meses_param = [_to_yyyymm(anios[0], mn) for mn in meses_nombre]
+
         print("\n[INTÉRPRETE] TOP_PROVEEDORES")
         print(f"  Pregunta : {texto_original}")
         print(f"  Año      : {anios[0]}")
+        print(f"  Meses    : {meses_param}")  # ✅ NUEVO log
         print(f"  Top N    : {top_n}")
         print(f"  Moneda   : {moneda_param}")
 
@@ -1301,10 +1340,11 @@ def interpretar_pregunta(pregunta: str) -> Dict[str, Any]:
             "tipo": "dashboard_top_proveedores",
             "parametros": {
                 "anio": anios[0],
+                "meses": meses_param,  # ✅ NUEVO parámetro
                 "top_n": top_n,
                 "moneda": moneda_param,
             },
-            "debug": f"top proveedores por año {anios[0]} en {moneda_param}",
+            "debug": f"top proveedores año {anios[0]} {'mes ' + str(meses_param) if meses_param else ''} en {moneda_param}",
         }
 
     out_ai = _interpretar_con_openai(texto_original)
