@@ -1,7 +1,3 @@
-#OBSERVACIÓN:
-#TODO BLOQUE QUE DICE SQL FUNCIONA PERFECTO NO MODIFICAR SOLO AGREGAR ALGO SI SE SOLICITA YA QUE FUNCIONAN PERFECTOS
-#POR ENDE NO MODIFICAR EL GET QUE LO LLAMA
-
 # =========================
 # SQL COMPRAS - CONSULTAS TRANSACCIONALES
 # =========================
@@ -495,9 +491,10 @@ def build_sql_articulo(modo_sql: str) -> str:
     
     raise ValueError(f"Modo SQL '{modo_sql}' no soportado")
 
-def get_compras_articulo_anio(modo_sql: str, valor: str, anios: list[int], limite: int = 5000) -> pd.DataFrame:
+def get_compras_articulo_anio(modo_sql: str, valor: str, anios: list[int], meses: Optional[List[str]] = None, limite: int = 5000) -> pd.DataFrame:
     """
     Obtiene compras de artículo según modo SQL.
+    Ahora soporta filtro opcional por meses.
     """
     if not valor or not anios:
         return pd.DataFrame()
@@ -515,6 +512,12 @@ def get_compras_articulo_anio(modo_sql: str, valor: str, anios: list[int], limit
     anios_str = ', '.join(str(int(a)) for a in anios)
     where_anios = f'"Año"::int IN ({anios_str})'
 
+    # Meses (opcional)
+    where_meses = ""
+    if meses:
+        meses_str = ', '.join(f"'{m}'" for m in meses)
+        where_meses = f' AND TRIM("Mes") IN ({meses_str})'
+
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
@@ -525,7 +528,7 @@ def get_compras_articulo_anio(modo_sql: str, valor: str, anios: list[int], limit
             "Moneda",
             TRIM("Monto Neto") AS Total
         FROM chatbot_raw
-        WHERE {where_art} AND {where_anios}
+        WHERE {where_art} AND {where_anios}{where_meses}
         ORDER BY "Fecha" DESC NULLS LAST
         LIMIT {limite}
     """
@@ -1038,25 +1041,58 @@ def get_dashboard_compras_por_mes(anio: int) -> pd.DataFrame:
     """
     return ejecutar_consulta(sql, (anio,))
 
-
-def get_dashboard_top_proveedores(anio: int, top_n: int = 10, moneda: str = "$") -> pd.DataFrame:
-    """Top proveedores por moneda."""
+def get_dashboard_top_proveedores(
+    anio: int, 
+    top_n: int = 10, 
+    moneda: str = "$",
+    meses: list = None  # ✅ NUEVO parámetro
+) -> pd.DataFrame:
+    """Top proveedores por moneda - VERSIÓN EXTENDIDA CON FECHA y filtro de meses."""
     total_expr = _sql_total_num_expr_general()
-    moneda_filter = f"TRIM(\"Moneda\") = '{moneda}'" if moneda == "$" else f"TRIM(\"Moneda\") IN ('U$S', 'U$$')"
+    
+    # ✅ NUEVO: Construir filtro de mes
+    filtro_mes = ""
+    meses_params = []
+    if meses and len(meses) > 0:
+        meses_placeholders = ', '.join(['%s'] * len(meses))
+        filtro_mes = f'AND TRIM("Mes") IN ({meses_placeholders})'
+        meses_params = list(meses)
+    
     sql = f"""
-        SELECT
-            TRIM("Cliente / Proveedor") AS Proveedor,
-            COALESCE(SUM({total_expr}), 0) AS Total
-        FROM chatbot_raw
-        WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
-          AND "Año" = %s
-          AND {moneda_filter}
-          AND TRIM("Cliente / Proveedor") <> ''
-        GROUP BY TRIM("Cliente / Proveedor")
-        ORDER BY Total DESC
-        LIMIT %s
+        WITH proveedor_totales AS (
+            SELECT
+                TRIM("Cliente / Proveedor") AS Proveedor,
+                SUM(CASE WHEN TRIM("Moneda") IN ('$', 'UYU', 'PESO') THEN {total_expr} ELSE 0 END) AS Total_$,
+                SUM(CASE WHEN TRIM("Moneda") IN ('U$S', 'USD', 'US$') THEN {total_expr} ELSE 0 END) AS Total_USD
+            FROM chatbot_raw
+            WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+              AND "Año" = %s
+              {filtro_mes}
+              AND TRIM("Cliente / Proveedor") <> ''
+            GROUP BY TRIM("Cliente / Proveedor")
+            ORDER BY Total_$ DESC, Total_USD DESC
+            LIMIT %s
+        )
+        SELECT 
+            TRIM(c."Cliente / Proveedor") AS Proveedor,
+            c."Articulo" AS Articulo,
+            c."Nro. Comprobante" AS Nro_Factura,
+            c."Fecha" AS Fecha,
+            c."Cantidad" AS Cantidad,
+            c."Moneda" AS Moneda,
+            {total_expr} AS Total
+        FROM chatbot_raw c
+        INNER JOIN proveedor_totales pt ON TRIM(c."Cliente / Proveedor") = pt.Proveedor
+        WHERE (c."Tipo Comprobante" = 'Compra Contado' OR c."Tipo Comprobante" LIKE 'Compra%%')
+          AND c."Año" = %s
+          {filtro_mes}
+        ORDER BY c."Fecha" DESC
     """
-    return ejecutar_consulta(sql, (anio, top_n))
+    
+    # ✅ Construir parámetros en el orden correcto
+    params = [anio] + meses_params + [top_n, anio] + meses_params
+    
+    return ejecutar_consulta(sql, tuple(params))
 
 
 def get_dashboard_gastos_familia(anio: int) -> pd.DataFrame:
@@ -1074,7 +1110,6 @@ def get_dashboard_gastos_familia(anio: int) -> pd.DataFrame:
         ORDER BY Total DESC
     """
     return ejecutar_consulta(sql, (anio,))
-
 
 def get_dashboard_ultimas_compras(anio: int, limite: int = 10) -> pd.DataFrame:
     """Últimas compras recientes."""
@@ -1255,5 +1290,51 @@ def get_total_compras_por_moneda_todos_anios() -> pd.DataFrame:
         WHERE ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
         GROUP BY "Año", TRIM("Moneda")
         ORDER BY "Año" ASC, monto_total DESC
+    """
+    return ejecutar_consulta(sql, ())
+
+
+# =========================
+# AGREGADO: get_compras_articulos_anios
+# =========================
+def get_compras_articulos_anios(
+    articulos: list[str],
+    modo_sql: str,
+    anios: list[int],
+    meses: list[str] | None = None,
+    limite: int = 5000
+):
+    if not articulos or not anios:
+        return pd.DataFrame()
+
+    where_art = build_sql_articulo(modo_sql)
+
+    art_clauses = []
+    params
+
+# =========================
+# get_top_proveedores_por_anios
+# =========================
+def get_top_proveedores_por_anios(anios: list[int], limite: int = 20) -> pd.DataFrame:
+    """
+    Devuelve top proveedores por monto total acumulado en múltiples años.
+    """
+    if not anios:
+        return pd.DataFrame()
+
+    total_expr = _sql_total_num_expr_general()
+    anios_str = ', '.join(str(int(a)) for a in anios)
+
+    sql = f"""
+        SELECT
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            COALESCE(SUM({total_expr}), 0) AS Total
+        FROM chatbot_raw
+        WHERE UPPER(TRIM("Tipo Comprobante")) LIKE 'COMPRA%'
+          AND "Año"::int IN ({anios_str})
+          AND TRIM("Cliente / Proveedor") <> ''
+        GROUP BY TRIM("Cliente / Proveedor")
+        ORDER BY Total DESC
+        LIMIT {limite}
     """
     return ejecutar_consulta(sql, ())
