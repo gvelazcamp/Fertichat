@@ -1,6 +1,3 @@
-# ui_compras.py - Código completo corregido para "compras vitek 2025"
-# Se corrigió solo la sección de compras_articulo_anio para usar "valor" en lugar de "articulo"
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -906,36 +903,63 @@ def render_dashboard_compras_vendible(df: pd.DataFrame, titulo: str = "Resultado
 
     # ==========================================
     # MÉTRICAS CON TARJETAS MODERNAS (ocultas si hide_metrics)
-    # ==========================================
-    tot_uyu = float(df_view.loc[df_view["__moneda_view__"] == "UYU", "__total_num__"].sum())
-    tot_usd = float(df_view.loc[df_view["__moneda_view__"] == "USD", "__total_num__"].sum())
-    # FIX: Si no hay columna moneda (como en comparaciones), mostrar total general en UYU
-    if not col_moneda:
-        tot_uyu = float(df_view["__total_num__"].sum())
-        tot_usd = 0.0
+    # =========================================
+# ✅ FIX DEFINITIVO: Top proveedores suma directa desde SQL (case insensitive)
+    cols_lower = [c.lower() for c in df_view.columns]
+    if "total_$" in cols_lower and "total_usd" in cols_lower:
+        # Encontrar los nombres reales de las columnas
+        col_pesos = [c for c in df_view.columns if c.lower() == "total_$"][0]
+        col_usd = [c for c in df_view.columns if c.lower() == "total_usd"][0]
+        tot_uyu = float(df_view[col_pesos].fillna(0).sum())
+        tot_usd = float(df_view[col_usd].fillna(0).sum())
+    else:
+        tot_uyu = float(
+            df_view.loc[
+                df_view["__moneda_view__"] == "UYU",
+                "__total_num__"
+            ].sum()
+        )
+        tot_usd = float(
+            df_view.loc[
+                df_view["__moneda_view__"] == "USD",
+                "__total_num__"
+            ].sum()
+        )
+        # FIX: Si no hay columna moneda (como en comparaciones),
+        # mostrar total general en UYU
+        if not col_moneda:
+            tot_uyu = float(df_view["__total_num__"].sum())
+            tot_usd = 0.0
 
-    st.markdown(f"""
-    <div class="fc-metrics-grid">
-        <div class="fc-metric-card">
-            <p class="fc-metric-label">Total UYU 💰</p>
-            <p class="fc-metric-value">{_fmt_compact_money(tot_uyu, "UYU")}</p>
-            <p class="fc-metric-help">Valor exacto: $ {tot_uyu:,.2f}</p>
+    st.markdown(
+        f"""
+        <div class="fc-metrics-grid">
+            <div class="fc-metric-card">
+                <p class="fc-metric-label">Total UYU 💰</p>
+                <p class="fc-metric-value">{_fmt_compact_money(tot_uyu, "UYU")}</p>
+                <p class="fc-metric-help">Valor exacto: $ {tot_uyu:,.2f}</p>
+            </div>
+            <div class="fc-metric-card">
+                <p class="fc-metric-label">Total USD 💵</p>
+                <p class="fc-metric-value">{_fmt_compact_money(tot_usd, "USD")}</p>
+                <p class="fc-metric-help">Valor exacto: U$S {tot_usd:,.2f}</p>
+            </div>
+            <div class="fc-metric-card">
+                <p class="fc-metric-label">
+                    {"Facturas 📄" if col_nro else "Registros 📄"}
+                </p>
+                <p class="fc-metric-value">
+                    {facturas if col_nro else filas_total}
+                </p>
+            </div>
+            <div class="fc-metric-card">
+                <p class="fc-metric-label">Proveedores 🏭</p>
+                <p class="fc-metric-value">{proveedores}</p>
+            </div>
         </div>
-        <div class="fc-metric-card">
-            <p class="fc-metric-label">Total USD 💵</p>
-            <p class="fc-metric-value">{_fmt_compact_money(tot_usd, "USD")}</p>
-            <p class="fc-metric-help">Valor exacto: U$S {tot_usd:,.2f}</p>
-        </div>
-        <div class="fc-metric-card">
-            <p class="fc-metric-label">{"Facturas 📄" if col_nro else "Registros 📄"}</p>
-            <p class="fc-metric-value">{facturas if col_nro else filas_total}</p>
-        </div>
-        <div class="fc-metric-card">
-            <p class="fc-metric-label">Proveedores 🏭</p>
-            <p class="fc-metric-value">{proveedores}</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
     # ============================================================
     # SIN FILTROS (mostrar todo)
@@ -1520,7 +1544,7 @@ def render_dashboard_comparativas_moderno(df: pd.DataFrame, titulo: str = "Compa
         }
         
         .metrics-grid {
-            margin-bottom: 20px !important;  /* Espacio entre tarjetas y gráfico */
+            margin-bottom: 20px !important;  /* Espacio entre tarjetas y gr��fico */
         }
         
         /* INTERLINEADO ENTRE BOTONES Y TARJETAS */
@@ -2020,6 +2044,7 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         modo_sql = parametros.get("modo_sql", "LIKE_NORMALIZADO")
         valor = parametros.get("valor", "")
         anios = parametros.get("anios", [])
+        meses = parametros.get("meses", None)  # ✅ Agregado
         
         # ✅ Validar que tengamos datos
         if not valor or not anios:
@@ -2031,6 +2056,7 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
             modo_sql=modo_sql,
             valor=valor,
             anios=anios,
+            meses=meses,  # ✅ Agregado
             limite=5000
         )
         return df
@@ -2094,6 +2120,22 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         _dbg_set_result(df)
         return df
 
+    # ===== DASHBOARD TOP PROVEEDORES =====
+    elif tipo == "dashboard_top_proveedores":
+        anio = parametros.get("anio")
+        top_n = parametros.get("top_n", 10)
+        moneda = parametros.get("moneda", "$")
+        meses = parametros.get("meses")  # ✅ NUEVO: obtener meses
+
+        # ✅ NUEVO: pasar meses a la función SQL
+        return sqlq_compras.get_dashboard_top_proveedores(
+            anio=anio, 
+            top_n=top_n, 
+            moneda=moneda,
+            meses=meses  # ✅ NUEVO parámetro
+        )
+
+
     # ===== STOCK =====
     elif tipo == "stock_total":
         df = sqlq_compras.get_stock_total()  # Ajusta si es otro módulo
@@ -2130,7 +2172,6 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
         return df
 
     raise ValueError(f"Tipo '{tipo}' no implementado en ejecutar_consulta_por_tipo")
-
 
 # =========================
 # UI PRINCIPAL
@@ -2301,7 +2342,6 @@ def Compras_IA():
     .single-provider-icon {
         width: 40px !important;  /* Más pequeño */
         height: 40px !important;
-        font-size: 1.3rem !important;
     }
     
     .single-provider-name {
@@ -2480,6 +2520,23 @@ def Compras_IA():
 
         elif tipo == "conocimiento":
             respuesta_content = responder_con_openai(pregunta, tipo="conocimiento")
+
+        elif tipo == "saludo":
+            nombre = st.session_state.get("nombre", "👋")
+            st.markdown(f"""
+Hola **{nombre}** 👋  
+
+¿En qué puedo ayudarte hoy?
+
+Puedo ayudarte con:
+• 🛒 **Compras**
+• 📦 **Stock**
+• 📊 **Comparativas**
+• 🧪 **Artículos**
+
+Escribí lo que necesites 👇
+""")
+            return
 
         elif tipo == "no_entendido":
             respuesta_content = "🤔 No entendí bien tu pregunta."
@@ -2770,3 +2827,7 @@ def Compras_IA():
                 st_autorefresh(interval=5000, key="fc_keepalive")
             except Exception:
                 pass
+
+# Ejecutar la función principal si se ejecuta directamente
+if __name__ == "__main__":
+    Compras_IA()  
