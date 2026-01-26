@@ -12,12 +12,6 @@ import sql_comparativas as sqlq_comparativas
 import sql_facturas as sqlq_facturas
 from sql_core import get_unique_proveedores, get_unique_articulos, ejecutar_consulta
 
-try:
-    from debug_panel import DebugPanel
-    HAS_DEBUG = True
-except:
-    HAS_DEBUG = False
-
 # Agregado: Mapeo de meses para display amigable
 month_names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 month_num = {name: f"{i+1:02d}" for i, name in enumerate(month_names)}
@@ -256,37 +250,16 @@ def convertir_mes_a_nombre(mes_str):
 
 
 # =========================
-# DEBUG HELPERS
+# DEBUG HELPERS (NO-OP PARA PRODUCCIÓN)
 # =========================
 def _dbg_set_interpretacion(obj: dict):
-    try:
-        st.session_state["DBG_INT_LAST"] = obj or {}
-    except Exception:
-        pass
-
+    pass
 
 def _dbg_set_sql(tag: Optional[str], query: str, params, df: Optional[pd.DataFrame] = None):
-    try:
-        st.session_state["DBG_SQL_LAST_TAG"] = tag
-        st.session_state["DBG_SQL_LAST_QUERY"] = query or ""
-        st.session_state["DBG_SQL_LAST_PARAMS"] = params if params is not None else []
-        if isinstance(df, pd.DataFrame):
-            st.session_state["DBG_SQL_ROWS"] = int(len(df))
-            st.session_state["DBG_SQL_COLS"] = list(df.columns)
-        else:
-            st.session_state["DBG_SQL_ROWS"] = None
-            st.session_state["DBG_SQL_COLS"] = []
-    except Exception:
-        pass
-
+    pass
 
 def _dbg_set_result(df: Optional[pd.DataFrame]):
-    try:
-        if isinstance(df, pd.DataFrame):
-            st.session_state["DBG_SQL_ROWS"] = int(len(df))
-            st.session_state["DBG_SQL_COLS"] = list(df.columns)
-    except Exception:
-        pass
+    pass
 
 
 # =========================
@@ -2189,16 +2162,13 @@ def ejecutar_consulta_por_tipo(tipo: str, parametros: dict):
 def Compras_IA(modo="compras"):
     
     # ========================================
-    # INICIALIZAR DEBUG PANEL EN SESSION STATE
+    # FAKE DEBUG (PRODUCCIÓN - NO HACER NADA)
     # ========================================
     if "debug" not in st.session_state:
-        if HAS_DEBUG:
-            st.session_state["debug"] = DebugPanel()
-        else:
-            class FakeDebug:
-                def log(self, *args, **kwargs): pass
-                def render(self): pass
-            st.session_state["debug"] = FakeDebug()
+        class FakeDebug:
+            def log(self, *args, **kwargs): pass
+            def render(self): pass
+        st.session_state["debug"] = FakeDebug()
     
     # Acceso rápido
     debug = st.session_state["debug"]
@@ -2415,15 +2385,14 @@ def Compras_IA(modo="compras"):
     # TABS PRINCIPALES (según modo)
     # =========================
     tab_chat = None
-    tab_debug = None
     tab_buscador = None
     tab_comparativas = None
 
     if modo == "comparar":
         tab_comparativas, = st.tabs(["Comparativas"])
     else:
-        tab_chat, tab_debug, tab_buscador = st.tabs(
-            ["Compras", "Debug", "Buscador Fácil"]
+        tab_chat, tab_buscador = st.tabs(
+            ["Compras", "Buscador Fácil"]
         )
 
     # =========================
@@ -2840,16 +2809,6 @@ Escribí lo que necesites 👇
                     df_guardado,
                     titulo=titulo_guardado
                 )
-    # =========================
-    # TAB DEBUG (solo modo compras)
-    # =========================
-    if tab_debug is not None:
-        with tab_debug:
-            if HAS_DEBUG:
-                debug.render()
-            else:
-                st.info("🔬 Debug panel no disponible. Instala debug_panel.py")
-                
     # =========================
     # TAB BUSCADOR FÁCIL (solo modo compras)
     # =========================
