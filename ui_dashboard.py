@@ -7,12 +7,15 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from imports_globales import *
 
 from config import DEBUG_MODE, POWERBI_URL
 from utils_format import _fmt_num_latam, _safe_float
-from sql_compras import (
+from sql_core import (
     ejecutar_consulta,
     _sql_total_num_expr_general,
+)
+from sql_compras import (
     get_dashboard_totales,
     get_dashboard_compras_por_mes,
     get_dashboard_top_proveedores,
@@ -34,7 +37,7 @@ def mostrar_dashboard():
     anio_actual = datetime.now().year
     col_filtro, col_espacio = st.columns([1, 3])
     with col_filtro:
-        anio = st.selectbox("Año:", [anio_actual, anio_actual - 1, anio_actual - 2], index=0)
+        anio = st.selectbox("Año:", [2025, 2024, 2023], index=0)
 
     st.markdown("---")
 
@@ -199,13 +202,53 @@ def mostrar_dashboard():
         # ✅ CHANGED: Alertas combinadas (stock = 1 + vencimientos <30 días con stock > 0)
         try:
             alertas = get_alertas_combinadas(5, dias_filtro=30)
-            if alertas:
+            if alertas and len(alertas) > 0:
                 st.markdown("**⚠️ Alertas (stock=1 o vence <30 días):**")
-                for alerta in alertas[:3]:
+                
+                alertas_validas = []
+                for alerta in alertas:
+                    # ✅ FIX: Buscar columnas ignorando mayúsculas/minúsculas
+                    def get_valor(diccionario, *keys):
+                        """Busca una clave ignorando mayúsculas y valida que no sea nan"""
+                        for key in keys:
+                            # Buscar la clave exacta
+                            if key in diccionario:
+                                val = diccionario[key]
+                                # Validar que no sea nan/None
+                                if val is not None and val != '' and str(val).lower() != 'nan' and pd.notna(val):
+                                    return val
+                            # Buscar ignorando mayúsculas
+                            for k, v in diccionario.items():
+                                if k.lower() == key.lower():
+                                    # Validar que no sea nan/None
+                                    if v is not None and v != '' and str(v).lower() != 'nan' and pd.notna(v):
+                                        return v
+                        return None
+                    
+                    # Solo agregar alertas con artículo válido
+                    articulo = get_valor(alerta, 'articulo', 'ARTICULO', 'Articulo')
+                    if articulo:
+                        alertas_validas.append(alerta)
+                
+                # Mostrar solo las 3 primeras alertas válidas
+                for alerta in alertas_validas[:3]:
+                    def get_valor(diccionario, *keys):
+                        """Busca una clave ignorando mayúsculas y valida que no sea nan"""
+                        for key in keys:
+                            if key in diccionario:
+                                val = diccionario[key]
+                                if val is not None and val != '' and str(val).lower() != 'nan' and pd.notna(val):
+                                    return val
+                            for k, v in diccionario.items():
+                                if k.lower() == key.lower():
+                                    if v is not None and v != '' and str(v).lower() != 'nan' and pd.notna(v):
+                                        return v
+                        return None
+                    
                     # Procesar días restantes
-                    dias = alerta.get('dias_restantes', alerta.get('Dias_Para_Vencer', None))
+                    dias = get_valor(alerta, 'dias_restantes', 'Dias_Para_Vencer', 'dias_para_vencer')
                     try:
-                        dias = int(dias) if dias is not None else 999999
+                        dias = int(float(dias)) if dias is not None else 999999
                     except:
                         dias = 999999
 
@@ -217,20 +260,26 @@ def mostrar_dashboard():
                     else:
                         color = "🟡"
 
-                    # Mostrar artículo, lote, stock
-                    articulo = str(alerta.get('articulo', alerta.get('ARTICULO', '')))[:30]
-                    lote = str(alerta.get('lote', alerta.get('LOTE', 'Sin lote')))
-                    stock = str(alerta.get('stock', alerta.get('STOCK', '0')))
-                    venc = str(alerta.get('vencimiento', alerta.get('VENCIMIENTO', 'Sin fecha')))
+                    # Obtener valores
+                    articulo = str(get_valor(alerta, 'articulo', 'ARTICULO', 'Articulo') or 'Sin nombre')[:40]
+                    lote = str(get_valor(alerta, 'lote', 'LOTE', 'Lote') or 'Sin lote')
+                    stock_val = get_valor(alerta, 'stock', 'STOCK', 'Stock')
+                    stock = str(int(float(stock_val))) if stock_val else '0'
+                    venc = str(get_valor(alerta, 'vencimiento', 'VENCIMIENTO', 'Vencimiento') or 'Sin fecha')
 
                     if dias < 999999:  # Es vencimiento
-                        st.markdown(f"{color} **{articulo}** (Lote: {lote}) - Vence: {venc} ({dias} días) - Stock: {stock}")
+                        st.markdown(f"{color} **{articulo}** (Lote: {lote}) - Stock: {stock} (bajo) - Vence: {venc} ({dias}d)")
                     else:  # Stock = 1
                         st.markdown(f"🟡 **{articulo}** (Lote: {lote}) - Stock: {stock} (bajo)")
+                
+                if len(alertas_validas) == 0:
+                    st.success("✅ No hay alertas activas")
             else:
                 st.success("✅ No hay alertas activas")
         except Exception as e:
             st.error(f"Error cargando alertas: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
         st.markdown("---")
 
@@ -239,12 +288,21 @@ def mostrar_dashboard():
             st.markdown("**🛒 Últimos artículos comprados:**")
             df_ultimas = get_dashboard_ultimas_compras(anio, 10)
             if df_ultimas is not None and not df_ultimas.empty:
-                st.dataframe(df_ultimas[['articulo', 'proveedor', 'fecha', 'total']].head(10), use_container_width=True)
-                for _, row in df_ultimas.iterrows():
-                    total_fmt = f"${row['total']:,.0f}".replace(',', '.') if pd.notna(row['total']) else "$0"
-                    articulo = str(row['articulo'])[:25] + "..." if len(str(row['articulo'])) > 25 else str(row['articulo'])
-                    proveedor = str(row['proveedor'])[:15] if pd.notna(row['proveedor']) else ""
-                    st.markdown(f"• {row['fecha']} - **{articulo}** - {proveedor} - {total_fmt}")
+                # ✅ FIX: Normalizar nombres de columnas a minúsculas
+                df_ultimas_display = df_ultimas.copy()
+                df_ultimas_display.columns = df_ultimas_display.columns.str.lower()
+                
+                # Seleccionar columnas que existan
+                columnas_mostrar = []
+                for col in ['articulo', 'proveedor', 'fecha', 'total']:
+                    if col in df_ultimas_display.columns:
+                        columnas_mostrar.append(col)
+                
+                if columnas_mostrar:
+                    st.dataframe(df_ultimas_display[columnas_mostrar].head(10), use_container_width=True)
+                else:
+                    # Mostrar todas las columnas si no encontramos las esperadas
+                    st.dataframe(df_ultimas_display.head(10), use_container_width=True)
             else:
                 st.info("No hay compras recientes")
         except Exception as e:
@@ -397,21 +455,39 @@ def _get_top_proveedores_anio(anio: int, top_n: int = 20) -> pd.DataFrame:
 # =========================
 def mostrar_resumen_compras_rotativo():
     """
-    Resumen rotativo que se detiene cuando hay una comparativa activa.
+    Resumen rotativo que se detiene cuando hay una comparativa activa o usuario está escribiendo.
     """
-    # ✅ NUEVO: Solo auto-refresh si NO hay comparativa activa
+    # ✅ Solo auto-refresh si NO hay comparativa activa
     if "comparativa_activa" not in st.session_state:
         st.session_state.comparativa_activa = False
     
+    # ✅ Detectar si el usuario está escribiendo en un text_input
+    usuario_escribiendo = False
+    
+    # Lista de keys que típicamente son text_input donde el usuario escribe
+    text_input_keys = [
+        'chat_input', 'buscar_text', 'filtro_texto', 'search_query',
+        'nro_factura', 'input_articulo', 'input_proveedor'
+    ]
+    
+    for key in text_input_keys:
+        if key in st.session_state:
+            value = st.session_state[key]
+            # Solo si es string y tiene contenido
+            if isinstance(value, str) and len(value.strip()) > 0:
+                usuario_escribiendo = True
+                break
+    
     tick = 0
     
-    # Solo hacer auto-refresh si NO hay comparativa mostrándose
-    if not st.session_state.comparativa_activa:
-        try:
-            from streamlit_autorefresh import st_autorefresh
-            tick = st_autorefresh(interval=5000, key="__rotar_proveedor_5s__") or 0
-        except Exception:
-            tick = 0
+    # Solo hacer auto-refresh si NO hay comparativa Y NO está escribiendo
+    # # Auto-refresh desactivado temporalmente
+# if not st.session_state.comparativa_activa and not usuario_escribiendo:
+#     try:
+#         from streamlit_autorefresh import st_autorefresh
+#         tick = st_autorefresh(interval=5000, key="__rotar_proveedor_5s__") or 0
+#     except Exception:
+#         tick = 0
     
     # Usar 2025 ya que 2026 no tiene datos todavía
     anio = 2025
