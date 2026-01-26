@@ -2391,7 +2391,7 @@ def Compras_IA():
     art_options = get_unique_articulos()  # ✅ CAMBIO: TODOS LOS ARTÍCULOS (sin [:100])
 
     # TABS PRINCIPALES: Chat IA + Comparativas
-    tab_chat, tab_comparativas = st.tabs(["💬Compras", " Comparativas"])
+    tab_chat, tab_comparativas = st.tabs(["💬 Compras", "🔄 Comparativas"])
 
     with tab_chat:
         # BOTÓN LIMPIAR (solo en chat)
@@ -2610,7 +2610,7 @@ Escribí lo que necesites 👇
         st.markdown("Selecciona opciones y compara proveedores/meses/años directamente (sin chat).")
 
         # Agregado: Submenús Compras y Comparativas
-        tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=0, key="tipo_consulta")
+        tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=1, key="tipo_consulta")
 
         if tipo_consulta == "Compras":
             st.markdown("#### 🛒 Consultas de Compras")
@@ -2830,4 +2830,4 @@ Escribí lo que necesites 👇
 
 # Ejecutar la función principal si se ejecuta directamente
 if __name__ == "__main__":
-    Compras_IA()  
+    Compras_IA()
