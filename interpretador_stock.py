@@ -179,3 +179,4 @@ def determinar_tipo_consulta(pregunta: str, params: Dict) -> str:
     
     # 9. FALLBACK
     return 'no_entendido'
+
