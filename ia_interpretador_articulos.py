@@ -2,6 +2,32 @@ import re
 from typing import Dict, List, Any
 
 # =====================================================================
+# ARTÍCULOS EXCLUIDOS (para filtrar términos no deseados del catálogo)
+# =====================================================================
+ARTICULOS_EXCLUIDOS = [
+    "IVA",
+    "IMPUESTO",
+    "IMPUESTOS",
+    "RETENCION",
+    "RETENCIONES",
+    "PERCEPCION",
+    "PERCEPCIONES",
+    "ESTADO",
+    "DGI",
+    "BPS",
+]
+
+# =====================================================================
+# MESES MAP (para normalizar nombres a YYYY-MM)
+# =====================================================================
+MESES_MAP = {
+    "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+    "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+    "septiembre": "09", "setiembre": "09", "octubre": "10",
+    "noviembre": "11", "diciembre": "12",
+}
+
+# =====================================================================
 # ALIASES DE ARTÍCULOS (MÍNIMO PARA FUNCIONAR)
 # =====================================================================
 ARTICULO_ALIASES = {
@@ -51,13 +77,27 @@ def _extraer_meses(texto: str) -> List[str]:
     out.extend(meses_yyyymm)
     return list(set(out))
 
+def normalizar_meses(meses: List[str], anios: List[int]) -> List[str]:
+    """
+    Convierte ['noviembre'] + [2025] → ['2025-11']
+    """
+    if not meses or not anios:
+        return []
+    meses_norm = []
+    for anio in anios:
+        for mes in meses:
+            m = MESES_MAP.get(mes.lower())
+            if m:
+                meses_norm.append(f"{anio}-{m}")
+    return list(set(meses_norm))  # Eliminar duplicados
+
 def detectar_articulo(tokens, catalogo_articulos):
     for token in tokens:
         t = token.strip().lower()
         if len(t) < 4:
             continue
         for art in catalogo_articulos:
-            if art and t in art.lower():  # ✅ Agregado check if art para evitar 'NoneType' object has no attribute 'lower'
+            if art and art.upper() not in ARTICULOS_EXCLUIDOS and t in art.lower():  # ✅ Agregado filtro de exclusión
                 return art
     return None
 
@@ -104,26 +144,31 @@ def interpretar_articulo(texto: str, anios: List[int] = None, meses: List[str] =
 
             print(f"  Alias encontrado: '{t}' -> {config} | Modo SQL: {modo_sql}")
 
+            # ✅ NORMALIZAR MESES ANTES DE RETORNAR
+            meses_norm = normalizar_meses(meses, anios) if meses else None
+
             if anios:
                 return {
                     "tipo": "compras_articulo_anio",
                     "parametros": {
                         "modo_sql": modo_sql,
                         "valor": valor,
-                        "anios": anios
+                        "anios": anios,
+                        "meses": meses_norm  # ✅ Normalizado
                     },
-                    "debug": f"alias '{t}' ({tipo}) + años {anios} | modo: {modo_sql}"
+                    "debug": f"alias '{t}' ({tipo}) + años {anios} + meses {meses_norm} | modo: {modo_sql}"
                 }
 
-            if meses:
+            if meses_norm:
                 return {
-                    "tipo": "compras_articulo_mes",
+                    "tipo": "compras_articulo_anio",  # ✅ Cambiado a anio para usar la misma función SQL
                     "parametros": {
                         "modo_sql": modo_sql,
                         "valor": valor,
-                        "meses": meses
+                        "anios": anios if anios else [2025],  # Default si no hay años
+                        "meses": meses_norm
                     },
-                    "debug": f"alias '{t}' ({tipo}) + meses {meses} | modo: {modo_sql}"
+                    "debug": f"alias '{t}' ({tipo}) + meses {meses_norm} | modo: {modo_sql}"
                 }
 
             return {
@@ -152,26 +197,31 @@ def interpretar_articulo(texto: str, anios: List[int] = None, meses: List[str] =
             # Para artículos de BD, usar LIKE_NORMALIZADO (búsqueda exacta)
             modo_sql = "LIKE_NORMALIZADO"
 
+            # ✅ NORMALIZAR MESES ANTES DE RETORNAR
+            meses_norm = normalizar_meses(meses, anios) if meses else None
+
             if anios:
                 return {
                     "tipo": "compras_articulo_anio",
                     "parametros": {
                         "modo_sql": modo_sql,
                         "valor": articulo,
-                        "anios": anios
+                        "anios": anios,
+                        "meses": meses_norm  # ✅ Normalizado
                     },
-                    "debug": f"BD '{articulo}' + años {anios} | modo: {modo_sql}"
+                    "debug": f"BD '{articulo}' + años {anios} + meses {meses_norm} | modo: {modo_sql}"
                 }
 
-            if meses:
+            if meses_norm:
                 return {
-                    "tipo": "compras_articulo_mes",
+                    "tipo": "compras_articulo_anio",  # ✅ Cambiado a anio
                     "parametros": {
                         "modo_sql": modo_sql,
                         "valor": articulo,
-                        "meses": meses
+                        "anios": anios if anios else [2025],
+                        "meses": meses_norm
                     },
-                    "debug": f"BD '{articulo}' + meses {meses} | modo: {modo_sql}"
+                    "debug": f"BD '{articulo}' + meses {meses_norm} | modo: {modo_sql}"
                 }
 
             return {
