@@ -206,12 +206,18 @@ def get_compras_multiples(
         if mes_clauses:
             where_parts.append("(" + " OR ".join(mes_clauses) + ")")
 
+    # ✅ FIX: Filtro por años
+    if anios:
+        anios_str = ', '.join(str(int(a)) for a in anios)
+        where_parts.append(f'"Año"::int IN ({anios_str})')
+
     sql = f"""
         SELECT
             TRIM("Cliente / Proveedor") AS Proveedor,
             TRIM("Articulo") AS Articulo,
             TRIM("Nro. Comprobante") AS Nro_Factura,
             "Fecha",
+            "Año",
             "Cantidad",
             "Moneda",
             TRIM("Monto Neto") AS Total
@@ -587,30 +593,47 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
             TRIM("Nro. Comprobante") AS nro_factura,
             TRIM("Cliente / Proveedor") AS Proveedor,
             TRIM("Articulo") AS Articulo,
+            "Fecha",
             "Cantidad",
             "Moneda",
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE TRIM("Nro. Comprobante") = %s
           AND TRIM("Nro. Comprobante") <> 'A0000000'
-          AND ("Tipo Comprobante" = 'Compra Contado' OR "Tipo Comprobante" LIKE 'Compra%%')
+          AND (
+            "Tipo Comprobante" ILIKE '%Compra%'
+            OR "Tipo Comprobante" ILIKE '%Factura%'
+          )
         ORDER BY TRIM("Articulo")
     """
 
     variantes = _factura_variantes(nro_factura)
+    
+    # DEBUG: Imprimir variantes generadas
+    print(f"🔍 DEBUG FACTURA: Buscando '{nro_factura}'")
+    print(f"🔍 Variantes generadas: {variantes}")
+    
     if not variantes:
+        print("❌ No se generaron variantes")
         return ejecutar_consulta(sql, ("",))
 
+    # Probar primera variante
+    print(f"🔍 Probando variante 1: '{variantes[0]}'")
     df = ejecutar_consulta(sql, (variantes[0],))
     if df is not None and not df.empty:
+        print(f"✅ Encontrada con '{variantes[0]}' ({len(df)} líneas)")
         return df
 
-    for alt in variantes[1:]:
+    # Probar variantes alternativas
+    for i, alt in enumerate(variantes[1:], 2):
+        print(f"🔍 Probando variante {i}: '{alt}'")
         df2 = ejecutar_consulta(sql, (alt,))
         if df2 is not None and not df2.empty:
+            print(f"✅ Encontrada con '{alt}' ({len(df2)} líneas)")
             df2.attrs["nro_factura_fallback"] = alt
             return df2
 
+    print(f"❌ No encontrada con ninguna variante de {variantes}")
     return df if df is not None else pd.DataFrame()
 
 
@@ -1186,6 +1209,7 @@ def get_compras_por_mes_excel(
     return get_compras_multiples(
         proveedores=proveedores,
         meses=meses,
+        anios=[anio],  # ✅ FIX: Pasar año como lista
         limite=limite
     )
 
