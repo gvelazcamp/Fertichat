@@ -2618,12 +2618,11 @@ Escribí lo que necesites 👇
         st.rerun()
 
     with tab_comparativas:
-        try:
-            st.markdown("### Menú Comparativas Fáciles")
-            st.markdown("Selecciona opciones y compara proveedores/meses/años directamente (sin chat).")
+        st.markdown("### Menú Comparativas Fáciles")
+        st.markdown("Selecciona opciones y compara proveedores/meses/años directamente (sin chat).")
 
-            # Agregado: Submenús Compras y Comparativas
-            tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=1, key="tipo_consulta")
+        # Agregado: Submenús Compras y Comparativas
+        tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=1, key="tipo_consulta_comparativas_tab")
 
         if tipo_consulta == "Compras":
             st.markdown("#### 🛒 Consultas de Compras")
@@ -2832,11 +2831,6 @@ Escribí lo que necesites 👇
                     df_guardado,
                     titulo=titulo_guardado
                 )
-        
-        except Exception as e:
-            st.error(f"❌ Error en tab Comparativas: {e}")
-            import traceback
-            st.code(traceback.format_exc())
 
         # ✅ AUTOREFRESH CONDICIONAL: SOLO SI NO ESTÁ PAUSADO
         if not st.session_state.get("pause_autorefresh", False):
