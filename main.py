@@ -9,6 +9,7 @@ st.set_page_config(
 
 from ui_css import CSS_GLOBAL
 from login_page import require_auth, get_current_user, logout
+from imports_globales import *
 
 from config import MENU_OPTIONS, DEBUG_MODE
 from auth import init_db
@@ -33,18 +34,36 @@ from comprobantes import mostrar_menu_comprobantes
 from ui_chat_chainlit import mostrar_chat_chainlit
 from sql_core import ejecutar_consulta
 
-# NUEVOS IMPORTS PARA SOPORTE DE COMPRAS
-from ia_interpretador import interpretar_pregunta
-import ia_interpretador
+from ia_router import interpretar_pregunta
 
-print(">>> IA INTERPRETADOR USADO:", ia_interpretador.__file__)
+print(">>> 🚀 USANDO IA_ROUTER: ia_router.interpretar_pregunta")
 
-from sql_facturas import get_facturas_proveedor as get_facturas_proveedor_detalle
+from sql_facturas import (
+    get_facturas_proveedor as get_facturas_proveedor_detalle,
+    get_detalle_factura_por_numero,
+    buscar_facturas_similares,
+)
 from sql_compras import (
     get_compras_proveedor_anio,
     get_detalle_compras_proveedor_mes,
     get_compras_multiples,
     get_compras_anio,
+    get_top_proveedores_por_anios,
+)
+from utils_format import formatear_dataframe
+from utils_openai import responder_con_openai
+
+from sql_facturas import (
+    get_facturas_proveedor as get_facturas_proveedor_detalle,
+    get_detalle_factura_por_numero,
+    buscar_facturas_similares,
+)
+from sql_compras import (
+    get_compras_proveedor_anio,
+    get_detalle_compras_proveedor_mes,
+    get_compras_multiples,
+    get_compras_anio,
+    get_top_proveedores_por_anios,  # 🔥 AGREGADO: Función para top proveedores por año
 )
 from utils_format import formatear_dataframe
 from utils_openai import responder_con_openai
@@ -226,15 +245,49 @@ def ejecutar_consulta_por_tipo(tipo: str, params: dict, pregunta_original: str):
 
         elif tipo == "compras_anio":
             anio = params.get("anio", 2025)
-            limite = params.get("limite", 5000)
+            limite = params.get("limite", 10)
 
-            df = get_compras_anio(anio, limite)
+            # =========================
+            # DEBUG – INTERPRETACIÓN
+            # =========================
+            st.session_state["DBG_INT_LAST"] = {
+                "tipo": tipo,
+                "parametros": params,
+                "pregunta": pregunta_original,
+            }
+
+            # =========================
+            # DEBUG – ROUTER
+            # =========================
+            st.session_state["DBG_ROUTER_LAST"] = {
+                "tipo": tipo,
+                "parametros": params,
+            }
+
+            # =========================
+            # EJECUCIÓN SQL
+            # =========================
+            df = get_top_proveedores_por_anios(anios=[anio], limite=limite)
+
+            # =========================
+            # DEBUG – SQL
+            # =========================
+            st.session_state["DBG_SQL_LAST_TAG"] = "sql_compras.get_top_proveedores_por_anios"
+            st.session_state["DBG_SQL_PARAMS"] = {"anios": [anio], "limite": limite}
 
             if df is None or df.empty:
+                st.session_state["DBG_SQL_ROWS"] = 0
+                st.session_state["DBG_SQL_COLS"] = []
                 return f"⚠️ No se encontraron compras en {anio}.", None, None
 
+            st.session_state["DBG_SQL_ROWS"] = len(df)
+            st.session_state["DBG_SQL_COLS"] = list(df.columns)
+
+            total_general = df["Total"].sum() if "Total" in df.columns else 0
+
             return (
-                f"🛒 Todas las compras en {anio} ({len(df)} registros):",
+                f"📊 **Top {len(df)} Proveedores - Compras {anio}**\n\n"
+                f"💰 Total: ${total_general:,.2f}",
                 formatear_dataframe(df),
                 None,
             )
@@ -250,7 +303,7 @@ def ejecutar_consulta_por_tipo(tipo: str, params: dict, pregunta_original: str):
             moneda = params.get("moneda", "$")
 
             if not anio:
-                return "❌ Indicá el año. Ej: top proveedores 2025", None, None
+                return "❌ Indic�� el año. Ej: top proveedores 2025", None, None
 
             df = get_dashboard_top_proveedores(anio=anio, top_n=top_n, moneda=moneda)
 
@@ -260,6 +313,55 @@ def ejecutar_consulta_por_tipo(tipo: str, params: dict, pregunta_original: str):
             moneda_label = "USD" if moneda == "U$S" else "pesos"
             return (
                 f"🏭 Top {top_n} proveedores {anio} en {moneda_label}:",
+                formatear_dataframe(df),
+                None,
+            )
+
+        # =========================================================
+        # DETALLE DE FACTURA POR NÚMERO
+        # =========================================================
+        elif tipo == "detalle_factura_numero":
+            nro_factura = params.get("nro_factura", "").strip()
+            
+            if not nro_factura:
+                return "❌ Indicá el número de factura. Ej: detalle factura 60907", None, None
+            
+            df = get_detalle_factura_por_numero(nro_factura)
+            
+            # Si no se encuentra la factura, buscar similares
+            if df is None or df.empty:
+                print(f"⚠️ No se encontró factura exacta, buscando similares a '{nro_factura}'...")
+                similares = buscar_facturas_similares(nro_factura, limite=20)
+                
+                if similares is not None and not similares.empty:
+                    mensaje = f"⚠️ No se encontró la factura **{nro_factura}** exactamente.\n\n"
+                    mensaje += f"📋 Encontré **{len(similares)}** factura(s) similar(es):\n"
+                    return (
+                        mensaje,
+                        formatear_dataframe(similares),
+                        None,
+                    )
+                else:
+                    return f"❌ No se encontró la factura {nro_factura} ni facturas similares.", None, None
+            
+            # Obtener info del encabezado
+            proveedor = df["Proveedor"].iloc[0] if "Proveedor" in df.columns else "N/A"
+            fecha = df["Fecha"].iloc[0] if "Fecha" in df.columns else "N/A"
+            moneda = df["Moneda"].iloc[0] if "Moneda" in df.columns else ""
+            nro_factura_encontrado = df["nro_factura"].iloc[0] if "nro_factura" in df.columns else nro_factura
+            
+            # Calcular totales
+            total_lineas = len(df)
+            total_monto = df["Total"].sum() if "Total" in df.columns else 0
+            
+            mensaje = f"📄 **Factura {nro_factura_encontrado}**\n"
+            mensaje += f"🏢 Proveedor: **{proveedor}**\n"
+            mensaje += f"📅 Fecha: {fecha}\n"
+            mensaje += f"💰 Total: {moneda} {total_monto:,.2f}\n"
+            mensaje += f"📦 {total_lineas} artículo(s)\n"
+            
+            return (
+                mensaje,
                 formatear_dataframe(df),
                 None,
             )
@@ -377,11 +479,6 @@ section[data-testid="stMain"] {
     animation: none !important;
 }
 
-/* Ocultar loader superior */
-div[data-testid="stDecoration"] {
-    display: none !important;
-}
-
 /* Quitar shimmer / placeholders */
 [data-testid="stSkeleton"] {
     display: none !important;
@@ -427,24 +524,25 @@ main_container = st.container()
 init_db()
 user = get_current_user() or {}
 
-# Grupos del menú - CAMBIADO A "Sugerencia de pedidos"
+# Grupos del menú - SIN EMOJIS
 groups = {
-    "PRINCIPAL": ["🏠 Inicio", "🛒 Compras IA", "🔎 Buscador IA", "📦 Stock IA"],
-    "GESTIÓN": ["📄 Pedidos internos", "🧾 Baja de stock", "📦 Órdenes de compra", "📥 Ingreso de comprobantes", "Sugerencia de pedidos"],  # ← CAMBIADO
-    "CATÁLOGO": ["📚 Artículos", "🧩 Familias", "🏬 Depósitos", "📑 Comprobantes"],
-    "ANÁLISIS": ["📊 Dashboard", "📈 Indicadores (Power BI)"],
+    "PRINCIPAL": ["Inicio"],
+    "CONSULTAS": ["Compras", "Comparar", "Stock IA", "Buscador IA"],
+    "GESTIÓN": ["Pedidos internos", "Baja de stock", "Órdenes de compra", "Ingreso de comprobantes", "Sugerencia de pedidos"],
+    "CATÁLOGO": ["Artículos", "Familias", "Depósitos", "Comprobantes"],
+    "ANÁLISIS": ["Dashboard"],
 }
 
 # Inicializar página
 if "pagina" not in st.session_state:
-    st.session_state.pagina = "🏠 Inicio"
+    st.session_state.pagina = "Inicio"
 
 # Inicializar radios
 for group in groups:
     key = f"radio_{group.lower()}"
     if key not in st.session_state:
         if group == "PRINCIPAL":
-            st.session_state[key] = "🏠 Inicio"
+            st.session_state[key] = "Inicio"
         else:
             st.session_state[key] = None
 
@@ -455,7 +553,7 @@ st.session_state["ORQUESTADOR_CARGADO"] = True
 st.markdown(f"<style>{CSS_GLOBAL}</style>", unsafe_allow_html=True)
 
 # =========================
-# INICIALIZAR DETECCIÓN DE DISPOSITIVO
+# INICIALIZACIÓN
 # =========================
 inicializar_deteccion_dispositivo()
 
@@ -555,8 +653,8 @@ def _clear_qp():
 _go = _get_qp_first("go")
 if _go == "compras":
     with st.spinner("⏳ Cargando Compras..."):
-        st.session_state["radio_principal"] = "🛒 Compras IA"
-        st.session_state.pagina = "🛒 Compras IA"
+        st.session_state["radio_principal"] = "Compras IA"
+        st.session_state.pagina = "Compras IA"
         for g in groups:
             if g != "PRINCIPAL":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -565,8 +663,8 @@ if _go == "compras":
 
 elif _go == "buscador":
     with st.spinner("🔍 Cargando Buscador..."):
-        st.session_state["radio_principal"] = "🔎 Buscador IA"
-        st.session_state.pagina = "🔎 Buscador IA"
+        st.session_state["radio_principal"] = "Buscador IA"
+        st.session_state.pagina = "Buscador IA"
         for g in groups:
             if g != "PRINCIPAL":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -575,8 +673,8 @@ elif _go == "buscador":
 
 elif _go == "stock":
     with st.spinner("📦 Cargando Stock..."):
-        st.session_state["radio_principal"] = "📦 Stock IA"
-        st.session_state.pagina = "📦 Stock IA"
+        st.session_state["radio_principal"] = "Stock IA"
+        st.session_state.pagina = "Stock IA"
         for g in groups:
             if g != "PRINCIPAL":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -585,8 +683,8 @@ elif _go == "stock":
 
 elif _go == "dashboard":
     with st.spinner("📊 Cargando Dashboard..."):
-        st.session_state["radio_analisis"] = "📊 Dashboard"
-        st.session_state.pagina = "📊 Dashboard"
+        st.session_state["radio_analisis"] = "Dashboard"
+        st.session_state.pagina = "Dashboard"
         for g in groups:
             if g != "ANÁLISIS":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -595,8 +693,8 @@ elif _go == "dashboard":
 
 elif _go == "pedidos":
     with st.spinner("📄 Cargando Pedidos..."):
-        st.session_state["radio_gestion"] = "📄 Pedidos internos"
-        st.session_state.pagina = "📄 Pedidos internos"
+        st.session_state["radio_gestion"] = "Pedidos internos"
+        st.session_state.pagina = "Pedidos internos"
         for g in groups:
             if g != "GESTIÓN":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -605,8 +703,8 @@ elif _go == "pedidos":
 
 elif _go == "baja":
     with st.spinner("🧾 Cargando Baja de Stock..."):
-        st.session_state["radio_gestion"] = "🧾 Baja de stock"
-        st.session_state.pagina = "🧾 Baja de stock"
+        st.session_state["radio_gestion"] = "Baja de stock"
+        st.session_state.pagina = "Baja de stock"
         for g in groups:
             if g != "GESTIÓN":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -615,8 +713,8 @@ elif _go == "baja":
 
 elif _go == "ordenes":
     with st.spinner("📦 Cargando Órdenes..."):
-        st.session_state["radio_gestion"] = "📦 Órdenes de compra"
-        st.session_state.pagina = "📦 Órdenes de compra"
+        st.session_state["radio_gestion"] = "Órdenes de compra"
+        st.session_state.pagina = "Órdenes de compra"
         for g in groups:
             if g != "GESTIÓN":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -625,8 +723,8 @@ elif _go == "ordenes":
 
 elif _go == "indicadores":
     with st.spinner("📈 Cargando Indicadores..."):
-        st.session_state["radio_analisis"] = "📈 Indicadores (Power BI)"
-        st.session_state.pagina = "📈 Indicadores (Power BI)"
+        st.session_state["radio_analisis"] = "Indicadores (Power BI)"
+        st.session_state.pagina = "Indicadores (Power BI)"
         for g in groups:
             if g != "ANÁLISIS":
                 st.session_state[f"radio_{g.lower()}"] = None
@@ -637,8 +735,8 @@ elif _go == "indicadores":
 try:
     if st.query_params.get("ir_notif") == "1":
         with st.spinner("🔔 Cargando Notificaciones..."):
-            st.session_state["radio_gestion"] = "📄 Pedidos internos"
-            st.session_state.pagina = "📄 Pedidos internos"
+            st.session_state["radio_gestion"] = "Pedidos internos"
+            st.session_state.pagina = "Pedidos internos"
             for g in groups:
                 if g != "GESTIÓN":
                     st.session_state[f"radio_{g.lower()}"] = None
@@ -783,12 +881,32 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # Buscador
-    st.text_input(
+    search_term = st.text_input(
         "Buscar...",
         key="sidebar_search",
         label_visibility="collapsed",
-        placeholder="Buscar...",
+        placeholder="Buscar menú...",
     )
+    
+    # ✅ NUEVO: Filtrar grupos y opciones según búsqueda
+    if search_term and search_term.strip():
+        search_lower = search_term.strip().lower()
+        groups_filtered = {}
+        
+        for group, options in groups.items():
+            # Filtrar opciones que contengan el término de búsqueda
+            filtered_options = [opt for opt in options if search_lower in opt.lower()]
+            
+            # Solo agregar el grupo si tiene opciones que coinciden
+            if filtered_options:
+                groups_filtered[group] = filtered_options
+        
+        # Mostrar mensaje si no hay resultados
+        if not groups_filtered:
+            st.info(f"🔍 No se encontraron menús para '{search_term}'")
+    else:
+        # Sin búsqueda, mostrar todo
+        groups_filtered = groups
     
     # Info usuario
     st.markdown(f"👤 **{user.get('nombre', 'Usuario')}**")
@@ -807,26 +925,70 @@ with st.sidebar:
     
     st.markdown('<div class="fc-divider"></div>', unsafe_allow_html=True)
     
-    # Debug SQL
-    st.session_state["DEBUG_SQL"] = st.checkbox(
-        "Debug SQL", value=False, key="debug_sql"
-    )
     
-    st.markdown('<div class="fc-divider"></div>', unsafe_allow_html=True)
-    
-    # Menu agrupado
-    for group, options in groups.items():
-        st.markdown(f'<div class="fc-section-header">{group}</div>', unsafe_allow_html=True)
-        st.radio("Opciones", options, key=f"radio_{group.lower()}", label_visibility="collapsed", on_change=update_pagina, args=(group,))
-    
+    # =========================
+    # Menu agrupado (PRINCIPAL con submenú bien alineado)
+    # =========================
+    for group, options in groups_filtered.items():
+        st.markdown(
+            f'<div class="fc-section-header">{group}</div>',
+            unsafe_allow_html=True
+        )
+
+        # ===== PRINCIPAL =====
+        if group == "PRINCIPAL":
+            # Radio principal COMPLETO (incluye Compras IA)
+            st.radio(
+                "Opciones",
+                options,
+                key="radio_principal",
+                label_visibility="collapsed",
+                on_change=update_pagina,
+                args=(group,),
+            )
+
+            # Submenú SOLO si está seleccionado "Compras IA"
+            if st.session_state.get("radio_principal") == "Compras IA":
+                st.markdown(
+                    "<div style='margin-left:22px; margin-top:2px;'>",
+                    unsafe_allow_html=True
+                )
+
+                st.radio(
+                    "",
+                    ["Compras", "Comparar"],
+                    key="submenu_compras_ia",
+                    label_visibility="collapsed",
+                )
+
+                # Página real sigue siendo Compras IA (no rompemos nada)
+                st.session_state.pagina = "Compras IA"
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+        # ===== RESTO DE LOS GRUPOS =====
+        else:
+            st.radio(
+                "Opciones",
+                options,
+                key=f"radio_{group.lower()}",
+                label_visibility="collapsed",
+                on_change=update_pagina,
+                args=(group,),
+            )
+
     st.components.v1.html(r"""
     <script>
     (function() {
         const interval = setInterval(() => {
-            const labels = parent.document.querySelectorAll('section[data-testid="stSidebar"] .stRadio label p');
+            const labels = parent.document.querySelectorAll(
+                'section[data-testid="stSidebar"] .stRadio label p'
+            );
             if (labels.length > 0) {
                 labels.forEach(label => {
-                    label.textContent = label.textContent.replace(/[\u{1F000}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+                    label.textContent = label.textContent
+                        .replace(/[\u{1F000}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                        .trim();
                 });
                 clearInterval(interval);
             }
@@ -834,6 +996,7 @@ with st.sidebar:
     })();
     </script>
     """, height=0)
+
 
 # =========================
 # FUNCIÓN DEBUG SQL FACTURA (pestaña aparte)
@@ -887,20 +1050,23 @@ def mostrar_debug_sql_factura():
 # ROUTER PRINCIPAL CON CONTAINER FIJO
 # =========================
 with main_container:
-    if st.session_state.pagina == "🏠 Inicio":
+    if st.session_state.pagina == "Inicio":
         mostrar_inicio()
 
     elif "Chat (Chainlit)" in st.session_state.pagina:
         mostrar_chat_chainlit()
 
-    elif st.session_state.pagina == "🛒 Compras IA":
+    # =========================
+    # COMPRAS - OPERATIVO
+    # =========================
+    elif st.session_state.pagina == "Compras":
         mostrar_resumen_compras_rotativo()
         Compras_IA()
 
-        # Panel de debug general (última consulta)
+        # Panel de debug general (ultima consulta)
         if st.session_state.get("DEBUG_SQL", False):
-            with st.expander("🛠 Debug (última consulta)", expanded=True):
-                st.subheader("Interpretación")
+            with st.expander("Debug (ultima consulta)", expanded=True):
+                st.subheader("Interpretacion")
                 st.json(st.session_state.get("DBG_INT_LAST", {}))
                 st.subheader("SQL ejecutado")
                 st.write("Origen:", st.session_state.get("DBG_SQL_LAST_TAG"))
@@ -908,59 +1074,86 @@ with main_container:
                 st.write("Filas:", st.session_state.get("DBG_SQL_ROWS"))
                 st.write("Columnas:", st.session_state.get("DBG_SQL_COLS", []))
 
-    elif st.session_state.pagina == "🔍 Debug SQL factura":
+    # =========================
+    # COMPRAS - COMPARATIVAS
+    # =========================
+    elif st.session_state.pagina == "Comparar":
+        # Reutiliza el modulo de Compras IA
+        # Se fuerza modo comparativas para ocultar Compras y Debug
+        Compras_IA(modo="comparar")  # <-- CAMBIO CLAVE (no tocar nada mas)
+
+    # =========================
+    # DEBUG FACTURAS
+    # =========================
+    elif st.session_state.pagina == "Debug SQL factura":
         mostrar_debug_sql_factura()
 
-    elif st.session_state.pagina == "📦 Stock IA":
-        mostrar_resumen_stock_rotativo(dias_vencer=30)  # Cambiado a 30 días
+    # =========================
+    # STOCK
+    # =========================
+    elif st.session_state.pagina == "Stock IA":
+        mostrar_resumen_stock_rotativo(dias_vencer=30)
         mostrar_stock_ia()
 
-    elif st.session_state.pagina == "🔎 Buscador IA":
+    # =========================
+    # BUSCADOR
+    # =========================
+    elif st.session_state.pagina == "Buscador IA":
         mostrar_buscador_ia()
 
-    elif st.session_state.pagina == "📥 Ingreso de comprobantes":
+    # =========================
+    # INGRESO DE COMPROBANTES
+    # =========================
+    elif st.session_state.pagina == "Ingreso de comprobantes":
         mostrar_ingreso_comprobantes()
 
-    elif st.session_state.pagina == "📊 Dashboard":
+    # =========================
+    # DASHBOARD
+    # =========================
+    elif st.session_state.pagina == "Dashboard":
         mostrar_dashboard()
 
-    elif st.session_state.pagina == "📄 Pedidos internos":
+    # =========================
+    # GESTION
+    # =========================
+    elif st.session_state.pagina == "Pedidos internos":
         mostrar_pedidos_internos()
 
-    elif st.session_state.pagina == "🧾 Baja de stock":
+    elif st.session_state.pagina == "Baja de stock":
         mostrar_baja_stock()
 
-    elif st.session_state.pagina == "📈 Indicadores (Power BI)":
+    elif st.session_state.pagina == "Indicadores (Power BI)":
         mostrar_indicadores_ia()
 
-    elif st.session_state.pagina == "📦 Órdenes de compra":
+    elif st.session_state.pagina == "Órdenes de compra":
         mostrar_ordenes_compra()
 
-    elif st.session_state.pagina == "📒 Ficha de stock":
+    # =========================
+    # CATALOGO
+    # =========================
+    elif st.session_state.pagina == "Ficha de stock":
         mostrar_ficha_stock()
 
-    elif st.session_state.pagina == "📚 Artículos":
+    elif st.session_state.pagina == "Artículos":
         mostrar_articulos()
 
-    elif st.session_state.pagina == "🏬 Depósitos":
+    elif st.session_state.pagina == "Depósitos":
         mostrar_depositos()
 
-    elif st.session_state.pagina == "🧩 Familias":
+    elif st.session_state.pagina == "Familias":
         mostrar_familias()
 
-    elif st.session_state.pagina == "📑 Comprobantes":
+    elif st.session_state.pagina == "Comprobantes":
         mostrar_menu_comprobantes()
 
-    # ← CONDICIÓN PARA SUGERENCIAS - CAMBIADO A "Sugerencia de pedidos"
+    # =========================
+    # SUGERENCIAS
+    # =========================
     elif st.session_state.pagina == "Sugerencia de pedidos":
         try:
-            import sugerencias  # ← CAMBIADO
-            sugerencias.main()  # ← CAMBIADO
+            import sugerencias
+            sugerencias.main()
         except ImportError:
-            st.error("Página 'Sugerencias' no encontrada. Verifica que sugerencias.py exista en la raíz.")
+            st.error("Pagina 'Sugerencias' no encontrada. Verifica que sugerencias.py exista.")
         except Exception as e:
             st.error(f"Error al cargar sugerencias: {str(e)}")
-
-# Marca visual para saber que el orquestador está cargado
-# st.markdown("<div style='margin-top:30px;'></div>", unsafe_allow_html=True)
-# st.write("ORQUESTADOR_CARGADO = True")
