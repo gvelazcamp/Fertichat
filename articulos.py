@@ -841,3 +841,4 @@ def mostrar_articulos():
                 st.markdown("---")
                 _ui_archivos(str(sel["id"]))
 
+
