@@ -2,6 +2,8 @@
 # SQL_FACTURAS.PY - CONSULTAS DE FACTURAS
 # =========================
 
+print("🔥 sql_facturas.py CARGADO")
+
 import re
 import pandas as pd
 from typing import List, Optional, Any
@@ -19,8 +21,9 @@ from sql_core import (
 def _factura_variantes(nro_factura: str) -> List[str]:
     """
     Genera variantes de números de factura:
-    - "275015"       -> ["275015", "A00275015", "00275015"]
-    - "A00275015"    -> ["A00275015", "00275015", "275015"]
+    - "275015"       -> ["275015", "A00275015", "00275015", "A275015"]
+    - "A00275015"    -> ["A00275015", "00275015", "275015", "A275015"]
+    - "60907"        -> ["60907", "A00060907", "00060907", "A60907", "A0060907"]
     """
     s = (nro_factura or "").strip().upper()
     if not s:
@@ -29,11 +32,12 @@ def _factura_variantes(nro_factura: str) -> List[str]:
     variantes = [s]
 
     if s.isdigit():
-        # Sólo números
-        if len(s) <= 8:
-            variantes.append("A" + s.zfill(8))
+        # Sólo números - generar TODAS las variantes posibles
+        variantes.append("A" + s.zfill(8))      # A00060907
+        variantes.append(s.zfill(8))            # 00060907
+        variantes.append("A" + s)               # A60907
         if len(s) < 8:
-            variantes.append(s.zfill(8))
+            variantes.append("A00" + s)         # A0060907 (por si acaso)
     else:
         # Prefijo letras + dígitos
         i = 0
@@ -43,10 +47,11 @@ def _factura_variantes(nro_factura: str) -> List[str]:
         dig = s[i:]
 
         if dig.isdigit() and dig:
-            variantes.append(dig)
-            variantes.append(dig.lstrip("0") or dig)
+            variantes.append(dig)                   # 60907
+            variantes.append(dig.lstrip("0") or dig)  # 60907
             if pref and len(dig) < 8:
-                variantes.append(pref + dig.zfill(8))
+                variantes.append(pref + dig.zfill(8))  # A00060907
+            variantes.append(pref + dig)            # A60907
 
     out: List[str] = []
     seen = set()
@@ -98,44 +103,138 @@ def get_detalle_factura_por_numero(nro_factura: str) -> pd.DataFrame:
     """
     Devuelve el detalle de una factura (todas las líneas) dado un número,
     probando variantes del número (A + 8 dígitos, etc.).
+    
+    ESTRATEGIA:
+    1. Primero busca coincidencia EXACTA (más rápido)
+    2. Si falla, busca con ILIKE (más flexible, encuentra "A 60907", " 60907", etc.)
     """
     total_expr = _sql_total_num_expr_general()
-    sql = f"""
+    
+    # SQL con coincidencia EXACTA (primera prueba)
+    sql_exacta = f"""
         SELECT
             TRIM("Nro. Comprobante") AS nro_factura,
             TRIM("Cliente / Proveedor") AS Proveedor,
             TRIM("Articulo") AS Articulo,
             "Fecha",
             "Cantidad",
-            "Precio Unitario",
             "Moneda",
             {total_expr} AS Total
         FROM chatbot_raw
         WHERE TRIM("Nro. Comprobante") = %s
           AND TRIM("Nro. Comprobante") <> 'A0000000'
           AND (
-            "Tipo Comprobante" = 'Compra Contado'
-            OR "Tipo Comprobante" ILIKE 'Compra%%'
-            OR "Tipo Comprobante" ILIKE 'Factura%%'
+            "Tipo Comprobante" ILIKE '%Compra%'
+            OR "Tipo Comprobante" ILIKE '%Factura%'
+          )
+        ORDER BY TRIM("Articulo")
+    """
+    
+    # SQL con ILIKE (búsqueda flexible - fallback)
+    sql_ilike = f"""
+        SELECT
+            TRIM("Nro. Comprobante") AS nro_factura,
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            TRIM("Articulo") AS Articulo,
+            "Fecha",
+            "Cantidad",
+            "Moneda",
+            {total_expr} AS Total
+        FROM chatbot_raw
+        WHERE "Nro. Comprobante" ILIKE %s
+          AND TRIM("Nro. Comprobante") <> 'A0000000'
+          AND (
+            "Tipo Comprobante" ILIKE '%Compra%'
+            OR "Tipo Comprobante" ILIKE '%Factura%'
           )
         ORDER BY TRIM("Articulo")
     """
 
+    # SQL final sin filtro de tipo (último recurso)
+    sql_ilike_sin_tipo = f"""
+        SELECT
+            TRIM("Nro. Comprobante") AS nro_factura,
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            TRIM("Articulo") AS Articulo,
+            "Fecha",
+            "Cantidad",
+            "Moneda",
+            {total_expr} AS Total
+        FROM chatbot_raw
+        WHERE "Nro. Comprobante" ILIKE %s
+          AND TRIM("Nro. Comprobante") <> 'A0000000'
+        ORDER BY TRIM("Articulo")
+    """
+
     variantes = _factura_variantes(nro_factura)
+    
+    # DEBUG: Imprimir variantes generadas
+    print(f"🔍 DEBUG FACTURA: Buscando '{nro_factura}'")
+    print(f"🔍 Variantes generadas: {variantes}")
+    
     if not variantes:
-        return ejecutar_consulta(sql, ("",))
+        print("❌ No se generaron variantes")
+        return pd.DataFrame()
 
-    df = ejecutar_consulta(sql, (variantes[0],))
-    if df is not None and not df.empty:
-        return df
+    # ===================================================
+    # FASE 1: BÚSQUEDA EXACTA
+    # ===================================================
+    for i, variante in enumerate(variantes, 1):
+        print(f"🔍 [EXACTA] Probando variante {i}: '{variante}'")
+        df = ejecutar_consulta(sql_exacta, (variante,))
+        if df is not None and not df.empty:
+            print(f"✅ [EXACTA] Encontrada con '{variante}' ({len(df)} líneas)")
+            return df
 
-    for alt in variantes[1:]:
-        df2 = ejecutar_consulta(sql, (alt,))
-        if df2 is not None and not df2.empty:
-            df2.attrs["nro_factura_fallback"] = alt
-            return df2
+    # ===================================================
+    # FASE 2: BÚSQUEDA FLEXIBLE CON ILIKE
+    # ===================================================
+    print(f"⚠️ No encontrada con búsqueda exacta. Probando con ILIKE...")
+    
+    for i, variante in enumerate(variantes, 1):
+        patron = f"%{variante}%"
+        print(f"🔍 [ILIKE] Probando variante {i}: '{patron}'")
+        df = ejecutar_consulta(sql_ilike, (patron,))
+        if df is not None and not df.empty:
+            print(f"✅ [ILIKE] Encontrada con '{patron}' ({len(df)} líneas)")
+            df.attrs["nro_factura_fallback"] = variante
+            return df
 
-    return df if df is not None else pd.DataFrame()
+    # ===================================================
+    # FASE 3: BÚSQUEDA ULTRA-FLEXIBLE (SOLO DÍGITOS)
+    # ===================================================
+    # Extraer solo dígitos del input
+    solo_digitos = ''.join(c for c in nro_factura if c.isdigit())
+    if solo_digitos and len(solo_digitos) >= 4:
+        patron_digitos = f"%{solo_digitos}%"
+        print(f"🔍 [ULTRA-FLEX] Probando solo dígitos: '{patron_digitos}'")
+        df = ejecutar_consulta(sql_ilike, (patron_digitos,))
+        if df is not None and not df.empty:
+            print(f"✅ [ULTRA-FLEX] Encontrada con '{patron_digitos}' ({len(df)} líneas)")
+            df.attrs["nro_factura_fallback"] = solo_digitos
+            return df
+
+
+    # ===================================================
+    # FASE 4: ÚLTIMO FALLBACK (SIN FILTRO DE TIPO COMPROBANTE)
+    # ===================================================
+    print(f"⚠️ No encontrada con filtros de tipo. Probando ILIKE sin filtrar Tipo Comprobante...")
+
+    patrones_finales = []
+    if solo_digitos and len(solo_digitos) >= 4:
+        patrones_finales.append(f"%{solo_digitos}%")
+    # Variante principal (la que vino en el input/primer variante)
+    patrones_finales.append(f"%{variantes[0]}%")
+
+    for patron in patrones_finales:
+        print(f"🔍 [SIN-TIPO] Probando: '{patron}'")
+        df = ejecutar_consulta(sql_ilike_sin_tipo, (patron,))
+        if df is not None and not df.empty:
+            print(f"✅ [SIN-TIPO] Encontrada con '{patron}' ({len(df)} líneas)")
+            df.attrs["nro_factura_fallback"] = patron.strip("%")
+            return df
+    print(f"❌ No encontrada con ninguna estrategia")
+    return pd.DataFrame()
 
 
 def get_total_factura_por_numero(nro_factura: str) -> dict:
@@ -230,9 +329,6 @@ def get_facturas_proveedor(
             where_parts.append('TRIM("Moneda") IN (\'U$S\', \'U$$\', \'USD\', \'US$\')')
         elif m in ("$", "PESOS", "UYU", "URU"):
             where_parts.append('TRIM("Moneda") = \'$\'')
-        else:
-            where_parts.append('UPPER(TRIM("Moneda")) LIKE %s')
-            params.append(f"%{m}%")
 
     # Tiempo (rango > meses > años)
     if desde and hasta:
@@ -627,6 +723,155 @@ def get_facturas_por_rango_monto(
 
 
 # =========================
-# WRAPPER – TOTAL FACTURAS POR MONEDA (TODOS LOS AÑOS)
+# BÚSQUEDA DE FACTURAS SIMILARES (DEBUG)
 # =========================
-from sql_compras import get_total_facturas_por_moneda_todos_anios
+
+def buscar_facturas_similares(patron: str, limite: int = 10) -> pd.DataFrame:
+    """
+    Busca facturas que contengan el patrón dado (útil para debug cuando no se encuentra una factura exacta)
+    """
+    total_expr = _sql_total_num_expr_general()
+    sql = f"""
+        SELECT 
+            TRIM("Nro. Comprobante") AS nro_factura,
+            TRIM("Cliente / Proveedor") AS Proveedor,
+            MIN("Fecha") AS Fecha,
+            COUNT(*) as Lineas,
+            SUM({total_expr}) AS Total
+        FROM chatbot_raw
+        WHERE TRIM("Nro. Comprobante") LIKE %s
+          AND TRIM("Nro. Comprobante") <> 'A0000000'
+          AND (
+            "Tipo Comprobante" = 'Compra Contado'
+            OR "Tipo Comprobante" ILIKE 'Compra%%'
+            OR "Tipo Comprobante" ILIKE 'Factura%%'
+          )
+        GROUP BY TRIM("Nro. Comprobante"), TRIM("Cliente / Proveedor")
+        ORDER BY TRIM("Nro. Comprobante")
+        LIMIT {limite}
+    """
+    
+    return ejecutar_consulta(sql, (f"%{patron}%",))
+
+
+# =====================================================================
+# QUERY FINAL PARA TOTAL FACTURAS POR AÑO
+# =====================================================================
+
+def get_total_facturas_por_moneda_todos_anios():
+    sql = """
+        SELECT
+            "Año" AS anio,
+            SUM(
+                CASE
+                    WHEN TRIM("Moneda") IN ('$', 'UYU', 'PESOS') THEN
+                        CASE
+                            WHEN LEFT(TRIM("Monto Neto"), 1) = '(' THEN
+                                -CAST(
+                                    REPLACE(
+                                        REPLACE(
+                                            REPLACE(
+                                                SUBSTRING(TRIM("Monto Neto"), 2, LENGTH(TRIM("Monto Neto")) - 2),
+                                                ' ', ''
+                                            ),
+                                            '.', ''
+                                        ),
+                                        ',', '.'
+                                    ) AS numeric
+                                )
+                            ELSE
+                                CAST(
+                                    REPLACE(
+                                        REPLACE(
+                                            REPLACE(TRIM("Monto Neto"), ' ', ''),
+                                            '.', ''
+                                        ),
+                                        ',', '.'
+                                    ) AS numeric
+                                )
+                        END
+                    ELSE 0
+                END
+            ) AS total_pesos,
+            SUM(
+                CASE
+                    WHEN TRIM("Moneda") IN ('USD', 'US$', 'U$S', 'U$$') THEN
+                        CASE
+                            WHEN LEFT(TRIM("Monto Neto"), 1) = '(' THEN
+                                -CAST(
+                                    REPLACE(
+                                        REPLACE(
+                                            REPLACE(
+                                                SUBSTRING(TRIM("Monto Neto"), 2, LENGTH(TRIM("Monto Neto")) - 2),
+                                                ' ', ''
+                                            ),
+                                            '.', ''
+                                        ),
+                                        ',', '.'
+                                    ) AS numeric
+                                )
+                            ELSE
+                                CAST(
+                                    REPLACE(
+                                        REPLACE(
+                                            REPLACE(TRIM("Monto Neto"), ' ', ''),
+                                            '.', ''
+                                        ),
+                                        ',', '.'
+                                    ) AS numeric
+                                )
+                        END
+                    ELSE 0
+                END
+            ) AS total_usd,
+            COUNT(*) AS registros
+        FROM chatbot_raw
+        WHERE "Año" IS NOT NULL
+        GROUP BY "Año"
+        ORDER BY "Año";
+    """
+    return ejecutar_consulta(sql)
+
+
+# =====================================================================
+# NUEVA FUNCIÓN: TOTAL FACTURAS POR MONEDA GENÉRICO
+# =====================================================================
+
+def get_total_facturas_por_moneda_generico():
+    print("🔥 get_total_facturas_por_moneda_generico EJECUTADA")
+    sql = """
+    SELECT
+        TRIM("Moneda") AS moneda,
+        COUNT(*) AS registros,
+        SUM(
+            CASE
+                WHEN TRIM("Monto Neto") LIKE '(%'
+                THEN
+                    -1 * CAST(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(TRIM("Monto Neto"), '(', ''),
+                                ')', ''),
+                            '.', ''),
+                        ',', '.'
+                        ) AS numeric
+                    )
+                ELSE
+                    CAST(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(TRIM("Monto Neto"), '.', ''),
+                            ',', '.'),
+                        ' ', ''
+                        ) AS numeric
+                    )
+            END
+        ) AS total
+    FROM chatbot_raw
+    WHERE TRIM("Moneda") IS NOT NULL
+      AND TRIM("Moneda") <> ''
+    GROUP BY TRIM("Moneda")
+    ORDER BY moneda;
+    """
+    return ejecutar_consulta(sql)
