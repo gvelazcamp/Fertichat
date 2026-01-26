@@ -2385,10 +2385,22 @@ def Compras_IA():
         st.session_state["art_multi"] = []
 
     # Fetch opciones dinámicas - TODOS sin límite
-    prov_options = get_unique_proveedores()  # ✅ Sin límite
-    print(f"🐛 Proveedores disponibles: {len(prov_options)}")  # Debug
+    try:
+        prov_options = get_unique_proveedores()  # ✅ Sin límite
+        if not prov_options:
+            prov_options = []
+        print(f"🐛 Proveedores disponibles: {len(prov_options)}")  # Debug
+    except Exception as e:
+        print(f"❌ Error obteniendo proveedores: {e}")
+        prov_options = []
 
-    art_options = get_unique_articulos()  # ✅ CAMBIO: TODOS LOS ARTÍCULOS (sin [:100])
+    try:
+        art_options = get_unique_articulos()  # ✅ CAMBIO: TODOS LOS ARTÍCULOS (sin [:100])
+        if not art_options:
+            art_options = []
+    except Exception as e:
+        print(f"❌ Error obteniendo artículos: {e}")
+        art_options = []
 
     # TABS PRINCIPALES: Chat IA + Comparativas
     tab_chat, tab_comparativas = st.tabs(["💬 Compras", "🔄 Comparativas"])
@@ -2606,11 +2618,12 @@ Escribí lo que necesites 👇
         st.rerun()
 
     with tab_comparativas:
-        st.markdown("### Menú Comparativas Fáciles")
-        st.markdown("Selecciona opciones y compara proveedores/meses/años directamente (sin chat).")
+        try:
+            st.markdown("### Menú Comparativas Fáciles")
+            st.markdown("Selecciona opciones y compara proveedores/meses/años directamente (sin chat).")
 
-        # Agregado: Submenús Compras y Comparativas
-        tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=1, key="tipo_consulta")
+            # Agregado: Submenús Compras y Comparativas
+            tipo_consulta = st.selectbox("Tipo de consulta", options=["Compras", "Comparativas"], index=1, key="tipo_consulta")
 
         if tipo_consulta == "Compras":
             st.markdown("#### 🛒 Consultas de Compras")
@@ -2819,6 +2832,11 @@ Escribí lo que necesites 👇
                     df_guardado,
                     titulo=titulo_guardado
                 )
+        
+        except Exception as e:
+            st.error(f"❌ Error en tab Comparativas: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
         # ✅ AUTOREFRESH CONDICIONAL: SOLO SI NO ESTÁ PAUSADO
         if not st.session_state.get("pause_autorefresh", False):
